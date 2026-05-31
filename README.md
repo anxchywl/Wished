@@ -2,7 +2,7 @@
 
 **Wished** is a Telegram Mini App for social wishlists and gift coordination. Create wishlists, share them with friends, and let people reserve or chip in on gifts — without spoiling surprises.
 
-Built with Next.js, FastAPI, PostgreSQL, and the Telegram Mini Apps SDK.
+Built with Next.js, FastAPI, PostgreSQL, Redis, and the Telegram Mini Apps SDK.
 
 ---
 
