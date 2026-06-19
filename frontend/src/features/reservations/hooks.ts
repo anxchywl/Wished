@@ -18,11 +18,12 @@ export const reservationQueryKeys = {
  */
 export function useReservationStatusQuery(wishId: string) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
     queryKey: reservationQueryKeys.status(wishId),
     queryFn: () => getReservationStatus(accessToken ?? "", wishId),
-    enabled: Boolean(accessToken && wishId),
+    enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
     staleTime: 15 * 1000,
   });
 }

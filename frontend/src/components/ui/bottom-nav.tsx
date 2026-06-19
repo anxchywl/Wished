@@ -92,7 +92,10 @@ export function BottomNav() {
   return (
     <nav ref={navRef} className="bottom-nav" aria-label="main navigation">
       {tabs.map((tab) => {
-        const isActive = pathname === tab.href || pathname.startsWith(tab.href + "/");
+        const isActive =
+          pathname === tab.href ||
+          pathname.startsWith(tab.href + "/") ||
+          (tab.href === "/wishlists" && pathname === "/");
         return (
           <Link
             key={tab.href}

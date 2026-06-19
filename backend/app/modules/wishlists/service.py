@@ -30,11 +30,18 @@ async def list_user_wishlists(
     db: AsyncSession,
     current_user: User,
     username: str,
+    allow_profile_access: bool = False,
 ) -> WishlistListResponse:
     """list visible user wishlists"""
     user_result = await db.execute(select(User).where(User.username.ilike(username.strip().removeprefix("@"))))
     owner = user_result.scalar_one_or_none()
     if owner is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if (
+        owner.id != current_user.id
+        and owner.profile_visibility != "public"
+        and not allow_profile_access
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     conditions = [Wishlist.owner_user_id == owner.id]

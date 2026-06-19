@@ -1,86 +1,127 @@
 "use client";
 
-import { useState } from "react";
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
-import { useSearchUsersQuery } from "@/features/users/hooks";
 import { PublicWishlistNavigator } from "@/features/users/public-wishlist-navigator";
 import { UserAvatar } from "@/features/users/user-avatar";
-import type { UserSearchResponse } from "@/features/users/api";
-import { normalizeTextInput } from "@/lib/forms/input-normalize";
+import { useFollowingQuery } from "@/features/users/hooks";
 import { useTranslation } from "@/lib/i18n/useTranslation";
-import { useAuthStore } from "@/stores/auth-store";
+import { logStartup } from "@/lib/debug/startup-log";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
+import { useRouter, useSearchParams } from "next/navigation";
+
+type TelegramWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      close?: () => void;
+      openTelegramLink?: (url: string) => void;
+    };
+  };
+};
 
 /**
- * discover user profiles
+ * discover telegram contacts
  */
 export function UserDiscoveryManager() {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedUser, setSelectedUser] = useState<UserSearchResponse | null>(null);
+  const authStatus = useAuthStore((state) => state.authStatus);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedUsername = searchParams.get("profile");
+  const profileToken = searchParams.get("profile_token");
+  const followingQuery = useFollowingQuery();
+  const followedUsers = followingQuery.data?.items ?? [];
   const { t } = useTranslation();
 
-  const searchResults = useSearchUsersQuery(searchQuery);
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
+
+  logStartup("route guard decision", authStatus, {
+    component: "UserDiscoveryManager",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
 
   return (
     <>
-      <main className="content flex flex-col gap-4">
-        {!accessToken ? (
+      <main className="content discover-content">
+        {guardDecision === "startup" ? (
+          <AuthRequiredPanel forcePending />
+        ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
-        ) : (
-          <div className="panel flex flex-col gap-2">
-            <label className="text-sm font-semibold mb-1" htmlFor="search-user">
-              {t("findProfiles")}
-            </label>
-            <input
-              className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              id="search-user"
-              onChange={(event) => setSearchQuery(normalizeTextInput(event.target.value, 100))}
-              placeholder={t("enterUsernamePlaceholder")}
-              value={searchQuery}
-            />
-
-            {searchQuery.trim().length > 0 && (
-              <div className="flex flex-col gap-2 mt-2 border-t border-border/50 pt-2">
-                {searchResults.isLoading && <p className="text-xs text-muted">{t("searching")}</p>}
-                {searchResults.isLoading === false && (searchResults.data?.length ?? 0) === 0 && (
-                  <p className="text-xs text-muted">{t("noUsersFound")}</p>
-                )}
-                <div className="flex flex-col gap-2">
-                  {(searchResults.data ?? []).map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className={`flex justify-between items-center border-b border-border/50 pb-2 last:border-0 text-left ${user.username ? "" : "pointer-events-none opacity-60"}`}
-                      onClick={() => setSelectedUser(user)}
-                      disabled={!user.username}
-                    >
-                      <div className="flex items-center gap-3">
-                        <UserAvatar user={user} />
-                        <div>
-                          <p className="text-sm font-medium">{user.first_name} {user.last_name || ""}</p>
-                          {user.username ? (
-                            <p className="text-xs text-primary">@{user.username}</p>
-                          ) : (
-                            <p className="text-xs text-muted">{t("noUsername")}</p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs font-semibold text-primary">{t("viewProfile")}</span>
-                    </button>
-                  ))}
-                </div>
+        ) : (followingQuery.isLoading || followedUsers.length > 0) ? (
+            <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start">
+              <div className="discover-following">
+                {followingQuery.isLoading ? (
+                  <div className="public-skeleton h-14 w-full rounded-xl" />
+                ) : null}
+                {followedUsers.map((user) => (
+                  <button
+                    key={user.username}
+                    type="button"
+                    className="discover-following-row pressable-action"
+                    onClick={() => {
+                      if (user.username) router.replace(`/users?profile=${encodeURIComponent(user.username)}`);
+                    }}
+                    disabled={!user.username}
+                  >
+                    <UserAvatar user={user} />
+                    <span>{user.first_name || user.username}</span>
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+              <button
+                type="button"
+                className="pressable-action flex items-center justify-center gap-2 py-3 px-4 w-full text-primary font-semibold text-sm cursor-pointer border-t border-border"
+                onClick={openTelegramFriendPicker}
+              >
+                <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>{t("followNew")}</span>
+              </button>
+            </div>
+          ) : (
+            <section className="discover-launch">
+              <h2>{t("findTelegramFriends")}</h2>
+              <button type="button" className="discover-launch-button" onClick={openTelegramFriendPicker}>
+                <span>{t("chooseTelegramUsers")}</span>
+              </button>
+            </section>
+          )}
       </main>
 
       <PublicWishlistNavigator
-        open={Boolean(selectedUser?.username)}
-        username={selectedUser?.username ?? null}
-        initialUser={selectedUser}
-        onClose={() => setSelectedUser(null)}
+        open={Boolean(selectedUsername)}
+        username={selectedUsername}
+        profileToken={profileToken}
+        onClose={() => router.replace("/users")}
       />
     </>
   );
+}
+
+/**
+ * open bot contact picker
+ */
+function openTelegramFriendPicker() {
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
+  if (!botUsername) return;
+
+  const botUrl = `https://t.me/${botUsername}`;
+  const webApp = (window as TelegramWindow).Telegram?.WebApp;
+
+  try {
+    (webApp as { HapticFeedback?: { impactOccurred?: (style: string) => void } })?.HapticFeedback?.impactOccurred?.("medium");
+  } catch {}
+
+  if (webApp?.openTelegramLink) {
+    webApp.openTelegramLink(botUrl);
+    window.setTimeout(() => webApp.close?.(), 450);
+    return;
+  }
+
+  window.location.assign(botUrl);
 }

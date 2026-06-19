@@ -22,16 +22,16 @@ import { useAuthStore } from "@/stores/auth-store";
 /**
  * load wishlists
  */
-export function useWishlistsQuery(options?: { refetchInterval?: number | false }) {
+export function useWishlistsQuery() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const tgUserId = useAuthStore((state) => state.tgUserId);
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
     queryKey: wishlistQueryKeys.all(tgUserId),
     queryFn: () => listWishlists(accessToken ?? ""),
-    enabled: Boolean(accessToken),
-    staleTime: 0,
-    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 2000,
+    enabled: Boolean(authStatus === "authenticated" && accessToken),
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -41,33 +41,33 @@ export function useWishlistsQuery(options?: { refetchInterval?: number | false }
 export function useWishlistQuery(wishlistId: string) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const tgUserId = useAuthStore((state) => state.tgUserId);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: [...wishlistQueryKeys.detail(wishlistId), accessToken] as const,
     queryFn: () => getWishlist(accessToken ?? "", wishlistId),
-    enabled: Boolean(accessToken && wishlistId),
+    enabled: Boolean(authStatus === "authenticated" && accessToken && wishlistId),
     initialData: () =>
       queryClient
         .getQueryData<WishlistListResponse>(wishlistQueryKeys.all(tgUserId))
         ?.items.find((wishlist) => wishlist.id === wishlistId),
-    staleTime: 0,
-    refetchInterval: 2000,
+    staleTime: 2 * 60 * 1000,
   });
 }
 
 /**
  * load user wishlists
  */
-export function useUserWishlistsQuery(username: string) {
+export function useUserWishlistsQuery(username: string, profileToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
-    queryKey: [...wishlistQueryKeys.user(username), accessToken] as const,
-    queryFn: () => listUserWishlists(accessToken ?? "", username),
-    enabled: Boolean(accessToken && username),
-    staleTime: 0,
-    refetchInterval: 2000,
+    queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
+    queryFn: () => listUserWishlists(accessToken ?? "", username, profileToken),
+    enabled: Boolean(authStatus === "authenticated" && accessToken && username),
+    staleTime: 2 * 60 * 1000,
   });
 }
 

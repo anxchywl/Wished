@@ -9,9 +9,12 @@ class WishImageResponse(BaseModel):
     id: UUID
     wish_id: UUID
     url: str
+    thumbnail_url: str | None
+    medium_url: str | None
     file_name: str
     content_type: str
     size_bytes: int
+    status: str
     created_at: datetime
 
 

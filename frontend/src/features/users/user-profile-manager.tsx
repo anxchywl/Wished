@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { PublicWishlistNavigator } from "@/features/users/public-wishlist-navigator";
-import { useAuthStore } from "@/stores/auth-store";
+import { logStartup } from "@/lib/debug/startup-log";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 
 type UserProfileManagerProps = {
   username: string;
@@ -16,8 +17,20 @@ type UserProfileManagerProps = {
  */
 export function UserProfileManager({ username }: UserProfileManagerProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const [open, setOpen] = useState(true);
   const router = useRouter();
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
+
+  logStartup("route guard decision", authStatus, {
+    component: "UserProfileManager",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
 
   function handleClose() {
     setOpen(false);
@@ -27,7 +40,9 @@ export function UserProfileManager({ username }: UserProfileManagerProps) {
   return (
     <>
       <main className="content flex flex-col gap-4">
-        {!accessToken ? (
+        {guardDecision === "startup" ? (
+          <AuthRequiredPanel forcePending />
+        ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
         ) : null}
       </main>

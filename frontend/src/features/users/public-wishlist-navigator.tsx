@@ -8,7 +8,7 @@ import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCancelReservationMutation, useCreateReservationMutation } from "@/features/reservations/hooks";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, type UserProfileResponse } from "@/features/users/api";
-import { userQueryKeys, useUserProfileQuery } from "@/features/users/hooks";
+import { userQueryKeys, useFollowMutation, useUserProfileQuery } from "@/features/users/hooks";
 import { getWishlist, listUserWishlists } from "@/features/wishlists/api";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
 import type { Wishlist } from "@/features/wishlists/types";
@@ -20,11 +20,13 @@ import { wishQueryKeys } from "@/features/wishes/query-keys";
 import type { Wish } from "@/features/wishes/types";
 import { useWishlistsQuery, useUserWishlistsQuery, useWishlistQuery } from "@/features/wishlists/hooks";
 import { useTranslation } from "@/lib/i18n/useTranslation";
-import { useAuthStore } from "@/stores/auth-store";
+import { logStartup } from "@/lib/debug/startup-log";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 
 type PublicWishlistNavigatorProps = {
   open: boolean;
   username: string | null;
+  profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
   onClose: () => void;
 };
@@ -43,8 +45,9 @@ type NavigationDirection = "forward" | "back";
 /**
  * navigate public wishlists
  */
-export function PublicWishlistNavigator({ open, username, initialUser, onClose }: PublicWishlistNavigatorProps) {
+export function PublicWishlistNavigator({ open, username, profileToken, initialUser, onClose }: PublicWishlistNavigatorProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const [active, setActive] = useState(false);
   const [stack, setStack] = useState<NavigationFrame[]>([{ view: "user" }]);
   const [direction, setDirection] = useState<NavigationDirection>("forward");
@@ -64,6 +67,17 @@ export function PublicWishlistNavigator({ open, username, initialUser, onClose }
   if (!open || !username) return null;
 
   const activeUsername = username.trim().replace(/^@/, "");
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
+
+  logStartup("route guard decision", authStatus, {
+    component: "PublicWishlistNavigator",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
 
   function handleBack() {
     if (stack.length === 1) {
@@ -102,6 +116,7 @@ export function PublicWishlistNavigator({ open, username, initialUser, onClose }
       return (
         <PublicUserView
           username={activeUsername}
+          profileToken={profileToken}
           initialUser={initialUser}
           onOpenWishlist={handleWishlistOpen}
         />
@@ -158,14 +173,20 @@ export function PublicWishlistNavigator({ open, username, initialUser, onClose }
         </div>
 
         <div className="public-nav-viewport">
-          {!accessToken ? (
+          {guardDecision === "startup" ? (
+            <div className="public-nav-frame">
+              <div className="public-nav-content">
+                <AuthRequiredPanel forcePending />
+              </div>
+            </div>
+          ) : guardDecision === "auth_required" ? (
             <div className="public-nav-frame">
               <div className="public-nav-content">
                 <AuthRequiredPanel />
               </div>
             </div>
           ) : null}
-          {accessToken ? (
+          {guardDecision === "app" && accessToken ? (
             <>
           {previousFrame ? (
             <div
@@ -192,6 +213,7 @@ export function PublicWishlistNavigator({ open, username, initialUser, onClose }
 
 type PublicUserViewProps = {
   username: string;
+  profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
   onOpenWishlist: (wishlistId: string, title?: string) => void;
 };
@@ -199,27 +221,28 @@ type PublicUserViewProps = {
 /**
  * show public profile
  */
-function PublicUserView({ username, initialUser, onOpenWishlist }: PublicUserViewProps) {
+function PublicUserView({ username, profileToken, initialUser, onOpenWishlist }: PublicUserViewProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
-  const profileQuery = useUserProfileQuery(username);
-  const wishlistsQuery = useUserWishlistsQuery(username);
+  const profileQuery = useUserProfileQuery(username, profileToken);
+  const wishlistsQuery = useUserWishlistsQuery(username, profileToken);
   const profile = profileQuery.data ?? initialUser;
+  const followMutation = useFollowMutation(username, profileToken);
   const wishlists = wishlistsQuery.data?.items ?? [];
   const { t } = useTranslation();
 
   useEffect(() => {
     if (!accessToken || !username) return;
     queryClient.prefetchQuery({
-      queryKey: [...userQueryKeys.profile(username), accessToken] as const,
-      queryFn: () => getUserProfile(accessToken, username),
+      queryKey: [...userQueryKeys.profile(username), accessToken, profileToken] as const,
+      queryFn: () => getUserProfile(accessToken, username, profileToken),
       staleTime: 30 * 1000,
     });
     queryClient.prefetchQuery({
-      queryKey: [...wishlistQueryKeys.user(username), accessToken] as const,
-      queryFn: () => listUserWishlists(accessToken, username),
+      queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
+      queryFn: () => listUserWishlists(accessToken, username, profileToken),
     });
-  }, [accessToken, queryClient, username]);
+  }, [accessToken, profileToken, queryClient, username]);
 
   function handleWishlistHover(wishlistId: string) {
     if (!accessToken) return;
@@ -275,12 +298,28 @@ function PublicUserView({ username, initialUser, onOpenWishlist }: PublicUserVie
               ) : null}
             </div>
           </div>
-          {profile.birthday ? (
-            <div className="text-right flex-shrink-0">
-              <span className="block text-[9px] font-extrabold text-muted uppercase tracking-wider">{t("birthday") ?? "Birthday"}</span>
-              <span className="block text-xs font-semibold text-foreground mt-0.5">{formatBirthday(profile.birthday)}</span>
-            </div>
-          ) : null}
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            {!profile.is_self && profile.username ? (
+              <button
+                type="button"
+                className={`h-9 px-4 rounded-xl text-xs font-extrabold transition-all active:scale-[0.98] ${
+                  profile.is_following
+                    ? "border border-border bg-background text-primary"
+                    : "bg-primary text-white"
+                }`}
+                disabled={followMutation.isPending}
+                onClick={() => followMutation.mutate(!profile.is_following)}
+              >
+                {profile.is_following ? t("following") : t("follow")}
+              </button>
+            ) : null}
+            {profile.birthday ? (
+              <div className="text-right">
+                <span className="block text-[9px] font-extrabold text-muted uppercase tracking-wider">{t("birthday") ?? "Birthday"}</span>
+                <span className="block text-xs font-semibold text-foreground mt-0.5">{formatBirthday(profile.birthday)}</span>
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -636,9 +675,7 @@ function PublicCopyView({ wishlistId, wishId, onCopySuccess }: PublicCopyViewPro
                 }}
               >
                 <span className="text-sm font-semibold text-foreground line-clamp-1">{wl.title}</span>
-                <span className="text-xs font-semibold text-primary shrink-0 ml-4">
-                  {copyWishMutation.isPending ? t("copying") : t("copy")}
-                </span>
+                {copyWishMutation.isPending ? <span className="auth-loading-spinner copy-row-spinner shrink-0 ml-4" /> : null}
               </button>
             ))}
           </div>

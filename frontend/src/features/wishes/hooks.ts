@@ -25,15 +25,15 @@ import { useAuthStore } from "@/stores/auth-store";
 /**
  * load wishes
  */
-export function useWishesQuery(wishlistId: string, options?: { refetchInterval?: number | false }) {
+export function useWishesQuery(wishlistId: string) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
     queryKey: wishQueryKeys.list(wishlistId),
     queryFn: () => listWishes(accessToken ?? "", wishlistId),
-    enabled: Boolean(accessToken && wishlistId),
-    staleTime: 0,
-    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 2000,
+    enabled: Boolean(authStatus === "authenticated" && accessToken && wishlistId),
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -229,9 +229,12 @@ export function useUploadWishImageMutation(wishlistId: string) {
                       id: `preview-${timestamp}`,
                       wish_id: wishId,
                       url: previewUrl,
+                      thumbnail_url: previewUrl,
+                      medium_url: previewUrl,
                       file_name: "preview",
                       content_type: "image/jpeg",
                       size_bytes: 0,
+                      status: "ready",
                       created_at: timestamp,
                     },
                     ...item.images.filter((image) => !image.id.startsWith("preview-")),

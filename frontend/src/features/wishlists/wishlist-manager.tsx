@@ -31,8 +31,9 @@ import {
 import { CreateWishlistModal } from "@/features/wishlists/create-wishlist-modal";
 import { formatWishlistDescription } from "@/features/wishlists/utils";
 import type { Wishlist, WishlistVisibility } from "@/features/wishlists/types";
-import { useAuthStore } from "@/stores/auth-store";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { logStartup } from "@/lib/debug/startup-log";
 import { finalizeTextInput } from "@/lib/forms/input-normalize";
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { getWishlist } from "@/features/wishlists/api";
@@ -46,6 +47,7 @@ import { useWishesQuery } from "@/features/wishes/hooks";
  */
 export function WishlistManager() {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const { t } = useTranslation();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,7 +56,7 @@ export function WishlistManager() {
   const isDragging = activeWishlist !== null;
   const isReordering = useIsMutating({ mutationKey: ["reorderWishlists"] }) > 0;
 
-  const wishlistsQuery = useWishlistsQuery({ refetchInterval: (isDragging || isReordering) ? false : 2000 });
+  const wishlistsQuery = useWishlistsQuery();
   const createMutation = useCreateWishlistMutation();
   const reorderMutation = useReorderWishlistsMutation();
 
@@ -107,6 +109,41 @@ export function WishlistManager() {
 
   const wishlists = useMemo(() => wishlistsQuery.data?.items ?? [], [wishlistsQuery.data?.items]);
 
+  const resolvedOrderIds = useMemo(() => {
+    if (wishlistOrderIds.length === 0) {
+      return wishlists.map((wishlist) => wishlist.id);
+    }
+    return wishlistOrderIds;
+  }, [wishlists, wishlistOrderIds]);
+
+  // Derive ordered wishlists
+  const orderedWishlists = useMemo(() => {
+    const map = new Map(wishlists.map((w) => [w.id, w]));
+    return resolvedOrderIds.map((id) => map.get(id)).filter((w): w is Wishlist => w !== undefined);
+  }, [wishlists, resolvedOrderIds]);
+
+  const hasWishlists = wishlists.length > 0;
+  const showWishlistsLoading =
+    wishlistsQuery.isPending ||
+    (wishlistsQuery.isLoading && !hasWishlists) ||
+    (wishlistsQuery.isFetching && !hasWishlists);
+  const showWishlistsEmpty =
+    wishlistsQuery.isFetched &&
+    !wishlistsQuery.isError &&
+    !showWishlistsLoading &&
+    !hasWishlists;
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
+
+  logStartup("route guard decision", authStatus, {
+    component: "WishlistManager",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
+
   useEffect(() => {
     if (activeWishlist || reorderMutation.isPending || isReordering) return;
     const wishlistIds = wishlists.map((wishlist) => wishlist.id);
@@ -117,12 +154,6 @@ export function WishlistManager() {
       return wishlistIds;
     });
   }, [wishlists, reorderMutation.isPending, isReordering, activeWishlist]);
-
-  // Derive ordered wishlists
-  const orderedWishlists = useMemo(() => {
-    const map = new Map(wishlists.map((w) => [w.id, w]));
-    return wishlistOrderIds.map((id) => map.get(id)).filter((w): w is Wishlist => w !== undefined);
-  }, [wishlists, wishlistOrderIds]);
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event;
@@ -136,9 +167,10 @@ export function WishlistManager() {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = wishlistOrderIds.indexOf(active.id as string);
-      const newIndex = wishlistOrderIds.indexOf(over.id as string);
-      const newOrder = arrayMove(wishlistOrderIds, oldIndex, newIndex);
+      const currentOrder = wishlistOrderIds.length > 0 ? wishlistOrderIds : resolvedOrderIds;
+      const oldIndex = currentOrder.indexOf(active.id as string);
+      const newIndex = currentOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
 
       setWishlistOrderIds(newOrder);
 
@@ -161,7 +193,9 @@ export function WishlistManager() {
   return (
     <>
       <main className="content flex flex-col gap-4">
-        {!accessToken ? (
+        {guardDecision === "startup" ? (
+          <AuthRequiredPanel forcePending />
+        ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
         ) : (
           <>
@@ -169,7 +203,7 @@ export function WishlistManager() {
               <p className="text-sm text-destructive text-center py-4">{t("unableToLoadWishlists")}</p>
             )}
 
-            {wishlistsQuery.isPending || wishlistsQuery.isLoading || (wishlistsQuery.isFetching && orderedWishlists.length === 0) ? (
+            {showWishlistsLoading ? (
               <div className="panel flex flex-col gap-3 p-4">
                 <div className="public-skeleton h-16 w-full rounded-xl" />
                 <div className="public-skeleton h-16 w-full rounded-xl" />
@@ -177,7 +211,7 @@ export function WishlistManager() {
               </div>
             ) : null}
 
-            {!wishlistsQuery.isPending && !wishlistsQuery.isLoading && !wishlistsQuery.isFetching && !wishlistsQuery.isError && orderedWishlists.length === 0 ? (
+            {showWishlistsEmpty ? (
               <div className="panel empty-state-panel flex flex-col items-center justify-center text-center p-6 gap-4">
                 <p className="empty-state-desc text-sm text-muted">{t("noWishlistsDesc") ?? "Create your first wishlist to get started"}</p>
                 <button
@@ -192,7 +226,7 @@ export function WishlistManager() {
               </div>
             ) : null}
 
-            {!wishlistsQuery.isPending && !wishlistsQuery.isLoading && orderedWishlists.length > 0 ? (
+            {hasWishlists ? (
               <div className="panel flex flex-col p-0 overflow-hidden bg-background" style={{ padding: 0 }}>
                 <DndContext
                   sensors={sensors}
@@ -203,7 +237,7 @@ export function WishlistManager() {
                 >
                   <div className="divide-y divide-border">
                     <SortableContext
-                      items={wishlistOrderIds}
+                      items={resolvedOrderIds}
                       strategy={verticalListSortingStrategy}
                     >
                       {orderedWishlists.map((wishlist) => (

@@ -10,7 +10,6 @@ import {
   mountBackButton,
   offBackButtonClick,
   onBackButtonClick,
-  retrieveLaunchParams,
   showBackButton,
 } from "@telegram-apps/sdk-react";
 
@@ -20,14 +19,16 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 
 import { useTelegramLoginMutation } from "@/features/auth";
-import { useProfileQuery } from "@/features/profile";
-import { useWishlistsQuery } from "@/features/wishlists/hooks";
 import { listWishes } from "@/features/wishes/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
-import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { useWishlistsQuery } from "@/features/wishlists/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
 import { BottomNav } from "@/components/ui/bottom-nav";
+import { logStartup } from "@/lib/debug/startup-log";
+import { isAuthPending } from "@/stores/auth-store";
+import { clearPersistedCache } from "@/lib/query/cache-persister";
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -40,32 +41,54 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useTranslation();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setAuthStatus = useAuthStore((state) => state.setAuthStatus);
   const setAppReady = useAuthStore((state) => state.setAppReady);
   const tgUserId = useAuthStore((state) => state.tgUserId);
   const setTgUserId = useAuthStore((state) => state.setTgUserId);
   const clearAuth = useAuthStore((state) => state.clearAuth);
 
-  const { initDataRaw, isReady } = useTelegram();
+  const { initDataRaw, isReady, error: telegramError } = useTelegram();
   const loginMutation = useTelegramLoginMutation();
-  const profileQuery = useProfileQuery(accessToken);
   const wishlistsQuery = useWishlistsQuery();
   const queryClient = useQueryClient();
+  const [gateExpired, setGateExpired] = useState(false);
 
   const loginMutationRef = useRef(loginMutation);
   loginMutationRef.current = loginMutation;
 
+  // Safety valve: never block the app forever if auth hangs
   useEffect(() => {
-    if (!isReady) return;
+    const id = setTimeout(() => setGateExpired(true), 10_000);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    let currentTgUserId: number | null = null;
-    try {
-      const lp = retrieveLaunchParams();
-      currentTgUserId = lp.initData?.user?.id ?? null;
-    } catch {}
+  useEffect(() => {
+    logStartup("app mounted", authStatus, {
+      hasAccessToken: Boolean(accessToken),
+      hasInitDataRaw: Boolean(initDataRaw),
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // if account changed, clear token and reset mutation
+  useEffect(() => {
+    if (!isReady) {
+      // warm start: already have a token, keep authStatus and queries enabled
+      if (!accessToken) setAuthStatus("waiting_for_telegram");
+      return;
+    }
+
+    if (initDataRaw && authStatus === "waiting_for_telegram") {
+      setAuthStatus("telegram_ready");
+    }
+
+    const currentTgUserId = getTelegramUserId(initDataRaw);
+
+    // if account changed, clear token, query cache, and persisted cache
     if (currentTgUserId && tgUserId && currentTgUserId !== tgUserId) {
+      clearPersistedCache();
       queryClient.clear();
       clearAuth();
       setTgUserId(currentTgUserId);
@@ -78,6 +101,16 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       setTgUserId(currentTgUserId);
     }
 
+    if (initDataRaw && !hasTelegramInitDataHash(initDataRaw) && !accessToken) {
+      logStartup("login request skipped", "error", {
+        reason: "missing init data hash",
+      });
+      if (authStatus !== "error") {
+        setAuthStatus("error");
+      }
+      return;
+    }
+
     if (
       initDataRaw &&
       !accessToken &&
@@ -85,14 +118,32 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       !loginMutationRef.current.isError &&
       !loginMutationRef.current.isSuccess
     ) {
+      logStartup("login request starts", authStatus, {
+        hasInitDataRaw: true,
+      });
+      setAuthStatus("authenticating");
       loginMutationRef.current.mutate(initDataRaw, {
         onSuccess: (data) => {
+          logStartup("login request succeeds", "authenticated", {
+            telegramId: data.user.telegram_id,
+          });
           setAccessToken(data.access_token);
+          setTgUserId(data.user.telegram_id);
+        },
+        onError: (err) => {
+          logStartup("login request fails", "error", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          setAuthStatus("error");
         },
       });
+    } else if (!initDataRaw && !accessToken && !loginMutationRef.current.isPending) {
+      setAuthStatus(telegramError ? "error" : "unauthenticated");
+    } else if (accessToken && authStatus !== "authenticated") {
+      setAuthStatus("authenticated");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, initDataRaw, accessToken, tgUserId]);
+  }, [isReady, initDataRaw, accessToken, tgUserId, telegramError, authStatus]);
 
   useEffect(() => {
     if (!accessToken && loginMutation.isSuccess) {
@@ -101,12 +152,12 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }, [accessToken, loginMutation]);
 
   useEffect(() => {
-    if (accessToken && !profileQuery.isLoading && !wishlistsQuery.isLoading) {
+    if (accessToken && !wishlistsQuery.isLoading) {
       setAppReady(true);
     } else if (!accessToken) {
       setAppReady(false);
     }
-  }, [accessToken, profileQuery.isLoading, wishlistsQuery.isLoading, setAppReady]);
+  }, [accessToken, wishlistsQuery.isLoading, setAppReady]);
 
   const [initialWishesLoaded, setInitialWishesLoaded] = useState(false);
 
@@ -134,13 +185,14 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     }
   }, [accessToken, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
 
+  // Gate holds until auth is resolved or 10s hard timeout.
+  // accessToken arrives when Zustand persist hydrates (< 1 frame after mount),
+  // so warm starts lift the gate immediately without waiting for Telegram SDK.
   const isLoading =
-    !isReady ||
-    loginMutationRef.current.isPending ||
-    (accessToken &&
-      (profileQuery.isLoading ||
-        wishlistsQuery.isLoading ||
-        !initialWishesLoaded));
+    !gateExpired &&
+    ((!isReady && !accessToken) ||
+      (isAuthPending(authStatus) && !accessToken) ||
+      loginMutationRef.current.isPending);
 
   if (isLoading) {
     return (
@@ -151,6 +203,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }
 
   const isMainRoute =
+    pathname === "/" ||
     pathname === "/wishlists" ||
     pathname === "/users" ||
     (pathname.startsWith("/users/") && pathname.split("/").length === 3);
@@ -162,7 +215,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   let title = "";
   let hideProfile = false;
 
-  if (pathname === "/wishlists") {
+  if (pathname === "/wishlists" || pathname === "/") {
     title = t("wishlists");
   } else if (pathname === "/users") {
     title = t("discover");
@@ -178,6 +231,31 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       <BottomNav />
     </div>
   );
+}
+
+/**
+ * check init data hash
+ */
+function hasTelegramInitDataHash(initDataRaw: string) {
+  return new URLSearchParams(initDataRaw).has("hash");
+}
+
+function getTelegramUserId(initDataRaw: string | null): number | null {
+  if (!initDataRaw) {
+    return null;
+  }
+
+  const user = new URLSearchParams(initDataRaw).get("user");
+  if (!user) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(user) as { id?: unknown };
+    return typeof parsed.id === "number" ? parsed.id : null;
+  } catch {
+    return null;
+  }
 }
 
 // initialize ui settings
@@ -199,6 +277,50 @@ function UIInitializer() {
     if (typeof document === "undefined") return;
     document.documentElement.lang = lang;
   }, [lang]);
+
+  return null;
+}
+
+// profile deep link token length (secrets.token_urlsafe(24) = 32 chars)
+const PROFILE_TOKEN_LENGTH = 32;
+
+type DeepLinkWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      initDataUnsafe?: { start_param?: string };
+      onEvent?: (event: string, cb: () => void) => void;
+      offEvent?: (event: string, cb: () => void) => void;
+    };
+  };
+};
+
+// handle startapp deep links to open profile popups
+function TelegramDeepLinkHandler() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function handleDeepLink() {
+      const startParam = (window as DeepLinkWindow).Telegram?.WebApp?.initDataUnsafe?.start_param;
+      if (!startParam || startParam.length <= PROFILE_TOKEN_LENGTH) return;
+      const token = startParam.slice(0, PROFILE_TOKEN_LENGTH);
+      const username = startParam.slice(PROFILE_TOKEN_LENGTH);
+      if (!username) return;
+      const current = new URLSearchParams(window.location.search);
+      if (current.get("profile")?.toLowerCase() === username.toLowerCase()) return;
+      router.replace(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
+    }
+
+    // SDK is loaded beforeInteractive so start_param is available immediately
+    handleDeepLink();
+
+    const webApp = (window as DeepLinkWindow).Telegram?.WebApp;
+    webApp?.onEvent?.("activated", handleDeepLink);
+    return () => {
+      webApp?.offEvent?.("activated", handleDeepLink);
+    };
+  }, [router]);
 
   return null;
 }
@@ -267,6 +389,7 @@ export function AppProviders({ children }: AppProvidersProps) {
     <TelegramProvider>
       <QueryProvider>
         <UIInitializer />
+        <TelegramDeepLinkHandler />
         <TelegramBackButtonController />
         <PersistentLayout>
           <div key={pathname} className="app-route-transition">

@@ -12,8 +12,6 @@ Included:
 - Docker runtime support.
 - Health endpoint.
 
-Business logic is intentionally not implemented here.
-
 ## Local commands
 
 Run the API locally from the repository root:

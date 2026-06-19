@@ -21,9 +21,12 @@ class WishImage(Base):
     )
     bucket: Mapped[str] = mapped_column(String(255), nullable=False)
     object_name: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True)
+    thumbnail_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    medium_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     content_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ready")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

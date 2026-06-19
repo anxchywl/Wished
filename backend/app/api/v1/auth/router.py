@@ -1,4 +1,5 @@
 from typing import Annotated
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,7 @@ from app.modules.auth.schemas import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/telegram", response_model=TokenResponse)
@@ -25,6 +27,7 @@ async def telegram_auth(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
     """authenticate telegram user"""
+    logger.info("telegram auth request received")
     try:
         telegram_user = validate_telegram_init_data(
             init_data=payload.init_data,
@@ -32,6 +35,7 @@ async def telegram_auth(
             max_age_seconds=settings.telegram_init_data_max_age_seconds,
         )
     except TelegramInitDataError as exc:
+        logger.warning("telegram auth validation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Telegram authentication data",

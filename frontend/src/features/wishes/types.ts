@@ -2,9 +2,12 @@ export type WishImage = {
   id: string;
   wish_id: string;
   url: string;
+  thumbnail_url: string | null;
+  medium_url: string | null;
   file_name: string;
   content_type: string;
   size_bytes: number;
+  status: string;
   created_at: string;
 };
 

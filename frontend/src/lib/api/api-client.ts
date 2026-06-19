@@ -6,7 +6,7 @@ type RequestOptions = Omit<RequestInit, "body"> & {
   accessToken?: string | null;
 };
 
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = 8_000;
 
 /**
  * api request error

@@ -1,25 +1,26 @@
 """user schemas"""
 from datetime import date
-from uuid import UUID
+from datetime import datetime
 
 from pydantic import BaseModel
 
 
-class UserSearchResponse(BaseModel):
-    """user search response"""
-    id: UUID
-    username: str | None
-    first_name: str | None
-    last_name: str | None
-    photo_url: str | None
-    birthday: date | None = None
-
-
 class UserProfileResponse(BaseModel):
     """user profile response"""
-    id: UUID
     username: str | None
     first_name: str | None
     last_name: str | None
     photo_url: str | None
     birthday: date | None = None
+    is_self: bool = False
+    is_following: bool = False
+
+
+class FollowedUserResponse(UserProfileResponse):
+    """followed user response"""
+    followed_at: datetime
+
+
+class FollowedUserListResponse(BaseModel):
+    """followed user list response"""
+    items: list[FollowedUserResponse]

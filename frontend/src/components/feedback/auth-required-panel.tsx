@@ -1,5 +1,7 @@
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useTelegram } from "@/lib/telegram/telegram-provider";
+import { logStartup } from "@/lib/debug/startup-log";
+import { isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useMutationState } from "@tanstack/react-query";
 
 type AuthRequiredPanelProps = {
@@ -13,6 +15,7 @@ type AuthRequiredPanelProps = {
 export function AuthRequiredPanel({ forcePending = false, fullScreen = false }: AuthRequiredPanelProps) {
   const { t } = useTranslation();
   const { isReady } = useTelegram();
+  const authStatus = useAuthStore((state) => state.authStatus);
 
   const isLoginPending = useMutationState({
     filters: { mutationKey: ["telegramLogin"], status: "pending" },
@@ -22,8 +25,15 @@ export function AuthRequiredPanel({ forcePending = false, fullScreen = false }: 
     filters: { mutationKey: ["telegramLogin"], status: "error" },
   }).length > 0;
 
-  // show spinner while sdk is initializing or login is in-flight
-  if (forcePending || (!isLoginError && (!isReady || isLoginPending))) {
+  logStartup("auth required panel renders", authStatus, {
+    forcePending,
+    isReady,
+    isLoginPending,
+    isLoginError,
+  });
+
+  // show spinner during auth startup
+  if (forcePending || isAuthPending(authStatus) || (!isLoginError && (!isReady || isLoginPending))) {
     return (
       <div className={fullScreen ? "auth-loading-screen" : "auth-loading-panel"} aria-busy="true" aria-label="loading">
         <span className="auth-loading-spinner" />

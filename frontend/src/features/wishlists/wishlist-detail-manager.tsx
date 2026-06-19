@@ -32,7 +32,7 @@ import {
   normalizePriceInput,
   normalizeTextInput,
 } from "@/lib/forms/input-normalize";
-import { useAuthStore } from "@/stores/auth-store";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
@@ -63,6 +63,7 @@ import { getWishlistCoverStyle, WishImageThumb, resolveImageUrl } from "./wishli
 import { useModalFocusMode } from "./use-modal-focus-mode";
 import { ImageCropperModal } from "@/components/ui/image-cropper";
 import { useProfileQuery } from "@/features/profile/hooks";
+import { logStartup } from "@/lib/debug/startup-log";
 import {
   useCreateReservationMutation,
   useCancelReservationMutation,
@@ -104,6 +105,7 @@ type PreviewFile = File & {
 export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps) {
   const router = useRouter();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const fallbackCover = useUIStore((state) => state.coverStyle);
   const { t } = useTranslation();
   const profileQuery = useProfileQuery(accessToken);
@@ -132,7 +134,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   const deleteWishlistMutation = useDeleteWishlistMutation();
 
   // wishes query and mutations
-  const wishesQuery = useWishesQuery(wishlistId, { refetchInterval: (isDragging || isReordering) ? false : 2000 });
+  const wishesQuery = useWishesQuery(wishlistId);
   const wishes = useMemo(() => wishesQuery.data?.items ?? [], [wishesQuery.data?.items]);
   const createWishMutation = useCreateWishMutation(wishlistId);
   const updateWishMutation = useUpdateWishMutation(wishlistId);
@@ -200,8 +202,27 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     const byId = new Map(wishes.map((wish) => [wish.id, wish]));
     return wishOrderIds.map((id) => byId.get(id)).filter((wish): wish is Wish => Boolean(wish));
   }, [wishes, wishOrderIds]);
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
 
-  if (!accessToken) {
+  logStartup("route guard decision", authStatus, {
+    component: "WishlistDetailManager",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
+
+  if (guardDecision === "startup") {
+    return (
+      <main className="min-h-dvh px-5 py-6 flex items-center justify-center">
+        <span className="auth-loading-spinner" />
+      </main>
+    );
+  }
+
+  if (guardDecision === "auth_required") {
     return (
       <main className="min-h-dvh px-5 py-6">
         <p className="text-sm text-muted">{t("authenticateBeforeEditingWishes")}</p>
@@ -785,9 +806,7 @@ function CopyWishModal({ open, onClose, onCopy, isPending }: CopyWishModalProps)
                 onClick={() => onCopy(wishlist.id)}
               >
                 <span className="text-sm font-semibold text-foreground">{wishlist.title}</span>
-                <span className="text-xs font-semibold text-primary">
-                  {isPending ? t("copying") : t("copy")}
-                </span>
+                {isPending ? <span className="auth-loading-spinner copy-row-spinner" /> : null}
               </button>
             ))}
           </div>

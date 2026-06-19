@@ -9,26 +9,6 @@ from app.api.deps.database import get_db_session
 from app.main import create_app
 
 
-def test_search_users_uses_query_and_current_user(monkeypatch) -> None:
-    """test user search route"""
-    app = create_app()
-    user = _user()
-    app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_db_session] = lambda: object()
-
-    async def fake_search_users(db, query, current_user):
-        assert query == "bob"
-        assert current_user is user
-        return [_search_user()]
-
-    monkeypatch.setattr("app.api.v1.users.router.search_users", fake_search_users)
-
-    response = TestClient(app).get("/users/search?q=bob")
-
-    assert response.status_code == 200
-    assert response.json()[0]["username"] == "bob"
-
-
 def test_get_user_profile_returns_profile(monkeypatch) -> None:
     """test profile route"""
     app = create_app()
@@ -47,6 +27,26 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["username"] == "bob"
+    assert "id" not in response.json()
+
+
+def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
+    """test private profile hidden"""
+    app = create_app()
+    current_user = _user(username="alice")
+    target_user = _user(username="bob")
+    target_user.profile_visibility = "private"
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    app.dependency_overrides[get_db_session] = lambda: object()
+
+    async def fake_get_user_by_username(db, username):
+        return target_user
+
+    monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
+
+    response = TestClient(app).get("/users/bob")
+
+    assert response.status_code == 404
 
 
 def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
@@ -56,11 +56,20 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
     app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    async def fake_list_user_wishlists(db, current_user_arg, username):
+    async def fake_list_user_wishlists(
+        db,
+        current_user_arg,
+        username,
+        allow_profile_access=False,
+    ):
         assert current_user_arg is current_user
         assert username == "bob"
         return {"items": []}
 
+    async def fake_get_user_by_username(db, username):
+        return _user(username="bob")
+
+    monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
     monkeypatch.setattr("app.api.v1.users.router.list_user_wishlists", fake_list_user_wishlists)
 
     response = TestClient(app).get("/users/bob/wishlists")
@@ -89,15 +98,3 @@ def _user(username: str = "alice") -> SimpleNamespace:
         updated_at=timestamp,
         last_login_at=timestamp,
     )
-
-
-def _search_user() -> dict[str, object]:
-    """build search user"""
-    return {
-        "id": uuid4(),
-        "username": "bob",
-        "first_name": "Bob",
-        "last_name": "Example",
-        "photo_url": None,
-    }
-

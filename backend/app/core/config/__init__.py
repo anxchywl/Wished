@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     telegram_bot_token: str = ""
+    telegram_bot_username: str = ""
     telegram_mini_app_url: str = ""
     telegram_init_data_max_age_seconds: int = 86_400
 
@@ -48,6 +49,11 @@ class Settings(BaseSettings):
     minio_secret_key: str = "wished-password"
     minio_secure: bool = False
     minio_media_bucket: str = "wished-media"
+    minio_presigned_url_expires_seconds: int = 3600
+
+    max_images_per_wish: int = 5
+    upload_rate_per_minute: int = 20
+    upload_rate_per_hour: int = 100
 
     allowed_origins: list[str] = Field(default_factory=list)
 

@@ -2,9 +2,11 @@
 
 # Wished AI Coding Agent Rules
 
-This document defines mandatory rules for AI coding agents working on Wished.
+Mandatory rules for AI coding agents working on Wished.
 
 These rules are strict. If a required detail is missing, stop and ask before changing code.
+
+---
 
 ## 1. Project Rules
 
@@ -23,6 +25,8 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Always ask when requirements are incomplete, ambiguous, or conflicting.
 - If information is missing, STOP and ask.
 
+---
+
 ## 2. Architecture Rules
 
 - Follow the architecture already present in the repository.
@@ -35,6 +39,8 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Keep API transport concerns separate from persistence concerns.
 - Keep Telegram-specific integration code in the established Telegram integration area.
 - If the correct location for a change is unclear, STOP and ask.
+
+---
 
 ## 3. Backend Rules
 
@@ -52,21 +58,25 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Do not expose internal exceptions or sensitive data in API responses.
 - If backend behavior is not documented or discoverable in code, STOP and ask.
 
+---
+
 ## 4. Frontend Rules
 
-- Frontend code uses Next.js, TypeScript, Tailwind CSS, Telegram Mini Apps SDK, Zustand, and Tanstack Query.
+- Frontend code uses Next.js, TypeScript, Tailwind CSS, Telegram Mini Apps SDK, Zustand, and TanStack Query.
 - Follow existing Next.js routing and component structure.
 - Do not invent frontend routes.
 - Do not invent API calls.
 - Do not invent state fields.
 - Do not introduce new state stores unless needed and consistent with existing patterns.
-- Use Tanstack Query for server state when the existing frontend pattern does so.
+- Use TanStack Query for server state when the existing frontend pattern does so.
 - Use Zustand only for local client state that belongs in a client store.
 - Keep Telegram Mini App behavior consistent with the existing SDK integration.
 - Do not hardcode backend URLs, Telegram configuration, secrets, or environment-specific values.
 - Keep UI changes consistent with existing design patterns.
-- Always translate all new user-facing functionality and text strings to all 3 supported languages (en, ru, kz) in the translation dictionary.
+- Always translate all new user-facing strings to all 3 supported languages (en, ru, kz) in `frontend/src/lib/i18n/dict.ts`.
 - If the intended UX is unclear, STOP and ask.
+
+---
 
 ## 5. Database Rules
 
@@ -78,11 +88,13 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Never invent enum values.
 - Never modify migrations without understanding current schema state.
 - Every schema change must be tied to an explicit requirement.
-- Every schema change must include a migration if the project uses migrations.
-- Do not edit historical migrations unless the project explicitly allows it and the migration has not been shared.
+- Every schema change must include a migration.
+- Do not edit historical migrations unless explicitly allowed and the migration has not been shared.
 - Do not drop data, columns, tables, or constraints without explicit approval.
 - Do not store secrets in the database unless an approved design requires it.
 - If the data model is missing or unclear, STOP and ask.
+
+---
 
 ## 6. API Rules
 
@@ -98,6 +110,8 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Do not trust client-provided identity, ownership, or authorization claims.
 - If an API contract is not defined, STOP and ask.
 
+---
+
 ## 7. Docker Rules
 
 - Docker is used for local and deployment infrastructure.
@@ -110,6 +124,8 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - PostgreSQL, Redis, and MinIO configuration must match documented environment variables.
 - If Docker behavior is unclear or conflicts with documentation, STOP and ask.
 
+---
+
 ## 8. Testing Rules
 
 - Add or update tests for changed behavior.
@@ -120,6 +136,8 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Run the relevant test suite before reporting completion when feasible.
 - If tests cannot be run, report exactly why.
 - If existing tests define behavior that conflicts with the request, STOP and ask.
+
+---
 
 ## 9. Security Rules
 
@@ -135,198 +153,59 @@ These rules are strict. If a required detail is missing, stop and ask before cha
 - Do not weaken authentication, authorization, validation, rate limiting, or storage access rules without explicit approval.
 - If a requested change creates a security risk, STOP and ask.
 
-## 10. Code Style and Documentation Rules
+---
 
-These rules are mandatory across the entire codebase.
+## 10. Code Style Rules
 
-General principles:
+### General
 
-- Code should be self-documenting whenever possible.
-- Comments should explain why, not what.
-- Avoid obvious comments.
+- Prefer self-documenting code over comments.
 - Maintain consistent style across frontend and backend.
-- Every public module, class, function, hook, service, repository, and endpoint must have a short docstring or comment.
-- All comments must be concise.
+- Well-named identifiers are better than a comment explaining them.
 
-Comment style:
+### Comments
 
-- Use lowercase only.
-- Never end comments with punctuation.
-- Keep comments under six words when possible.
+Avoid unnecessary comments. Write one only when the **why** is non-obvious — a hidden constraint, a subtle invariant, a workaround for a specific bug, behavior that would surprise a reader.
 
-Good:
+When a comment is needed:
 
-```python
-# create jwt token pair
-```
-
-Bad:
-
-```python
-# Create JWT Token Pair.
-```
-
-Bad:
-
-```python
-# this function creates a jwt token pair for the user and returns both access and refresh tokens.
-```
-
-File headers:
-
-- Every important file should start with a short header.
-
-Examples:
-
-```python
-# authentication service
-```
-
-```typescript
-// wishlist api client
-```
-
-Functions:
-
-- Every public function should have a short docstring.
-
-Python:
-
-```python
-def create_tokens(user: User) -> TokenPair:
-    """create jwt token pair"""
-```
-
-TypeScript:
-
-```typescript
-/**
- * create wishlist
- */
-export async function createWishlist() {}
-```
-
-Classes:
-
-- Every class should contain a short description.
-
-Python:
-
-```python
-class AuthService:
-    """authentication operations"""
-```
-
-TypeScript:
-
-```typescript
-/**
- * wishlist state manager
- */
-export class WishlistStore {}
-```
-
-API routes:
-
-- Every route should contain a short description.
-
-```python
-@router.get("/me")
-async def get_me():
-    """get current profile"""
-```
-
-React components:
-
-- Every exported component should contain a short description.
-
-```typescript
-/**
- * profile settings page
- */
-export function ProfileSettingsPage() {}
-```
-
-Hooks:
-
-- Every custom hook should contain a short description.
-
-```typescript
-/**
- * load current profile
- */
-export function useProfile() {}
-```
-
-Services:
-
-- Every service method should contain a short description.
-
-```python
-def update_profile():
-    """update profile settings"""
-```
-
-Repositories:
-
-- Every repository method should contain a short description.
-
-```python
-def get_by_telegram_id():
-    """find user by telegram id"""
-```
-
-Migrations:
-
-- Every migration must include a short description.
-
-```python
-"""add profile visibility fields"""
-```
-
-Prohibited comments:
-
-- Obvious comments.
-- Joke comments.
-- Temporary comments.
-- Commented-out code.
-- TODO without an issue reference.
-- AI generated banners.
-- Large comment blocks.
-
-Bad:
-
-```python
-# increment i by one
-i += 1
-```
-
-Bad:
-
-```python
-# magic happens here
-```
-
-Naming:
-
-- Prefer descriptive names over comments.
+- Lowercase only
+- No trailing punctuation
+- Concise — explain intent, not implementation
 
 Good:
 
 ```python
-user_profile_visibility
+# telegram rejects requests older than 5 minutes
+if age > 300:
+    raise AuthError
 ```
 
-Bad:
+Bad — states the obvious:
 
 ```python
-upv
+# check if age is greater than 300
+if age > 300:
+    raise AuthError
 ```
 
-Consistency:
+Bad — wrong format:
 
-- All generated code must follow these rules.
-- If unsure, use fewer comments.
-- If unsure, keep comments lowercase.
-- If unsure, keep comments under six words.
-- If unsure, never end comments with punctuation.
+```python
+# Check if the Telegram init data has expired.
+```
+
+### Naming
+
+Prefer descriptive names over comments.
+
+Good: `user_profile_visibility`  
+Bad: `upv`
+
+### Prohibited
+
+- Obvious comments
+- Commented-out code
+- TODO without an issue reference
+- AI-generated banners
+- Large comment blocks

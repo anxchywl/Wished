@@ -24,9 +24,10 @@ export function getWishlist(accessToken: string, wishlistId: string) {
 /**
  * list user wishlists
  */
-export function listUserWishlists(accessToken: string, username: string) {
+export function listUserWishlists(accessToken: string, username: string, profileToken?: string | null) {
   const normalizedUsername = username.trim().replace(/^@/, "");
-  return apiClient<WishlistListResponse>(`/users/${encodeURIComponent(normalizedUsername)}/wishlists`, {
+  const query = profileToken ? `?profile_token=${encodeURIComponent(profileToken)}` : "";
+  return apiClient<WishlistListResponse>(`/users/${encodeURIComponent(normalizedUsername)}/wishlists${query}`, {
     accessToken,
   });
 }

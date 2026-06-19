@@ -16,10 +16,9 @@ import {
 } from "@/features/wishes/hooks";
 import type { Wish } from "@/features/wishes/types";
 import { useWishlistsQuery } from "@/features/wishlists/hooks";
-import { useAuthStore } from "@/stores/auth-store";
+import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { UIControls } from "@/components/ui/controls";
-import { compressImage } from "@/features/wishlists/utils";
 import {
   finalizePriceInput,
   finalizeTextInput,
@@ -29,6 +28,7 @@ import {
   normalizeTextInput,
 } from "@/lib/forms/input-normalize";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { logStartup } from "@/lib/debug/startup-log";
 
 type WishManagerProps = {
   wishlistId: string;
@@ -40,6 +40,7 @@ type WishManagerProps = {
 // wishes manager component
 export function WishManager({ wishlistId }: WishManagerProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
   const wishesQuery = useWishesQuery(wishlistId);
   const wishlistsQuery = useWishlistsQuery();
   const createMutation = useCreateWishMutation(wishlistId);
@@ -53,6 +54,17 @@ export function WishManager({ wishlistId }: WishManagerProps) {
   const [currency, setCurrency] = useState("");
   const { t } = useTranslation();
   const coverStyle = useUIStore((state) => state.coverStyle);
+  const guardDecision = isAuthPending(authStatus)
+    ? "startup"
+    : isAuthFailure(authStatus) || !accessToken
+      ? "auth_required"
+      : "app";
+
+  logStartup("route guard decision", authStatus, {
+    component: "WishManager",
+    decision: guardDecision,
+    hasAccessToken: Boolean(accessToken),
+  });
 
   /**
    * create wish
@@ -84,7 +96,15 @@ export function WishManager({ wishlistId }: WishManagerProps) {
     );
   }
 
-  if (!accessToken) {
+  if (guardDecision === "startup") {
+    return (
+      <main className="min-h-dvh px-5 py-6 flex items-center justify-center">
+        <span className="auth-loading-spinner" />
+      </main>
+    );
+  }
+
+  if (guardDecision === "auth_required") {
     return (
       <main className="min-h-dvh px-5 py-6">
         <p className="text-sm text-muted">{t("authenticateBeforeEditingWishes")}</p>
@@ -299,39 +319,36 @@ export function WishItem({
             accept="image/jpeg,image/png,image/webp"
             className="text-sm block w-full text-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
             id={`image-${wish.id}`}
-            onChange={async (event) => {
+            onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) {
-                try {
-                  const dataUrl = await compressImage(file, 400, 400, 0.8);
-                  const res = await fetch(dataUrl);
-                  const blob = await res.blob();
-                  const compressedFile = new File([blob], file.name, { type: file.type });
-                  onUploadImage(compressedFile);
-                } catch (err) {
-                  console.error("Compression failed", err);
-                  onUploadImage(file);
-                }
+                onUploadImage(file);
                 event.target.value = "";
               }
             }}
             type="file"
           />
         </div>
-        {wish.images.length ? (
+        {wish.images.filter((img) => img.status === "ready").length ? (
           <div className="grid grid-cols-2 gap-2 mt-2">
-            {wish.images.map((image) => (
-              <div className="overflow-hidden rounded-xl border border-border bg-muted/10" key={image.id}>
-                <img alt={image.file_name} className="aspect-square w-full object-cover" src={image.url} />
-                <button
-                  className="w-full px-2 py-2 text-sm text-destructive hover:bg-destructive/10 font-semibold transition-colors"
-                  onClick={() => onDeleteImage(image.id)}
-                  type="button"
-                >
-                  {t("deleteImageButton")}
-                </button>
-              </div>
-            ))}
+            {wish.images
+              .filter((img) => img.status === "ready")
+              .map((image) => (
+                <div className="overflow-hidden rounded-xl border border-border bg-muted/10" key={image.id}>
+                  <img
+                    alt={image.file_name}
+                    className="aspect-square w-full object-cover"
+                    src={image.thumbnail_url ?? image.url}
+                  />
+                  <button
+                    className="w-full px-2 py-2 text-sm text-destructive hover:bg-destructive/10 font-semibold transition-colors"
+                    onClick={() => onDeleteImage(image.id)}
+                    type="button"
+                  >
+                    {t("deleteImageButton")}
+                  </button>
+                </div>
+              ))}
           </div>
         ) : null}
       </div>

@@ -55,7 +55,7 @@ services:
     image: caddy:2-alpine
     container_name: wished-caddy
     ports:
-      - "8000:8000"
+      - "8002:8000"
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile
     extra_hosts:
@@ -130,6 +130,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-Wished Bot}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
       TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_HOST: postgres

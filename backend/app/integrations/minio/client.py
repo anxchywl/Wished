@@ -1,3 +1,5 @@
+import json
+from datetime import timedelta
 from io import BytesIO
 
 from minio import Minio
@@ -24,29 +26,11 @@ def get_minio_client() -> Minio:
     return _client
 
 
-import json
-
-
 def ensure_bucket(bucket: str) -> None:
-    """ensure bucket exists and is public"""
+    """ensure bucket exists — bucket is private by default"""
     client = get_minio_client()
     if not client.bucket_exists(bucket):
         client.make_bucket(bucket)
-    try:
-        policy = {
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": {"AWS": ["*"]},
-                    "Action": ["s3:GetObject"],
-                    "Resource": [f"arn:aws:s3:::{bucket}/*"],
-                }
-            ],
-        }
-        client.set_bucket_policy(bucket, json.dumps(policy))
-    except Exception:
-        pass
 
 
 def upload_object(
@@ -86,8 +70,18 @@ def copy_object(
     )
 
 
-def get_media_object_url(bucket: str, object_name: str) -> str:
-    """build object url"""
+def get_presigned_url(bucket: str, object_name: str, expires_seconds: int | None = None) -> str:
+    """generate a presigned GET URL for a private object"""
     settings = get_settings()
-    public_endpoint = settings.minio_public_endpoint.rstrip("/")
-    return f"{public_endpoint}/{bucket}/{object_name}"
+    ttl = expires_seconds if expires_seconds is not None else settings.minio_presigned_url_expires_seconds
+    client = get_minio_client()
+    return client.presigned_get_object(
+        bucket_name=bucket,
+        object_name=object_name,
+        expires=timedelta(seconds=ttl),
+    )
+
+
+def get_media_object_url(bucket: str, object_name: str) -> str:
+    """generate presigned URL for a media object (replaces public direct URL)"""
+    return get_presigned_url(bucket, object_name)

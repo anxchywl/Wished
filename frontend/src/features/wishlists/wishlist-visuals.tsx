@@ -108,11 +108,9 @@ export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVis
  */
 export function resolveImageUrl(url?: string | null): string {
   if (!url) return "";
-  if (url.includes("localhost:9000")) {
-    return url.replace("http://localhost:9000", "https://jarring-succulent-jumbo.ngrok-free.dev");
-  }
-  if (url.includes("127.0.0.1:9000")) {
-    return url.replace("http://127.0.0.1:9000", "https://jarring-succulent-jumbo.ngrok-free.dev");
+  // Serve MinIO objects through the Next.js /wished-media rewrite (same tunnel as the Mini App).
+  if (url.includes("localhost:9000") || url.includes("127.0.0.1:9000")) {
+    return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1):9000/, "");
   }
   return url;
 }

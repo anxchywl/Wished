@@ -25,8 +25,24 @@ export type TokenResponse = {
  * authenticate with telegram
  */
 export function authenticateTelegram(initData: string) {
+  if (!hasTelegramInitDataHash(initData)) {
+    return Promise.reject(new Error("Telegram init data hash is missing"));
+  }
+
   return apiClient<TokenResponse>("/auth/telegram", {
     method: "POST",
     body: { init_data: initData },
   });
+}
+
+/**
+ * check init data hash
+ */
+function hasTelegramInitDataHash(initData: string) {
+  const params = new URLSearchParams(initData);
+  const nestedInitData = params.get("tgWebAppData");
+  if (nestedInitData) {
+    return new URLSearchParams(nestedInitData).has("hash");
+  }
+  return params.has("hash");
 }

@@ -1,7 +1,8 @@
 # media cleanup worker
 """
-Deletes MinIO objects in the media bucket that have no corresponding
-wish_images DB row, older than a configurable grace period.
+Removes MinIO objects that have no corresponding wish_images DB row and are
+older than a configurable grace period.  Handles full, thumbnail, and medium
+variant object names tracked in the wish_images table.
 
 Run standalone:
     python -m app.workers.media_cleanup
@@ -30,16 +31,28 @@ DEFAULT_GRACE_HOURS = 1
 
 
 async def _load_known_objects(bucket: str) -> set[str]:
-    """load object names from wish_images table"""
+    """load all tracked object names (including variants) from wish_images"""
     async with async_session_factory() as db:
         result = await db.execute(
-            select(WishImage.object_name).where(WishImage.bucket == bucket)
+            select(
+                WishImage.object_name,
+                WishImage.thumbnail_object_name,
+                WishImage.medium_object_name,
+            ).where(WishImage.bucket == bucket)
         )
-        return {row[0] for row in result.all()}
+        known: set[str] = set()
+        for row in result.all():
+            full, thumb, medium = row
+            known.add(full)
+            if thumb:
+                known.add(thumb)
+            if medium:
+                known.add(medium)
+        return known
 
 
 def _list_bucket_objects(bucket: str) -> list[tuple[str, datetime]]:
-    """list objects and their last-modified times"""
+    """list objects and their last-modified timestamps"""
     client = get_minio_client()
     try:
         objects = list(client.list_objects(bucket, recursive=True))
@@ -54,12 +67,17 @@ def _list_bucket_objects(bucket: str) -> list[tuple[str, datetime]]:
 
 
 async def run_cleanup(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = False) -> None:
-    """remove orphaned media objects"""
+    """remove orphaned media objects older than the grace period"""
     settings = get_settings()
     bucket = settings.minio_media_bucket
     cutoff = datetime.now(UTC) - timedelta(hours=grace_hours)
 
-    logger.info("starting media cleanup (bucket=%s, grace=%dh, dry_run=%s)", bucket, grace_hours, dry_run)
+    logger.info(
+        "starting media cleanup (bucket=%s, grace=%dh, dry_run=%s)",
+        bucket,
+        grace_hours,
+        dry_run,
+    )
 
     known = await _load_known_objects(bucket)
     all_objects = _list_bucket_objects(bucket)
@@ -99,8 +117,8 @@ async def run_cleanup(grace_hours: int = DEFAULT_GRACE_HOURS, dry_run: bool = Fa
 def main() -> None:
     """parse args and run cleanup"""
     parser = argparse.ArgumentParser(description="media cleanup worker")
-    parser.add_argument("--grace-hours", type=int, default=DEFAULT_GRACE_HOURS, help="grace period in hours")
-    parser.add_argument("--dry-run", action="store_true", help="list orphans without deleting")
+    parser.add_argument("--grace-hours", type=int, default=DEFAULT_GRACE_HOURS)
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     asyncio.run(run_cleanup(grace_hours=args.grace_hours, dry_run=args.dry_run))
