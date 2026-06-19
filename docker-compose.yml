@@ -9,7 +9,7 @@ services:
       APP_NAME: ${APP_NAME:-Wished API}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
-      DEBUG: ${DEBUG:-true}
+      DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me}
@@ -73,8 +73,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-wished}
       POSTGRES_USER: ${POSTGRES_USER:-wished}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wished}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -88,8 +86,6 @@ services:
   redis:
     image: redis:7-alpine
     container_name: wished-redis
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -108,8 +104,7 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-wished}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wished-password}
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "9000:9000"
     volumes:
       - minio-data:/data
     healthcheck:

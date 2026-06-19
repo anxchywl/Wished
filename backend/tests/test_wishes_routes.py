@@ -219,6 +219,7 @@ def _wish(
     currency: str | None = "USD",
     priority: int = 3,
     position: int = 0,
+    status: str = "active",
 ) -> dict[str, object]:
     timestamp = datetime(2026, 6, 14, 10, 0, tzinfo=UTC)
     return {
@@ -231,6 +232,7 @@ def _wish(
         "position": position,
         "price": price,
         "currency": currency,
+        "status": status,
         "images": [],
         "created_at": timestamp,
         "updated_at": timestamp,

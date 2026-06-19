@@ -1,9 +1,12 @@
+import logging
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, UploadFile, status
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import Settings
 from app.db.models import User, Wish, WishImage, Wishlist
@@ -133,8 +136,8 @@ async def delete_wish_image(
     for obj in _image_object_names(image):
         try:
             delete_object(image.bucket, obj)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("failed to delete minio object %s/%s: %s", image.bucket, obj, exc)
     await db.delete(image)
     await db.commit()
 

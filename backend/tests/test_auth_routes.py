@@ -1,19 +1,35 @@
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
 from app.core.config import Settings, get_settings
 from app.integrations.telegram import TelegramUserData
 from app.main import create_app
 from app.modules.auth.schemas import RefreshResponse, TokenResponse, UserResponse
 
 
+def _fake_redis():
+    """redis mock that always passes rate limiting"""
+    r = AsyncMock()
+    pipe = AsyncMock()
+    pipe.__aenter__ = AsyncMock(return_value=pipe)
+    pipe.__aexit__ = AsyncMock(return_value=False)
+    pipe.incr = MagicMock(return_value=pipe)
+    pipe.expire = MagicMock(return_value=pipe)
+    pipe.execute = AsyncMock(return_value=[1, True, 1, True])
+    r.pipeline = MagicMock(return_value=pipe)
+    return r
+
+
 def test_telegram_auth_endpoint_uses_validated_telegram_user(monkeypatch) -> None:
     app = create_app()
     app.dependency_overrides[get_db_session] = _override_db
     app.dependency_overrides[get_settings] = _override_settings
+    app.dependency_overrides[get_redis] = _fake_redis
 
     async def fake_authenticate_telegram_user(db, telegram_user, settings):
         assert telegram_user.telegram_id == 123456789
@@ -52,6 +68,7 @@ def test_refresh_endpoint_rotates_refresh_token(monkeypatch) -> None:
     app = create_app()
     app.dependency_overrides[get_db_session] = _override_db
     app.dependency_overrides[get_settings] = _override_settings
+    app.dependency_overrides[get_redis] = _fake_redis
 
     async def fake_refresh_tokens(db, refresh_token, settings):
         assert refresh_token == "old-refresh-token"

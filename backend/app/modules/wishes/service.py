@@ -1,9 +1,12 @@
+import logging
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import get_settings
 from app.db.models import User, Wish, WishImage, Wishlist
@@ -186,8 +189,8 @@ async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> No
     for bucket, obj in objects_to_delete:
         try:
             delete_object(bucket, obj)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("failed to delete minio object %s/%s: %s", bucket, obj, exc)
 
 
 async def _get_owned_wishlist(
@@ -269,6 +272,7 @@ def _to_response(wish: Wish) -> WishResponse:
         position=wish.position,
         price=wish.price,
         currency=wish.currency,
+        status=wish.status,
         images=[
             WishImageResponse(
                 id=image.id,

@@ -54,6 +54,7 @@ async def get_user_profile(
         profile_token,
         current_user.telegram_id,
         user.telegram_id,
+        db=db,
     )
     is_following = await is_following_user(db, current_user, user)
     if (
@@ -77,7 +78,7 @@ async def post_user_follow(
     """follow user"""
     target = await get_user_by_username(db, username.removeprefix("@"))
     has_discovery_access = await validate_discovery_token(
-        redis, profile_token, current_user.telegram_id, target.telegram_id,
+        redis, profile_token, current_user.telegram_id, target.telegram_id, db=db,
     )
     return await follow_user(db, current_user, username, has_discovery_access=has_discovery_access)
 
@@ -108,6 +109,7 @@ async def get_user_wishlists(
         profile_token,
         current_user.telegram_id,
         target_user.telegram_id,
+        db=db,
     )
     is_following = await is_following_user(db, current_user, target_user)
     return await list_user_wishlists(

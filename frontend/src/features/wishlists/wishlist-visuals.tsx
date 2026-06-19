@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type React from "react";
 
 import { DEFAULT_COVER_GRADIENT } from "@/features/wishlists/utils";
@@ -109,8 +109,12 @@ export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVis
 export function resolveImageUrl(url?: string | null): string {
   if (!url) return "";
   // Serve MinIO objects through the Next.js /wished-media rewrite (same tunnel as the Mini App).
+  // Handles both direct localhost access and Docker-internal minio:9000 hostnames.
   if (url.includes("localhost:9000") || url.includes("127.0.0.1:9000")) {
     return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1):9000/, "");
+  }
+  if (url.includes("minio:9000")) {
+    return url.replace(/^https?:\/\/minio:9000/, "");
   }
   return url;
 }
@@ -120,6 +124,10 @@ export function resolveImageUrl(url?: string | null): string {
  */
 export function WishImageThumb({ id, title, imageUrl, className = "" }: WishVisualProps) {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [imageUrl]);
 
   if (!imageUrl || failed) {
     return <WishImagePlaceholder id={id} title={title} className={className} />;

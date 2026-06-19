@@ -119,6 +119,7 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
           profileToken={profileToken}
           initialUser={initialUser}
           onOpenWishlist={handleWishlistOpen}
+          onClose={onClose}
         />
       );
     }
@@ -216,12 +217,13 @@ type PublicUserViewProps = {
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
   onOpenWishlist: (wishlistId: string, title?: string) => void;
+  onClose: () => void;
 };
 
 /**
  * show public profile
  */
-function PublicUserView({ username, profileToken, initialUser, onOpenWishlist }: PublicUserViewProps) {
+function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, onClose }: PublicUserViewProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const profileQuery = useUserProfileQuery(username, profileToken);
@@ -305,10 +307,17 @@ function PublicUserView({ username, profileToken, initialUser, onOpenWishlist }:
                 className={`h-9 px-4 rounded-xl text-xs font-extrabold transition-all active:scale-[0.98] ${
                   profile.is_following
                     ? "border border-border bg-background text-primary"
-                    : "bg-primary text-white"
+                    : "theme-press-primary bg-primary text-white"
                 }`}
                 disabled={followMutation.isPending}
-                onClick={() => followMutation.mutate(!profile.is_following)}
+                onClick={() => {
+                  const nextFollowing = !profile.is_following;
+                  followMutation.mutate(nextFollowing, {
+                    onSuccess: () => {
+                      if (!nextFollowing) onClose();
+                    },
+                  });
+                }}
               >
                 {profile.is_following ? t("following") : t("follow")}
               </button>

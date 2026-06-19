@@ -19,14 +19,17 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 
 import { useTelegramLoginMutation } from "@/features/auth";
+import { useWishlistsQuery } from "@/features/wishlists/hooks";
 import { listWishes } from "@/features/wishes/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
-import { useWishlistsQuery } from "@/features/wishlists/hooks";
+import { listFollowing } from "@/features/users/api";
+import { userQueryKeys, useFollowingQuery } from "@/features/users/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
+import { extractTgUserIdFromInitData } from "@/lib/telegram/capture-init-data";
 import { isAuthPending } from "@/stores/auth-store";
 import { clearPersistedCache } from "@/lib/query/cache-persister";
 
@@ -47,13 +50,16 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   const setAppReady = useAuthStore((state) => state.setAppReady);
   const tgUserId = useAuthStore((state) => state.tgUserId);
   const setTgUserId = useAuthStore((state) => state.setTgUserId);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const prepareAccountSwitch = useAuthStore((state) => state.prepareAccountSwitch);
 
   const { initDataRaw, isReady, error: telegramError } = useTelegram();
   const loginMutation = useTelegramLoginMutation();
   const wishlistsQuery = useWishlistsQuery();
   const queryClient = useQueryClient();
   const [gateExpired, setGateExpired] = useState(false);
+  const [initialWishesLoaded, setInitialWishesLoaded] = useState(false);
+  const lastLoginInitDataRef = useRef<string | null>(null);
+  const followingQuery = useFollowingQuery();
 
   const loginMutationRef = useRef(loginMutation);
   loginMutationRef.current = loginMutation;
@@ -84,15 +90,15 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       setAuthStatus("telegram_ready");
     }
 
-    const currentTgUserId = getTelegramUserId(initDataRaw);
+    const currentTgUserId = extractTgUserIdFromInitData(initDataRaw ?? "");
 
-    // if account changed, clear token, query cache, and persisted cache
-    if (currentTgUserId && tgUserId && currentTgUserId !== tgUserId) {
+    // if account changed (or a stale token has no matching stored user), clear everything
+    if (currentTgUserId && accessToken && currentTgUserId !== tgUserId) {
       clearPersistedCache();
       queryClient.clear();
-      clearAuth();
-      setTgUserId(currentTgUserId);
+      prepareAccountSwitch(currentTgUserId);
       setInitialWishesLoaded(false);
+      lastLoginInitDataRef.current = null;
       loginMutationRef.current.reset();
       return;
     }
@@ -115,9 +121,9 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       initDataRaw &&
       !accessToken &&
       !loginMutationRef.current.isPending &&
-      !loginMutationRef.current.isError &&
-      !loginMutationRef.current.isSuccess
+      lastLoginInitDataRef.current !== initDataRaw
     ) {
+      lastLoginInitDataRef.current = initDataRaw;
       logStartup("login request starts", authStatus, {
         hasInitDataRaw: true,
       });
@@ -146,12 +152,6 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }, [isReady, initDataRaw, accessToken, tgUserId, telegramError, authStatus]);
 
   useEffect(() => {
-    if (!accessToken && loginMutation.isSuccess) {
-      loginMutation.reset();
-    }
-  }, [accessToken, loginMutation]);
-
-  useEffect(() => {
     if (accessToken && !wishlistsQuery.isLoading) {
       setAppReady(true);
     } else if (!accessToken) {
@@ -159,31 +159,29 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     }
   }, [accessToken, wishlistsQuery.isLoading, setAppReady]);
 
-  const [initialWishesLoaded, setInitialWishesLoaded] = useState(false);
-
-  // prefetch all wishlist contents silently in the background
+  // Background-prefetch wish counts + following list so both tabs are instant on first visit
   useEffect(() => {
     if (!accessToken) return;
 
     if (wishlistsQuery.isSuccess && !initialWishesLoaded) {
-      if (wishlistsQuery.data?.items && wishlistsQuery.data.items.length > 0) {
-        Promise.all(
-          wishlistsQuery.data.items.map((wl) =>
-            queryClient.prefetchQuery({
-              queryKey: wishQueryKeys.list(wl.id),
-              queryFn: () => listWishes(accessToken, wl.id),
-            })
-          )
-        ).finally(() => {
-          setInitialWishesLoaded(true);
-        });
-      } else {
+      const items = wishlistsQuery.data?.items ?? [];
+      const wishPrefetches = items.map((wl) =>
+        queryClient.prefetchQuery({
+          queryKey: wishQueryKeys.list(wl.id),
+          queryFn: () => listWishes(accessToken, wl.id),
+        })
+      );
+      const followingPrefetch = queryClient.prefetchQuery({
+        queryKey: userQueryKeys.following(tgUserId),
+        queryFn: () => listFollowing(accessToken),
+      });
+      Promise.all([...wishPrefetches, followingPrefetch]).finally(() => {
         setInitialWishesLoaded(true);
-      }
+      });
     } else if (wishlistsQuery.isError && !initialWishesLoaded) {
       setInitialWishesLoaded(true);
     }
-  }, [accessToken, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
+  }, [accessToken, tgUserId, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
 
   // Gate holds until auth is resolved or 10s hard timeout.
   // accessToken arrives when Zustand persist hydrates (< 1 frame after mount),
@@ -191,8 +189,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   const isLoading =
     !gateExpired &&
     ((!isReady && !accessToken) ||
-      (isAuthPending(authStatus) && !accessToken) ||
-      loginMutationRef.current.isPending);
+      (isAuthPending(authStatus) && !accessToken));
 
   if (isLoading) {
     return (
@@ -215,10 +212,13 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   let title = "";
   let hideProfile = false;
 
+  const followedUsersCount = followingQuery.data?.items?.length ?? 0;
+  const showDiscoverTitle = followedUsersCount >= 1;
+
   if (pathname === "/wishlists" || pathname === "/") {
     title = t("wishlists");
   } else if (pathname === "/users") {
-    title = t("discover");
+    title = showDiscoverTitle ? t("discover") : "";
   } else {
     title = t("profile");
     hideProfile = true;
@@ -238,24 +238,6 @@ function PersistentLayout({ children }: { children: ReactNode }) {
  */
 function hasTelegramInitDataHash(initDataRaw: string) {
   return new URLSearchParams(initDataRaw).has("hash");
-}
-
-function getTelegramUserId(initDataRaw: string | null): number | null {
-  if (!initDataRaw) {
-    return null;
-  }
-
-  const user = new URLSearchParams(initDataRaw).get("user");
-  if (!user) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(user) as { id?: unknown };
-    return typeof parsed.id === "number" ? parsed.id : null;
-  } catch {
-    return null;
-  }
 }
 
 // initialize ui settings

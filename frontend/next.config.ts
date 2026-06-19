@@ -5,8 +5,26 @@ const allowedDevOrigins = process.env.NEXT_PUBLIC_TELEGRAM_DEV_ORIGINS
   : [];
 
 const nextConfig: NextConfig = {
+  assetPrefix: "/wished-assets-v2",
   devIndicators: false,
   reactStrictMode: true,
+  async headers() {
+    const documentHeaders = [
+      {
+        key: "Cache-Control",
+        value: "no-store, max-age=0",
+      },
+    ];
+
+    return [
+      { source: "/", headers: documentHeaders },
+      { source: "/wishlists", headers: documentHeaders },
+      { source: "/wishlists/:path*", headers: documentHeaders },
+      { source: "/users", headers: documentHeaders },
+      { source: "/users/:path*", headers: documentHeaders },
+      { source: "/_next/static/:path*", headers: documentHeaders },
+    ];
+  },
   async rewrites() {
     return [
       {

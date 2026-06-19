@@ -119,7 +119,11 @@ export function WishlistManager() {
   // Derive ordered wishlists
   const orderedWishlists = useMemo(() => {
     const map = new Map(wishlists.map((w) => [w.id, w]));
-    return resolvedOrderIds.map((id) => map.get(id)).filter((w): w is Wishlist => w !== undefined);
+    const ordered = resolvedOrderIds
+      .map((id) => map.get(id))
+      .filter((w): w is Wishlist => w !== undefined);
+    const orderedIds = new Set(ordered.map((wishlist) => wishlist.id));
+    return [...ordered, ...wishlists.filter((wishlist) => !orderedIds.has(wishlist.id))];
   }, [wishlists, resolvedOrderIds]);
 
   const hasWishlists = wishlists.length > 0;
@@ -128,7 +132,6 @@ export function WishlistManager() {
     (wishlistsQuery.isLoading && !hasWishlists) ||
     (wishlistsQuery.isFetching && !hasWishlists);
   const showWishlistsEmpty =
-    wishlistsQuery.isFetched &&
     !wishlistsQuery.isError &&
     !showWishlistsLoading &&
     !hasWishlists;
@@ -336,7 +339,7 @@ function WishlistRowBase({ wishlist }: { wishlist: Wishlist }) {
   const router = useRouter();
   const { t } = useTranslation();
 
-  const wishesQuery = useWishesQuery(wishlist.id);
+  const wishesQuery = useWishesQuery(wishlist.id, false);
   const wishesCount = wishesQuery.data?.items.length ?? 0;
 
   const countText = wishesQuery.data === undefined

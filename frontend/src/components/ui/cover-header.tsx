@@ -113,7 +113,7 @@ export function CoverHeader({ title, hideProfile = false }: CoverHeaderProps) {
         )}
 
         {/* page title */}
-        <h1 className="cover-title">{title}</h1>
+        {title && <h1 className="cover-title">{title}</h1>}
       </header>
 
       <BirthdayPicker

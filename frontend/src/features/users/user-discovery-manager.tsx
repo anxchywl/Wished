@@ -51,46 +51,49 @@ export function UserDiscoveryManager() {
           <AuthRequiredPanel forcePending />
         ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
-        ) : (followingQuery.isLoading || followedUsers.length > 0) ? (
-            <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start">
-              <div className="discover-following">
-                {followingQuery.isLoading ? (
-                  <div className="public-skeleton h-14 w-full rounded-xl" />
-                ) : null}
-                {followedUsers.map((user) => (
-                  <button
-                    key={user.username}
-                    type="button"
-                    className="discover-following-row pressable-action"
-                    onClick={() => {
-                      if (user.username) router.replace(`/users?profile=${encodeURIComponent(user.username)}`);
-                    }}
-                    disabled={!user.username}
-                  >
-                    <UserAvatar user={user} />
-                    <span>{user.first_name || user.username}</span>
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                className="pressable-action flex items-center justify-center gap-2 py-3 px-4 w-full text-primary font-semibold text-sm cursor-pointer border-t border-border"
-                onClick={openTelegramFriendPicker}
-              >
-                <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                <span>{t("followNew")}</span>
-              </button>
+        ) : followingQuery.isLoading ? (
+          <div className="panel flex flex-col gap-3 p-4 w-full">
+            <div className="public-skeleton h-16 w-full rounded-xl" />
+            <div className="public-skeleton h-16 w-full rounded-xl" />
+            <div className="public-skeleton h-16 w-full rounded-xl" />
+          </div>
+        ) : followedUsers.length > 0 ? (
+          <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start">
+            <div className="discover-following">
+              {followedUsers.map((user) => (
+                <button
+                  key={user.username}
+                  type="button"
+                  className="discover-following-row pressable-action"
+                  onClick={() => {
+                    if (user.username) router.replace(`/users?profile=${encodeURIComponent(user.username)}`);
+                  }}
+                  disabled={!user.username}
+                >
+                  <UserAvatar user={user} />
+                  <span>{user.first_name || user.username}</span>
+                </button>
+              ))}
             </div>
-          ) : (
-            <section className="discover-launch">
-              <h2>{t("findTelegramFriends")}</h2>
-              <button type="button" className="discover-launch-button" onClick={openTelegramFriendPicker}>
-                <span>{t("chooseTelegramUsers")}</span>
-              </button>
-            </section>
-          )}
+            <button
+              type="button"
+              className="pressable-action flex items-center justify-center gap-2 py-3 px-4 w-full text-primary font-semibold text-sm cursor-pointer border-t border-border"
+              onClick={openTelegramFriendPicker}
+            >
+              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              <span>{t("followNew")}</span>
+            </button>
+          </div>
+        ) : (
+          <section className="discover-launch">
+            <h2>{t("findTelegramFriends")}</h2>
+            <button type="button" className="discover-launch-button" onClick={openTelegramFriendPicker}>
+              <span>{t("chooseTelegramUsers")}</span>
+            </button>
+          </section>
+        )}
       </main>
 
       <PublicWishlistNavigator

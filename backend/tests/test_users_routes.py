@@ -1,12 +1,18 @@
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
 from app.main import create_app
+
+
+def _fake_redis():
+    return AsyncMock()
 
 
 def test_get_user_profile_returns_profile(monkeypatch) -> None:
@@ -16,12 +22,21 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
     target_user = _user(username="bob")
     app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _fake_redis
 
     async def fake_get_user_by_username(db, username):
         assert username == "bob"
         return target_user
 
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
+        return False
+
+    async def fake_is_following_user(db, current_user, user):
+        return False
+
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
+    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/users/bob")
 
@@ -38,11 +53,20 @@ def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
     target_user.profile_visibility = "private"
     app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _fake_redis
 
     async def fake_get_user_by_username(db, username):
         return target_user
 
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
+        return False
+
+    async def fake_is_following_user(db, current_user, user):
+        return False
+
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
+    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/users/bob")
 
@@ -55,6 +79,7 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
     current_user = _user(username="alice")
     app.dependency_overrides[get_current_user] = lambda: current_user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _fake_redis
 
     async def fake_list_user_wishlists(
         db,
@@ -69,8 +94,16 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
     async def fake_get_user_by_username(db, username):
         return _user(username="bob")
 
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
+        return False
+
+    async def fake_is_following_user(db, current_user, user):
+        return False
+
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
     monkeypatch.setattr("app.api.v1.users.router.list_user_wishlists", fake_list_user_wishlists)
+    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/users/bob/wishlists")
 

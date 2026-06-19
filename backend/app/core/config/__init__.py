@@ -23,8 +23,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""
     telegram_mini_app_url: str = ""
-    telegram_init_data_max_age_seconds: int = 86_400
+    # telegram recommends validating auth_date within minutes, not hours
+    telegram_init_data_max_age_seconds: int = 300
 
+    # must be overridden in production — create_app() enforces this at startup
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 15

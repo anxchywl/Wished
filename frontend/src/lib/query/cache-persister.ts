@@ -3,9 +3,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { dehydrate, hydrate } from "@tanstack/react-query";
 
+import { useAuthStore } from "@/stores/auth-store";
+
 // Bump CACHE_BUSTER to invalidate persisted snapshots after breaking changes.
-const STORAGE_KEY = "wished/query-cache/v1";
-const CACHE_BUSTER = "1";
+const STORAGE_KEY_PREFIX = "wished/query-cache/v1";
+const CACHE_BUSTER = "2";
 // gcTime in query-client.ts must be >= MAX_AGE_MS so restored data isn't GC'd.
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 1_000;
@@ -25,16 +27,28 @@ function getStorage(): Storage | null {
   }
 }
 
+// Cache key is scoped by tgUserId so different Telegram accounts never share
+// persisted query data. Reads the current value from the auth store — Zustand
+// persist is synchronous so this is correct even in useState initialisers.
+function getCacheKey(): string {
+  const tgUserId = useAuthStore.getState().tgUserId;
+  return tgUserId != null ? `${STORAGE_KEY_PREFIX}/${tgUserId}` : STORAGE_KEY_PREFIX;
+}
+
 export function readPersistedSnapshot(): PersistedSnapshot | null {
   const storage = getStorage();
   if (!storage) return null;
   try {
-    const raw = storage.getItem(STORAGE_KEY);
+    const cacheKey = getCacheKey();
+    const raw = storage.getItem(cacheKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PersistedSnapshot;
-    if (parsed.buster !== CACHE_BUSTER) return null;
+    if (parsed.buster !== CACHE_BUSTER) {
+      storage.removeItem(cacheKey);
+      return null;
+    }
     if (Date.now() - parsed.timestamp > MAX_AGE_MS) {
-      storage.removeItem(STORAGE_KEY);
+      storage.removeItem(cacheKey);
       return null;
     }
     return parsed;
@@ -48,7 +62,12 @@ export function hasPersistedCache(): boolean {
 }
 
 export function hydrateQueryClient(queryClient: QueryClient): boolean {
+  const storage = getStorage();
   const snapshot = readPersistedSnapshot();
+  const cacheKey = getCacheKey();
+  if (cacheKey !== STORAGE_KEY_PREFIX && storage?.getItem(STORAGE_KEY_PREFIX)) {
+    storage.removeItem(STORAGE_KEY_PREFIX);
+  }
   if (!snapshot) return false;
   try {
     hydrate(queryClient, snapshot.clientState);
@@ -76,7 +95,9 @@ export function startPersistingQueryClient(queryClient: QueryClient): () => void
         buster: CACHE_BUSTER,
         clientState,
       };
-      storage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      // getCacheKey() is called at save time so it always uses the current
+      // (post-login) tgUserId, not the one from when the effect started.
+      storage.setItem(getCacheKey(), JSON.stringify(snapshot));
     } catch {
       // quota / serialization failures are non-fatal
     }
@@ -99,7 +120,7 @@ export function clearPersistedCache(): void {
   const storage = getStorage();
   if (!storage) return;
   try {
-    storage.removeItem(STORAGE_KEY);
+    storage.removeItem(getCacheKey());
   } catch {
     // ignore
   }

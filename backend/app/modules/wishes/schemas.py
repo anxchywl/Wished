@@ -33,6 +33,16 @@ class WishCreateRequest(BaseModel):
         normalized = value.strip()
         return normalized or None
 
+    @field_validator("url")
+    @classmethod
+    def validate_url_scheme(cls, value: str | None) -> str | None:
+        """only allow http and https URLs — blocks javascript:, data:, file:// etc."""
+        if value is None:
+            return None
+        if not value.startswith(("https://", "http://")):
+            raise ValueError("URL must use http or https scheme")
+        return value
+
     @field_validator("currency")
     @classmethod
     def normalize_currency(cls, value: str | None) -> str | None:
@@ -73,6 +83,16 @@ class WishUpdateRequest(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
+
+    @field_validator("url")
+    @classmethod
+    def validate_url_scheme(cls, value: str | None) -> str | None:
+        """only allow http and https URLs — blocks javascript:, data:, file:// etc."""
+        if value is None:
+            return None
+        if not value.startswith(("https://", "http://")):
+            raise ValueError("URL must use http or https scheme")
+        return value
 
     @field_validator("currency")
     @classmethod
@@ -129,6 +149,7 @@ class WishResponse(BaseModel):
     position: int
     price: Decimal | None
     currency: str | None
+    status: str
     images: list[WishImageResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

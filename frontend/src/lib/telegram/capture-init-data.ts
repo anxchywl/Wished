@@ -62,6 +62,20 @@ function removeTelegramInitDataTriggerFromLocation(): void {
 }
 
 /**
+ * extract telegram user id from raw init data string
+ */
+export function extractTgUserIdFromInitData(initDataRaw: string): number | null {
+  try {
+    const user = new URLSearchParams(initDataRaw).get("user");
+    if (!user) return null;
+    const parsed = JSON.parse(user) as { id?: unknown };
+    return typeof parsed.id === "number" ? parsed.id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * capture init data from url or webapp
  */
 export function captureTelegramInitDataFromLocation(): string | null {

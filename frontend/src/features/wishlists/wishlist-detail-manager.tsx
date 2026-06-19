@@ -946,7 +946,7 @@ function EditWishlistModal({
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-xl bg-red-500 text-white h-10 text-sm font-medium transition-colors disabled:opacity-60"
+                  className="theme-confirm-danger flex-1 rounded-xl h-10 text-sm font-medium disabled:opacity-60"
                   onClick={handleDeleteConfirm}
                   disabled={isPending}
                 >
@@ -1060,7 +1060,7 @@ function EditWishlistModal({
             </div>
           </div>
 
-          <div className={`${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
             <div
               className={`modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming
@@ -1101,7 +1101,7 @@ function EditWishlistModal({
               </div>
               <button
                 type="button"
-                className={`w-full rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/15 h-10 text-sm font-medium transition-colors mt-1`}
+                className="theme-press-danger w-full rounded-xl h-10 text-sm font-medium transition-colors mt-1"
                 onClick={() => setDeleteConfirming(true)}
               >
                 {t("deleteButton") ?? "Delete Wishlist"}
@@ -1282,7 +1282,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                   </div>
                 </div>
 
-                <div className="border-t border-border mt-2 pt-2 relative overflow-hidden">
+                <div className="modal-focus-footer border-t border-border mt-2 pt-2 relative overflow-hidden">
                   <div
                     className={`modal-footer-transition ${
                       focusMode.isFocusMode
@@ -1429,6 +1429,7 @@ function EditWishModal({
   onUpdate,
   onDelete,
   onUploadImage,
+  onDeleteImage,
   isPending,
 }: EditWishModalProps) {
   const { t } = useTranslation();
@@ -1440,25 +1441,31 @@ function EditWishModal({
   const [active, setActive] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
+  const [pendingCoverFile, setPendingCoverFile] = useState<PreviewFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localCoverPreview, setLocalCoverPreview] = useState<string | null>(null);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const lastInitializedId = useRef<string | null>(null);
 
   useEffect(() => {
     if (open && wish) {
       setActive(true);
-      setTitle(wish.title ?? "");
-      setDescription(wish.description ?? "");
-      setPrice(wish.price ?? "");
-      setCurrency(wish.currency ?? "");
-      if (!localCoverPreview) {
+      if (lastInitializedId.current !== wish.id) {
+        setTitle(wish.title ?? "");
+        setDescription(wish.description ?? "");
+        setPrice(wish.price ?? "");
+        setCurrency(wish.currency ?? "");
         setLocalCoverPreview(wish.images?.[0]?.url ?? null);
+        setPendingCropFile(null);
+        setPendingCoverFile(null);
+        setDeleteConfirming(false);
+        lastInitializedId.current = wish.id;
       }
-      setPendingCropFile(null);
-      setDeleteConfirming(false);
     } else {
       setActive(false);
       setLocalCoverPreview(null);
+      setPendingCoverFile(null);
+      lastInitializedId.current = null;
     }
   }, [open, wish]);
 
@@ -1488,6 +1495,12 @@ function EditWishModal({
         price: cleanPrice && cleanCurrency ? cleanPrice : null,
         currency: cleanPrice && cleanCurrency ? cleanCurrency : null,
       });
+      if (pendingCoverFile) {
+        if (hasImage && wish) {
+          wish.images?.forEach((img) => onDeleteImage(img.id));
+        }
+        onUploadImage(pendingCoverFile);
+      }
       onClose();
     }
   }
@@ -1551,7 +1564,7 @@ function EditWishModal({
                 </button>
                 <button
                   type="button"
-                  className="flex-1 rounded-xl bg-red-500 text-white h-10 text-sm font-medium transition-colors disabled:opacity-60"
+                  className="theme-confirm-danger flex-1 rounded-xl h-10 text-sm font-medium disabled:opacity-60"
                   onClick={handleDeleteConfirm}
                   disabled={isPending}
                 >
@@ -1668,7 +1681,7 @@ function EditWishModal({
           </div>
 
 
-          <div className={`${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
             <div
               className={`modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming
@@ -1709,7 +1722,7 @@ function EditWishModal({
               </div>
               <button
                 type="button"
-                className={`w-full rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/15 h-10 text-sm font-medium transition-colors mt-1`}
+                className="theme-press-danger w-full rounded-xl h-10 text-sm font-medium transition-colors mt-1"
                 onClick={() => setDeleteConfirming(true)}
               >
                 {t("deleteButton") ?? "Delete Wish"}
@@ -1730,7 +1743,7 @@ function EditWishModal({
               const blob = await res.blob();
               const newFile = Object.assign(new File([blob], croppedFile.name, { type: croppedFile.type }), { previewUrl: dataUrl });
               setLocalCoverPreview(dataUrl);
-              onUploadImage(newFile);
+              setPendingCoverFile(newFile);
             } catch (err) {
               console.error("Image upload failed", err);
             } finally {

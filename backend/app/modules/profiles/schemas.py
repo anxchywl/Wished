@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 ProfileVisibility = Literal["private", "public", "friends"]
 BirthdayVisibility = Literal["private", "public", "friends", "hidden"]
 WishlistVisibility = Literal["private", "public", "friends"]
+BookingVisibility = Literal["hide", "anonymous", "names"]
 
 
 class PrivacySettingsResponse(BaseModel):
@@ -14,6 +15,7 @@ class PrivacySettingsResponse(BaseModel):
     profile_visibility: ProfileVisibility
     birthday_visibility: BirthdayVisibility
     wishlist_visibility: WishlistVisibility
+    booking_visibility: BookingVisibility
 
 
 class ProfileResponse(BaseModel):
@@ -40,6 +42,7 @@ class PrivacySettingsUpdate(BaseModel):
     profile_visibility: ProfileVisibility | None = None
     birthday_visibility: BirthdayVisibility | None = None
     wishlist_visibility: WishlistVisibility | None = None
+    booking_visibility: BookingVisibility | None = None
 
 
 class ProfileUpdateRequest(BaseModel):

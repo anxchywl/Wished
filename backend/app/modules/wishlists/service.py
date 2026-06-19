@@ -1,9 +1,12 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.db.models import User, Wish, Wishlist
 from app.integrations.minio import delete_object
@@ -151,8 +154,8 @@ async def delete_wishlist(db: AsyncSession, current_user: User, wishlist_id: UUI
     for bucket, object_name in images_to_delete:
         try:
             delete_object(bucket, object_name)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("failed to delete minio object %s/%s: %s", bucket, object_name, exc)
 
 
 async def _get_owned_wishlist(

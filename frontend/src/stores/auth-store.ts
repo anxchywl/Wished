@@ -1,6 +1,7 @@
 "use client";
 
 import { logStartup } from "@/lib/debug/startup-log";
+import { captureTelegramInitDataFromLocation, extractTgUserIdFromInitData } from "@/lib/telegram/capture-init-data";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 
@@ -22,22 +23,38 @@ type AuthState = {
   setAuthStatus: (value: AuthStatus) => void;
   setTgUserId: (value: number | null) => void;
   setAppReady: (value: boolean) => void;
+  prepareAccountSwitch: (tgUserId: number) => void;
   clearAuth: () => void;
 };
 
 /**
  * derive initial authStatus synchronously from localStorage so warm starts
  * skip the bootstrap → waiting_for_telegram → authenticated waterfall.
- * accessToken/tgUserId still start as null and are hydrated by Zustand persist
- * — this keeps SSR and client first-render output identical (both show spinner).
+ *
+ * when telegram init data is already available, clear a confirmed mismatched
+ * session before react hydrates
  */
 function getInitialAuthStatus(): AuthStatus {
   if (typeof window === "undefined") return "bootstrap";
   try {
     const raw = window.localStorage.getItem("wished-auth");
     if (!raw) return "bootstrap";
-    const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null } };
-    return parsed?.state?.accessToken ? "authenticated" : "bootstrap";
+    const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null; tgUserId?: number | null } };
+    const { accessToken, tgUserId } = parsed?.state ?? {};
+    if (!accessToken) return "bootstrap";
+    if (!tgUserId) {
+      clearPersistedUserSession(tgUserId);
+      return "bootstrap";
+    }
+
+    const initDataRaw = captureTelegramInitDataFromLocation() || window.sessionStorage.getItem("wished/tgInitDataRaw");
+    const currentTgUserId = initDataRaw ? extractTgUserIdFromInitData(initDataRaw) : null;
+    if (currentTgUserId !== null && currentTgUserId !== tgUserId) {
+      clearPersistedUserSession(tgUserId);
+      return "bootstrap";
+    }
+
+    return "authenticated";
   } catch {
     return "bootstrap";
   }
@@ -67,6 +84,13 @@ export const useAuthStore = create<AuthState>()(
       },
       setTgUserId: (value) => set({ tgUserId: value }),
       setAppReady: (value) => set({ isAppReady: value }),
+      prepareAccountSwitch: (tgUserId) =>
+        set({
+          accessToken: null,
+          authStatus: "telegram_ready",
+          tgUserId,
+          isAppReady: false,
+        }),
       clearAuth: () =>
         set({
           accessToken: null,
@@ -124,4 +148,15 @@ function getStorage(): StateStorage {
   }
 
   return fallbackStorage;
+}
+
+/**
+ * clear persisted user credentials and query data
+ */
+function clearPersistedUserSession(tgUserId: number | null | undefined) {
+  window.localStorage.removeItem("wished-auth");
+  window.localStorage.removeItem("wished/query-cache/v1");
+  if (tgUserId != null) {
+    window.localStorage.removeItem(`wished/query-cache/v1/${tgUserId}`);
+  }
 }

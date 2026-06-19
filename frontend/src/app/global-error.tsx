@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { recoverFromChunkLoadError } from "@/lib/errors/chunk-load-recovery";
+
 type GlobalErrorProps = {
   error: Error & { digest?: string };
   reset: () => void;
@@ -9,6 +12,10 @@ type GlobalErrorProps = {
  * render startup error
  */
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  useEffect(() => {
+    recoverFromChunkLoadError(error);
+  }, [error]);
+
   return (
     <html lang="en">
       <body>
@@ -17,7 +24,11 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
           <p className="text-sm text-muted break-words">{error.message || "Unknown client error"}</p>
           <button
             className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-white"
-            onClick={reset}
+            onClick={() => {
+              if (!recoverFromChunkLoadError(error)) {
+                reset();
+              }
+            }}
             type="button"
           >
             Reload

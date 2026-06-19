@@ -25,14 +25,14 @@ import { useAuthStore } from "@/stores/auth-store";
 /**
  * load wishes
  */
-export function useWishesQuery(wishlistId: string) {
+export function useWishesQuery(wishlistId: string, enabled = true) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
     queryKey: wishQueryKeys.list(wishlistId),
     queryFn: () => listWishes(accessToken ?? "", wishlistId),
-    enabled: Boolean(authStatus === "authenticated" && accessToken && wishlistId),
+    enabled: Boolean(enabled && authStatus === "authenticated" && accessToken && wishlistId),
     staleTime: 2 * 60 * 1000,
   });
 }
@@ -146,8 +146,17 @@ export function useUpdateWishMutation(wishlistId: string) {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: WishUpdateInput }) =>
       updateWish(accessToken ?? "", id, input),
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+    onSuccess: (data, variables) => {
+      // Patch only the non-image fields so concurrent image uploads don't lose their
+      // optimistic preview when this refetch returns with images=[] (upload still in-flight).
+      queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => {
+        if (!current) return current;
+        return {
+          items: current.items.map((item) =>
+            item.id === variables.id ? { ...data, images: item.images } : item
+          ),
+        };
+      });
       if (variables.input.wishlist_id && variables.input.wishlist_id !== wishlistId) {
         queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(variables.input.wishlist_id) });
         queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
@@ -252,7 +261,7 @@ export function useUploadWishImageMutation(wishlistId: string) {
       }
     },
     onSuccess: (image, variables, context) => {
-      const imageUrl = context?.previewUrl && image.url.includes("localhost") ? context.previewUrl : image.url;
+      const imageUrl = context?.previewUrl && (image.url.includes("localhost") || image.url.includes("minio:9000") || image.url.includes("127.0.0.1")) ? context.previewUrl : image.url;
       queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => ({
         items: (current?.items ?? []).map((item) =>
           item.id === variables.wishId
@@ -266,7 +275,7 @@ export function useUploadWishImageMutation(wishlistId: string) {
             : item
         ),
       }));
-      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      // queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
     },
   });
 }
@@ -293,13 +302,14 @@ export function useDeleteWishImageMutation(wishlistId: string) {
       }));
       return { previousWishes };
     },
-    onError: (_error, _vars, context) => {
+    onError: (error, _vars, context) => {
+      console.error("DELETE IMAGE ERROR", error);
       if (context?.previousWishes) {
         queryClient.setQueryData(wishQueryKeys.list(wishlistId), context.previousWishes);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      // queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
     },
   });
 }

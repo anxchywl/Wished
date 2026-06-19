@@ -81,7 +81,10 @@ export function useCreateWishlistMutation() {
 
   return useMutation({
     mutationFn: (input: WishlistCreateInput) => createWishlist(accessToken ?? "", input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
+      queryClient.setQueryData(["wishes", data.id], { items: [] });
+    },
   });
 }
 

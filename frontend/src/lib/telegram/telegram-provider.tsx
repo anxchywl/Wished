@@ -6,7 +6,12 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { init, initDataRaw as sdkInitDataRaw, mockTelegramEnv } from "@telegram-apps/sdk-react";
 
 import { logStartup } from "@/lib/debug/startup-log";
-import { captureTelegramInitDataFromLocation, getEarlyCapturedInitDataRaw, storeEarlyInitDataRaw } from "@/lib/telegram/capture-init-data";
+import {
+  captureTelegramInitDataFromLocation,
+  getEarlyCapturedInitDataRaw,
+  storeEarlyInitDataRaw,
+  extractTgUserIdFromInitData,
+} from "@/lib/telegram/capture-init-data";
 import { useAuthStore } from "@/stores/auth-store";
 
 type TelegramContextValue = {
@@ -27,13 +32,15 @@ type TelegramProviderProps = {
 
 type TelegramWindow = Window & {
   Telegram?: {
-      WebApp?: {
+    WebApp?: {
       initData?: string;
       initDataUnsafe?: {
         user?: unknown;
       };
       ready?: () => void;
       expand?: () => void;
+      onEvent?: (event: string, callback: () => void) => void;
+      offEvent?: (event: string, callback: () => void) => void;
     };
   };
 };
@@ -155,8 +162,21 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
 
     void initializeTelegram();
 
+    const refreshInitData = () => {
+      const nextInitDataRaw = getTelegramInitDataRaw();
+      if (!nextInitDataRaw) return;
+      setInitDataRaw((current) => current === nextInitDataRaw ? current : nextInitDataRaw);
+    };
+    const webApp = (window as TelegramWindow).Telegram?.WebApp;
+    webApp?.onEvent?.("activated", refreshInitData);
+    window.addEventListener("focus", refreshInitData);
+    document.addEventListener("visibilitychange", refreshInitData);
+
     return () => {
       cancelled = true;
+      webApp?.offEvent?.("activated", refreshInitData);
+      window.removeEventListener("focus", refreshInitData);
+      document.removeEventListener("visibilitychange", refreshInitData);
     };
   }, []);
 
@@ -183,24 +203,62 @@ export function useTelegram() {
  * get telegram init data
  */
 function getTelegramInitDataRaw(): string | null {
-  const earlyCaptured = getEarlyCapturedInitDataRaw();
-  if (earlyCaptured) {
-    return earlyCaptured;
-  }
-
+  const telegramInitData = (window as TelegramWindow).Telegram?.WebApp?.initData;
+  const locationInitData = getTelegramInitDataFromLocation();
+  let signalInitDataRaw: string | null = null;
   try {
-    const signalInitDataRaw = sdkInitDataRaw();
-    if (signalInitDataRaw) {
-      storeEarlyInitDataRaw(signalInitDataRaw);
-      return signalInitDataRaw;
-    }
+    signalInitDataRaw = sdkInitDataRaw() || null;
   } catch {}
 
-  const telegramInitData = (window as TelegramWindow).Telegram?.WebApp?.initData;
-  if (telegramInitData) {
-    storeEarlyInitDataRaw(telegramInitData);
+  const liveInitData = selectNewestTelegramInitData([
+    telegramInitData || null,
+    locationInitData,
+    signalInitDataRaw,
+  ]);
+
+  if (liveInitData) {
+    const liveUserId = extractTgUserIdFromInitData(liveInitData);
+    const cachedInitData = getEarlyCapturedInitDataRaw();
+    const cachedUserId = cachedInitData ? extractTgUserIdFromInitData(cachedInitData) : null;
+
+    if (liveUserId !== null && cachedUserId !== null && liveUserId !== cachedUserId) {
+      console.info("Telegram user switched from", cachedUserId, "to", liveUserId, "- clearing storage");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.removeItem("wished/tgInitDataRaw");
+        window.localStorage.removeItem("wished-auth");
+        window.localStorage.removeItem("wished/query-cache/v1");
+        window.localStorage.removeItem(`wished/query-cache/v1/${cachedUserId}`);
+      }
+    }
+
+    storeEarlyInitDataRaw(liveInitData);
+    return liveInitData;
   }
-  return telegramInitData || null;
+
+  return getEarlyCapturedInitDataRaw();
+}
+
+function getTelegramInitDataFromLocation(): string | null {
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const rawInitData = searchParams.get("tgWebAppData") || hashParams.get("tgWebAppData");
+  return rawInitData && rawInitData !== "test" ? rawInitData : null;
+}
+
+function selectNewestTelegramInitData(candidates: Array<string | null>): string | null {
+  let selected: string | null = null;
+  let selectedAuthDate = -1;
+
+  for (const candidate of candidates) {
+    if (!candidate || !new URLSearchParams(candidate).has("hash")) continue;
+    const authDate = Number(new URLSearchParams(candidate).get("auth_date") ?? "0");
+    if (!selected || authDate > selectedAuthDate) {
+      selected = candidate;
+      selectedAuthDate = authDate;
+    }
+  }
+
+  return selected;
 }
 
 function hasTelegramLaunchParams(): boolean {

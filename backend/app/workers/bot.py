@@ -134,6 +134,7 @@ def _friend_discovery_keyboard(text: dict[str, str], web_app_url: str | None) ->
         resize_keyboard=True,
         one_time_keyboard=False,
         is_persistent=True,
+        input_field_placeholder=text["find_friends"],
     )
 
 
@@ -172,59 +173,60 @@ async def users_shared_handler(message: types.Message) -> None:
             for user in result.scalars().all()
         }
 
-    settings = get_settings()
-    for shared_user in shared_users:
-        user = registered_users.get(shared_user.user_id)
-        display_name = _shared_user_name(shared_user, text["unknown_user"])
-        if user and user.username:
-            discovery_token = await create_discovery_token(
-                get_redis_client(),
-                message.from_user.id,
-                user.telegram_id,
-            )
-            web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
-            profile_url = (
-                f"{web_app_url}/users"
-                f"?profile={user.username}"
-                f"&profile_token={discovery_token}"
-            )
+        settings = get_settings()
+        for shared_user in shared_users:
+            user = registered_users.get(shared_user.user_id)
+            display_name = _shared_user_name(shared_user, text["unknown_user"])
+            if user and user.username:
+                discovery_token = await create_discovery_token(
+                    get_redis_client(),
+                    message.from_user.id,
+                    user.telegram_id,
+                    db=db,
+                )
+                web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
+                profile_url = (
+                    f"{web_app_url}/users"
+                    f"?profile={user.username}"
+                    f"&profile_token={discovery_token}"
+                )
+                keyboard = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text=text["open_profile"].format(name=display_name),
+                                web_app=WebAppInfo(url=profile_url),
+                            )
+                        ]
+                    ]
+                )
+                await message.answer(
+                    text["registered"].format(name=display_name),
+                    reply_markup=keyboard,
+                )
+                continue
+
+            if user:
+                await message.answer(text["not_available"].format(name=display_name))
+                continue
+
+            bot_url = f"https://t.me/{settings.telegram_bot_username}"
+            invite_message = f"{INVITE_TEXT}"
+            invite_url = f"https://t.me/share/url?url={_urlencode(bot_url)}&text={_urlencode(invite_message)}"
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text=text["open_profile"].format(name=display_name),
-                            web_app=WebAppInfo(url=profile_url),
+                            text=text["invite"],
+                            url=invite_url,
                         )
                     ]
                 ]
             )
             await message.answer(
-                text["registered"].format(name=display_name),
+                text["not_registered"].format(name=display_name),
                 reply_markup=keyboard,
             )
-            continue
-
-        if user:
-            await message.answer(text["not_available"].format(name=display_name))
-            continue
-
-        bot_url = f"https://t.me/{settings.telegram_bot_username}"
-        invite_message = f"{INVITE_TEXT}"
-        invite_url = f"https://t.me/share/url?url={_urlencode(bot_url)}&text={_urlencode(invite_message)}"
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=text["invite"],
-                        url=invite_url,
-                    )
-                ]
-            ]
-        )
-        await message.answer(
-            text["not_registered"].format(name=display_name),
-            reply_markup=keyboard,
-        )
 
 
 def _shared_user_name(shared_user: types.SharedUser, fallback: str) -> str:

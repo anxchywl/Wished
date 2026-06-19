@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -50,7 +51,16 @@ async def create_reservation(
         status="active",
     )
     db.add(reservation)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # two concurrent requests raced through the for-update check;
+        # the partial unique index uq_reservations_wish_active rejected the loser
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is already reserved",
+        )
     await db.refresh(reservation)
     return _to_response(reservation)
 
@@ -120,7 +130,7 @@ async def get_wish_reservation_status(
 
 
 async def _get_accessible_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> Wish:
-    """find wish accessible to the user"""
+    """find wish accessible to the user — only returns active wishes for reservation purposes"""
     result = await db.execute(
         select(Wish)
         .options(selectinload(Wish.wishlist))
@@ -131,6 +141,11 @@ async def _get_accessible_wish(db: AsyncSession, current_user: User, wish_id: UU
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
     if wish.wishlist.owner_user_id != current_user.id and wish.wishlist.visibility != "public":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
+    if wish.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is not available for reservation",
+        )
     return wish
 
 
