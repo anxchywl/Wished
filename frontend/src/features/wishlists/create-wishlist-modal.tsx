@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ImageCropperModal } from "@/components/ui/image-cropper";
 import { finalizeTextInput, normalizeTextInput } from "@/lib/forms/input-normalize";
 import { useTranslation } from "@/lib/i18n/useTranslation";
-import { DEFAULT_COVER_GRADIENT, compressImage } from "./utils";
+import { compressImage } from "./utils";
 import type { WishlistVisibility } from "./types";
 import { getWishlistCoverStyle } from "./wishlist-visuals";
 import { useModalFocusMode } from "./use-modal-focus-mode";
@@ -14,7 +14,7 @@ import { useUIStore } from "@/stores/ui-store";
 type CreateWishlistModalProps = {
   open: boolean;
   onClose: () => void;
-  onCreate: (title: string, description: string | null, cover: string, visibility: WishlistVisibility) => void;
+  onCreate: (title: string, description: string | null, coverFile: File | null, visibility: WishlistVisibility) => void;
   isPending: boolean;
 };
 
@@ -30,6 +30,7 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [selectedCover, setSelectedCover] = useState<string>("");
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [visibility, setVisibility] = useState<WishlistVisibility>("public");
   const [active, setActive] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -42,6 +43,7 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
       setTitle("");
       setDescription("");
       setSelectedCover("");
+      setSelectedCoverFile(null);
       setVisibility("public");
       setPendingCropFile(null);
     } else {
@@ -71,7 +73,7 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
       }
       return;
     }
-    onCreate(cleanTitle, cleanDescription || null, selectedCover || DEFAULT_COVER_GRADIENT, visibility);
+    onCreate(cleanTitle, cleanDescription || null, selectedCoverFile, visibility);
   }
 
   function handleCancel() {
@@ -197,7 +199,7 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
                     style={
                       selectedCover
                         ? { backgroundImage: `url(${selectedCover})`, backgroundSize: "cover", backgroundPosition: "center", borderStyle: "solid" }
-                        : getWishlistCoverStyle({ coverStyle: DEFAULT_COVER_GRADIENT, fallback: fallbackCover })
+                        : getWishlistCoverStyle({ coverStyle: "", fallback: fallbackCover })
                     }
                   >
                     {selectedCover ? (
@@ -281,6 +283,9 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
               setCompressing(true);
               const dataUrl = await compressImage(croppedFile, 400, 400, 0.8);
               setSelectedCover(dataUrl);
+              const res = await fetch(dataUrl);
+              const blob = await res.blob();
+              setSelectedCoverFile(new File([blob], croppedFile.name, { type: "image/jpeg" }));
             } catch (err) {
               console.error("Image compression failed", err);
             } finally {

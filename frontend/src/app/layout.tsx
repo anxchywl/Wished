@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
 
-import { AppProviders } from "@/app/providers";
+import { ClientAppProviders } from "@/app/client-providers";
 import "@/app/globals.css";
 
 const captureTelegramInitDataScript = `
@@ -98,9 +98,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <Script id="recover-stale-chunks" strategy="beforeInteractive">
           {recoverStaleChunkScript}
         </Script>
-        <AppProviders>
-          {children}
-        </AppProviders>
+        <ClientAppProviders>{children}</ClientAppProviders>
       </body>
     </html>
   );

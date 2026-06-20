@@ -22,7 +22,7 @@ export function UserProfileManager({ username }: UserProfileManagerProps) {
   const router = useRouter();
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
-    : isAuthFailure(authStatus) || !accessToken
+    : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
       : "app";
 

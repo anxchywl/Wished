@@ -78,3 +78,26 @@ export function deleteWishlist(accessToken: string, wishlistId: string) {
     accessToken,
   });
 }
+
+/**
+ * upload wishlist cover image
+ */
+export function uploadWishlistCover(accessToken: string, wishlistId: string, file: File) {
+  const body = new FormData();
+  body.append("file", file);
+  return apiClient<Wishlist>(`/wishlists/${wishlistId}/cover`, {
+    method: "POST",
+    accessToken,
+    body,
+  });
+}
+
+/**
+ * delete wishlist cover image
+ */
+export function deleteWishlistCover(accessToken: string, wishlistId: string) {
+  return apiClient<Wishlist>(`/wishlists/${wishlistId}/cover`, {
+    method: "DELETE",
+    accessToken,
+  });
+}

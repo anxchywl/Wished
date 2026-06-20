@@ -1,19 +1,22 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
+from app.core.config import get_settings, Settings
 from app.db.models import User
 from app.modules.wishlists import (
     create_wishlist,
     delete_wishlist,
+    delete_wishlist_cover,
     get_wishlist,
     list_current_user_wishlists,
     reorder_wishlists,
     update_wishlist,
+    upload_wishlist_cover,
 )
 from app.modules.wishlists.schemas import (
     WishlistCreateRequest,
@@ -85,3 +88,26 @@ async def remove_wishlist(
     """delete wishlist"""
     await delete_wishlist(db, current_user, wishlist_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{wishlist_id}/cover", response_model=WishlistResponse)
+async def post_wishlist_cover(
+    wishlist_id: UUID,
+    file: UploadFile,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> WishlistResponse:
+    """upload or replace wishlist cover image"""
+    content = await file.read()
+    return await upload_wishlist_cover(db, current_user, wishlist_id, content, settings.minio_media_bucket)
+
+
+@router.delete("/{wishlist_id}/cover", response_model=WishlistResponse)
+async def remove_wishlist_cover(
+    wishlist_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WishlistResponse:
+    """remove wishlist cover image"""
+    return await delete_wishlist_cover(db, current_user, wishlist_id)

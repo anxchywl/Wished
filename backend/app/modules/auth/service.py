@@ -95,7 +95,7 @@ async def _get_or_create_user(db: AsyncSession, telegram_user: TelegramUserData)
 
 
 def _update_user_from_telegram(user: User, telegram_user: TelegramUserData) -> None:
-    """sync telegram fields"""
+    """sync telegram fields on every login so photo_url stays fresh"""
     user.username = telegram_user.username
     user.first_name = telegram_user.first_name
     user.last_name = telegram_user.last_name

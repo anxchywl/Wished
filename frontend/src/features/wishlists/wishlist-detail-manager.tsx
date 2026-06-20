@@ -40,10 +40,10 @@ import {
   useWishlistsQuery,
   useUpdateWishlistMutation,
   useDeleteWishlistMutation,
+  useUploadWishlistCoverMutation,
 } from "./hooks";
 import {
   compressImage,
-  DEFAULT_COVER_GRADIENT,
   parseWishlistDescription,
   formatWishlistDescription,
 } from "./utils";
@@ -124,6 +124,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   const [visibility, setVisibility] = useState<WishlistVisibility>("public");
   const [editModalOpen, setEditModalOpen] = useState(false);
 
+
   const [wishModalOpen, setWishModalOpen] = useState(false);
   const [selectedWish, setSelectedWish] = useState<Wish | null>(null);
   const [wishViewModalOpen, setWishViewModalOpen] = useState(false);
@@ -138,6 +139,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   const { data: wishlist, isError: wishlistError } = useWishlistQuery(wishlistId);
   const updateWishlistMutation = useUpdateWishlistMutation();
   const deleteWishlistMutation = useDeleteWishlistMutation();
+  const uploadCoverMutation = useUploadWishlistCoverMutation();
 
   // wishes query and mutations
   const wishesQuery = useWishesQuery(wishlistId);
@@ -176,10 +178,12 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   // load wishlist values into edit form state
   useEffect(() => {
     if (wishlist) {
-      const { description, coverStyle } = parseWishlistDescription(wishlist.description);
+      // strip any legacy [cover:...] from description for backward compat
+      const { description } = parseWishlistDescription(wishlist.description);
       setEditTitle(wishlist.title);
       setEditDesc(description ?? "");
-      setSelectedCover(coverStyle);
+      // display cover from MinIO URL, falling back to empty (gradient fallback kicks in)
+      setSelectedCover(wishlist.cover_medium_url ?? wishlist.cover_image_url ?? "");
       setVisibility(wishlist.visibility);
     }
   }, [wishlist]);
@@ -210,7 +214,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   }, [wishes, wishOrderIds]);
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
-    : isAuthFailure(authStatus) || !accessToken
+    : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
       : "app";
 
@@ -247,26 +251,29 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     );
   }
 
-  const { coverStyle } = parseWishlistDescription(wishlist.description);
+  const coverStyle = wishlist.cover_medium_url ?? wishlist.cover_image_url ?? "";
   const isOwner = !!currentUserId && wishlist.owner_user_id === currentUserId;
 
   // update wishlist settings
-  function handleSaveSettings(title: string, desc: string, cover: string, vis: WishlistVisibility) {
+  function handleSaveSettings(title: string, desc: string, coverFile: File | null, vis: WishlistVisibility) {
     const cleanTitle = finalizeTextInput(title, 120);
     const cleanDescription = finalizeTextInput(desc, 1000);
-    if (!cleanTitle || !cover) return;
+    if (!cleanTitle) return;
 
-    const formattedDesc = formatWishlistDescription(cleanDescription, cover);
+    const formattedDesc = formatWishlistDescription(cleanDescription);
     updateWishlistMutation.mutate({
       id: wishlistId,
       input: {
         title: cleanTitle,
-        description: formattedDesc,
+        description: formattedDesc || null,
         visibility: vis,
       },
     }, {
       onSuccess: () => {
         setEditModalOpen(false);
+        if (coverFile) {
+          uploadCoverMutation.mutate({ wishlistId, file: coverFile });
+        }
       }
     });
   }
@@ -991,7 +998,7 @@ function CopyWishModal({ open, onClose, onCopy, isPending }: CopyWishModalProps)
 type EditWishlistModalProps = {
   open: boolean;
   onClose: () => void;
-  onSave: (title: string, description: string, cover: string, visibility: WishlistVisibility) => void;
+  onSave: (title: string, description: string, coverFile: File | null, visibility: WishlistVisibility) => void;
   onDelete: () => void;
   isPending: boolean;
   initialTitle: string;
@@ -1021,6 +1028,7 @@ function EditWishlistModal({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [selectedCover, setSelectedCover] = useState(initialCover);
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
   const [visibility, setVisibility] = useState<WishlistVisibility>(initialVisibility);
   const [active, setActive] = useState(false);
   const [compressing, setCompressing] = useState(false);
@@ -1034,6 +1042,7 @@ function EditWishlistModal({
       setTitle(initialTitle);
       setDescription(initialDescription);
       setSelectedCover(initialCover);
+      setSelectedCoverFile(null);
       setVisibility(initialVisibility);
       setPendingCropFile(null);
       setDeleteConfirming(false);
@@ -1058,7 +1067,7 @@ function EditWishlistModal({
     setTitle(cleanTitle);
     setDescription(cleanDescription);
     if (cleanTitle) {
-      onSave(cleanTitle, cleanDescription, selectedCover, visibility);
+      onSave(cleanTitle, cleanDescription, selectedCoverFile, visibility);
     }
   }
 
@@ -1181,7 +1190,7 @@ function EditWishlistModal({
                 <div
                   className={hasCustomCover ? "wish-upload-cover-preview relative h-20 rounded-xl overflow-hidden border border-border text-left" : "wish-upload-cover-surface relative h-20 rounded-xl overflow-hidden cursor-pointer flex flex-col items-center justify-center gap-1 transition-all"}
                   onClick={() => fileInputRef.current?.click()}
-                  style={getWishlistCoverStyle({ coverStyle: selectedCover || DEFAULT_COVER_GRADIENT, fallback: fallbackCover })}
+                  style={getWishlistCoverStyle({ coverStyle: selectedCover, fallback: fallbackCover })}
                 >
                   {hasCustomCover ? (
                     <span className="wish-upload-cover-preview-label">{t("changeCover") ?? "Change Cover"}</span>
@@ -1291,6 +1300,9 @@ function EditWishlistModal({
               setCompressing(true);
               const dataUrl = await compressImage(croppedFile, 400, 400, 0.8);
               setSelectedCover(dataUrl);
+              const res = await fetch(dataUrl);
+              const blob = await res.blob();
+              setSelectedCoverFile(new File([blob], croppedFile.name, { type: "image/jpeg" }));
             } catch (err) {
               console.error("Image compression failed", err);
             } finally {

@@ -7,6 +7,9 @@ export type Wishlist = {
   description: string | null;
   visibility: WishlistVisibility;
   position: number;
+  cover_image_url: string | null;
+  cover_thumbnail_url: string | null;
+  cover_medium_url: string | null;
   created_at: string;
   updated_at: string;
 };

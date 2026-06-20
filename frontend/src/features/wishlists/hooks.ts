@@ -4,11 +4,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createWishlist,
   deleteWishlist,
+  deleteWishlistCover,
   getWishlist,
   listWishlists,
   listUserWishlists,
   reorderWishlists,
   updateWishlist,
+  uploadWishlistCover,
 } from "@/features/wishlists/api";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
 import type {
@@ -17,14 +19,14 @@ import type {
   WishlistReorderInput,
   WishlistUpdateInput,
 } from "@/features/wishlists/types";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, useSyncTgUserId } from "@/stores/auth-store";
 
 /**
  * load wishlists
  */
 export function useWishlistsQuery() {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
   const authStatus = useAuthStore((state) => state.authStatus);
 
   return useQuery({
@@ -40,7 +42,7 @@ export function useWishlistsQuery() {
  */
 export function useWishlistQuery(wishlistId: string) {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
   const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
 
@@ -77,7 +79,7 @@ export function useUserWishlistsQuery(username: string, profileToken?: string | 
 export function useCreateWishlistMutation() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useMutation({
     mutationFn: (input: WishlistCreateInput) => createWishlist(accessToken ?? "", input),
@@ -94,7 +96,7 @@ export function useCreateWishlistMutation() {
 export function useUpdateWishlistMutation() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: WishlistUpdateInput }) =>
@@ -112,7 +114,7 @@ export function useUpdateWishlistMutation() {
 export function useReorderWishlistsMutation() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useMutation({
     mutationKey: ["reorderWishlists"],
@@ -151,12 +153,47 @@ export function reorderWishlistItems(items: WishlistListResponse["items"], wishl
 }
 
 /**
+ * upload wishlist cover mutation
+ */
+export function useUploadWishlistCoverMutation() {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const tgUserId = useSyncTgUserId();
+
+  return useMutation({
+    mutationFn: ({ wishlistId, file }: { wishlistId: string; file: File }) =>
+      uploadWishlistCover(accessToken ?? "", wishlistId, file),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
+      queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.detail(data.id) });
+    },
+  });
+}
+
+/**
+ * delete wishlist cover mutation
+ */
+export function useDeleteWishlistCoverMutation() {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const tgUserId = useSyncTgUserId();
+
+  return useMutation({
+    mutationFn: (wishlistId: string) => deleteWishlistCover(accessToken ?? "", wishlistId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
+      queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.detail(data.id) });
+    },
+  });
+}
+
+/**
  * delete wishlist mutation
  */
 export function useDeleteWishlistMutation() {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useMutation({
     mutationFn: (id: string) => deleteWishlist(accessToken ?? "", id),

@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { followUser, getUserProfile, listFollowing, unfollowUser, type UserProfileResponse } from "@/features/users/api";
-import { useAuthStore } from "@/stores/auth-store";
+import { useAuthStore, useSyncTgUserId } from "@/stores/auth-store";
 
 export const userQueryKeys = {
   all: ["users"] as const,
@@ -31,7 +31,7 @@ export function useUserProfileQuery(username: string, profileToken?: string | nu
 export function useFollowingQuery() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useQuery({
     queryKey: userQueryKeys.following(tgUserId),
@@ -47,7 +47,7 @@ export function useFollowingQuery() {
 export function useFollowMutation(username: string, profileToken?: string | null) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const tgUserId = useSyncTgUserId();
 
   return useMutation({
     mutationFn: (nextFollowing: boolean) =>

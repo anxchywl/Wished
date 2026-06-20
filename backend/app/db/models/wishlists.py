@@ -23,6 +23,10 @@ class Wishlist(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="public")
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+    cover_image_bucket: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    cover_image_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    cover_image_thumbnail_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    cover_image_medium_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

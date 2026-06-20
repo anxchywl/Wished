@@ -3,8 +3,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { dehydrate, hydrate } from "@tanstack/react-query";
 
-import { useAuthStore } from "@/stores/auth-store";
-
 // Bump CACHE_BUSTER to invalidate persisted snapshots after breaking changes.
 const STORAGE_KEY_PREFIX = "wished/query-cache/v1";
 const CACHE_BUSTER = "2";
@@ -28,11 +26,20 @@ function getStorage(): Storage | null {
 }
 
 // Cache key is scoped by tgUserId so different Telegram accounts never share
-// persisted query data. Reads the current value from the auth store — Zustand
-// persist is synchronous so this is correct even in useState initialisers.
+// persisted query data. Reads directly from localStorage (not the Zustand store)
+// so it works correctly in synchronous useState initialisers before Zustand persist
+// has hydrated its async rehydration cycle.
 function getCacheKey(): string {
-  const tgUserId = useAuthStore.getState().tgUserId;
-  return tgUserId != null ? `${STORAGE_KEY_PREFIX}/${tgUserId}` : STORAGE_KEY_PREFIX;
+  if (typeof window === "undefined") return STORAGE_KEY_PREFIX;
+  try {
+    const raw = window.localStorage.getItem("wished-auth");
+    if (!raw) return STORAGE_KEY_PREFIX;
+    const parsed = JSON.parse(raw) as { state?: { tgUserId?: number | null } };
+    const tgUserId = parsed?.state?.tgUserId;
+    return tgUserId != null ? `${STORAGE_KEY_PREFIX}/${tgUserId}` : STORAGE_KEY_PREFIX;
+  } catch {
+    return STORAGE_KEY_PREFIX;
+  }
 }
 
 export function readPersistedSnapshot(): PersistedSnapshot | null {

@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +58,22 @@ class Settings(BaseSettings):
     upload_rate_per_hour: int = 100
 
     allowed_origins: list[str] = Field(default_factory=list)
+
+    admin_telegram_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("admin_telegram_ids", mode="before")
+    @classmethod
+    def parse_admin_telegram_ids(cls, v: object) -> list[int]:
+        if isinstance(v, list):
+            return [int(x) for x in v]
+        if isinstance(v, int):
+            return [v]
+        if isinstance(v, str):
+            val = v.strip()
+            if not val:
+                return []
+            return [int(x.strip()) for x in val.split(",") if x.strip()]
+        return []
 
     @computed_field
     @property

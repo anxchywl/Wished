@@ -126,6 +126,34 @@ export function isAuthFailure(authStatus: AuthStatus) {
   return authStatus === "unauthenticated" || authStatus === "error";
 }
 
+/**
+ * read tgUserId synchronously from local storage before zustand hydration
+ */
+export function getPersistedTgUserId(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("wished-auth");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: { tgUserId?: number | null } };
+    return parsed?.state?.tgUserId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * hook to get tgUserId immediately on client, skipping zustand hydration delay
+ */
+export function useSyncTgUserId(): number | null {
+  const tgUserId = useAuthStore((state) => state.tgUserId);
+  const hasHydrated = useAuthStore.persist?.hasHydrated() ?? false;
+
+  if (tgUserId === null && typeof window !== "undefined" && !hasHydrated) {
+    return getPersistedTgUserId();
+  }
+  return tgUserId;
+}
+
 const fallbackStorage: StateStorage = {
   getItem: () => null,
   setItem: () => undefined,

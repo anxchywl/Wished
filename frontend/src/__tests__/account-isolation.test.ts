@@ -102,6 +102,18 @@ describe("getInitialAuthStatus — sync identity check", () => {
     expect(status).toBe("authenticated");
   });
 
+  it("completes persisted auth hydration without rewriting credentials", async () => {
+    window.localStorage.setItem("wished-auth", makeStoredAuth(ACCESS_TOKEN, USER_A_ID));
+    window.sessionStorage.setItem("wished/tgInitDataRaw", makeInitDataRaw(USER_A_ID));
+
+    const { useAuthStore } = await import("@/stores/auth-store");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(useAuthStore.persist.hasHydrated()).toBe(true);
+    expect(useAuthStore.getState().accessToken).toBe(ACCESS_TOKEN);
+    expect(useAuthStore.getState().tgUserId).toBe(USER_A_ID);
+  });
+
   it("returns 'bootstrap' and wipes localStorage when a different user is in sessionStorage", async () => {
     window.localStorage.setItem("wished-auth", makeStoredAuth(ACCESS_TOKEN, USER_A_ID));
     window.localStorage.setItem(`wished/query-cache/v1/${USER_A_ID}`, "user-a-cache");

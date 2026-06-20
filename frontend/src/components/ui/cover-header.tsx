@@ -1,12 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { UIControls } from "@/components/ui/controls";
 import { BirthdayPicker } from "@/components/ui/birthday-picker";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useProfileQuery, useUpdateBirthdayMutation } from "@/features/profile";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { useAdminStatus } from "@/features/admin/hooks";
+
+/** read current user's Telegram profile photo URL directly from the WebApp SDK */
+function getTelegramPhotoUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const user = (window as unknown as {
+      Telegram?: { WebApp?: { initDataUnsafe?: { user?: { photo_url?: string } } } };
+    }).Telegram?.WebApp?.initDataUnsafe?.user;
+    return user?.photo_url ?? null;
+  } catch {
+    return null;
+  }
+}
 
 type CoverHeaderProps = {
   title: string;
@@ -19,11 +34,15 @@ type CoverHeaderProps = {
  */
 export function CoverHeader({ title, hideProfile = false, extraControls }: CoverHeaderProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const accessToken = useAuthStore((state) => state.accessToken);
   const coverStyle = useUIStore((state) => state.coverStyle);
   const { data: profile } = useProfileQuery(accessToken);
   const updateBirthday = useUpdateBirthdayMutation();
+  const { data: adminMe } = useAdminStatus();
+  const isAdmin = adminMe?.is_admin === true;
   const [pickerOpen, setPickerOpen] = useState(false);
+  const telegramPhotoUrl = getTelegramPhotoUrl();
 
   // derive display name
   const displayName = profile?.first_name
@@ -79,12 +98,18 @@ export function CoverHeader({ title, hideProfile = false, extraControls }: Cover
         {/* profile row */}
         {profile && !hideProfile && (
           <div className="cover-profile-row">
-            {/* avatar */}
-            <div className="cover-avatar">
-              {profile.photo_url ? (
+            {/* avatar — clickable only for admins */}
+            <button
+              type="button"
+              className="cover-avatar"
+              onClick={isAdmin ? () => router.push("/admin") : undefined}
+              disabled={!isAdmin}
+              aria-label={isAdmin ? "Admin panel" : undefined}
+            >
+              {telegramPhotoUrl ? (
                 <>
                   <img
-                    src={profile.photo_url}
+                    src={telegramPhotoUrl}
                     alt={displayName ?? ""}
                     className="cover-avatar-img"
                     onError={(e) => {
@@ -98,7 +123,7 @@ export function CoverHeader({ title, hideProfile = false, extraControls }: Cover
               ) : (
                 <span className="cover-avatar-initials">{initials}</span>
               )}
-            </div>
+            </button>
 
             {/* name + birthday */}
             <div className="cover-profile-meta">

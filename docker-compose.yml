@@ -35,6 +35,7 @@ services:
       MINIO_SECURE: ${MINIO_SECURE:-false}
       MINIO_MEDIA_BUCKET: ${MINIO_MEDIA_BUCKET:-wished-media}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-[]}
+      ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
     volumes:
       - ./backend/app:/app/app
     ports:

@@ -92,7 +92,7 @@ export function PublicWishlistNavigator({
   const activeUsername = username.trim().replace(/^@/, "");
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
-    : isAuthFailure(authStatus) || !accessToken
+    : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
       : "app";
 

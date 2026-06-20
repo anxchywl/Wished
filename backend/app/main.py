@@ -32,6 +32,8 @@ def create_app() -> FastAPI:
             raise RuntimeError("MINIO_SECRET_KEY must be set to a secure value in production")
         if not settings.telegram_bot_token:
             raise RuntimeError("TELEGRAM_BOT_TOKEN must be set in production")
+        if not settings.admin_telegram_ids:
+            logger.warning("ADMIN_TELEGRAM_IDS is empty — admin panel will be inaccessible")
 
     app = FastAPI(
         title=settings.app_name,

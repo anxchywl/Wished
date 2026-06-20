@@ -41,3 +41,21 @@ async def get_current_user(
         )
 
     return user
+
+
+def is_admin_user(user: User, settings: Settings) -> bool:
+    """check if user is in the admin telegram ids list"""
+    return user.telegram_id in settings.admin_telegram_ids
+
+
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> User:
+    """require admin telegram id membership"""
+    if not is_admin_user(current_user, settings):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user

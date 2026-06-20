@@ -26,6 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   useCreateWishlistMutation,
   useReorderWishlistsMutation,
+  useUploadWishlistCoverMutation,
   useWishlistsQuery,
 } from "@/features/wishlists/hooks";
 import { CreateWishlistModal } from "@/features/wishlists/create-wishlist-modal";
@@ -58,6 +59,7 @@ export function WishlistManager() {
 
   const wishlistsQuery = useWishlistsQuery();
   const createMutation = useCreateWishlistMutation();
+  const uploadCoverMutation = useUploadWishlistCoverMutation();
   const reorderMutation = useReorderWishlistsMutation();
 
   const sensors = useSensors(
@@ -87,21 +89,24 @@ export function WishlistManager() {
   function handleCreateWishlist(
     title: string,
     description: string | null,
-    cover: string,
+    coverFile: File | null,
     visibility: WishlistVisibility
   ) {
     const cleanTitle = finalizeTextInput(title, 120);
     const cleanDescription = description ? finalizeTextInput(description, 1000) : null;
-    const formattedDesc = formatWishlistDescription(cleanDescription, cover);
+    const formattedDesc = formatWishlistDescription(cleanDescription);
     createMutation.mutate(
       {
         title: cleanTitle,
-        description: formattedDesc,
+        description: formattedDesc || null,
         visibility,
       },
       {
-        onSuccess: () => {
+        onSuccess: (wishlist) => {
           setModalOpen(false);
+          if (coverFile) {
+            uploadCoverMutation.mutate({ wishlistId: wishlist.id, file: coverFile });
+          }
         },
       }
     );
@@ -137,7 +142,7 @@ export function WishlistManager() {
     !hasWishlists;
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
-    : isAuthFailure(authStatus) || !accessToken
+    : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
       : "app";
 

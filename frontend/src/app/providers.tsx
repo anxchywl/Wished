@@ -86,7 +86,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isReady) {
       // warm start: already have a token, keep authStatus and queries enabled
-      if (!accessToken) setAuthStatus("waiting_for_telegram");
+      if (!accessToken && authStatus !== "authenticated") setAuthStatus("waiting_for_telegram");
       return;
     }
 
@@ -125,7 +125,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       initDataRaw &&
       !accessToken &&
       !loginMutationRef.current.isPending &&
-      lastLoginInitDataRef.current !== initDataRaw
+      (lastLoginInitDataRef.current !== initDataRaw || authStatus === "unauthenticated")
     ) {
       lastLoginInitDataRef.current = initDataRaw;
       logStartup("login request starts", authStatus, {
@@ -187,11 +187,10 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     }
   }, [accessToken, tgUserId, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
 
-  // Gate holds until auth is resolved or 10s hard timeout.
-  // accessToken arrives when Zustand persist hydrates (< 1 frame after mount),
-  // so warm starts lift the gate immediately without waiting for Telegram SDK.
+  // warm sessions initialize synchronously and do not wait for telegram sdk startup
   const isLoading =
     !gateExpired &&
+    authStatus !== "authenticated" &&
     ((!isReady && !accessToken) ||
       (isAuthPending(authStatus) && !accessToken));
 

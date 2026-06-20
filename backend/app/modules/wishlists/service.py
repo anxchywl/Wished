@@ -1,5 +1,5 @@
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -9,7 +9,8 @@ from sqlalchemy.orm import selectinload
 logger = logging.getLogger(__name__)
 
 from app.db.models import User, Wish, Wishlist
-from app.integrations.minio import delete_object
+from app.integrations.minio import delete_object, get_presigned_url, upload_object
+from app.modules.media.processing import process_image
 from app.modules.wishlists.schemas import (
     WishlistCreateRequest,
     WishlistListResponse,
@@ -144,18 +145,95 @@ async def delete_wishlist(db: AsyncSession, current_user: User, wishlist_id: UUI
     )
     wishes = result.scalars().all()
     # collect image coordinates
-    images_to_delete = []
+    objects_to_delete: list[tuple[str, str]] = []
     for wish in wishes:
         for img in wish.images:
-            images_to_delete.append((img.bucket, img.object_name))
+            objects_to_delete.append((img.bucket, img.object_name))
+    # collect cover image objects
+    for obj_name in [
+        wishlist.cover_image_object_name,
+        wishlist.cover_image_thumbnail_object_name,
+        wishlist.cover_image_medium_object_name,
+    ]:
+        if wishlist.cover_image_bucket and obj_name:
+            objects_to_delete.append((wishlist.cover_image_bucket, obj_name))
     await db.delete(wishlist)
     await db.commit()
     # clean minio files
-    for bucket, object_name in images_to_delete:
+    for bucket, object_name in objects_to_delete:
         try:
             delete_object(bucket, object_name)
         except Exception as exc:
             logger.error("failed to delete minio object %s/%s: %s", bucket, object_name, exc)
+
+
+async def upload_wishlist_cover(
+    db: AsyncSession,
+    current_user: User,
+    wishlist_id: UUID,
+    content: bytes,
+    bucket: str,
+) -> WishlistResponse:
+    """upload and replace wishlist cover image"""
+    wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
+    thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+    image_id = uuid4()
+    full_name = f"wishlists/{wishlist_id}/{image_id}"
+    thumb_name = f"wishlists/{wishlist_id}/{image_id}-t"
+    medium_name = f"wishlists/{wishlist_id}/{image_id}-m"
+    # remember old objects to delete after commit
+    old_objects: list[tuple[str, str]] = []
+    for obj_name in [
+        wishlist.cover_image_object_name,
+        wishlist.cover_image_thumbnail_object_name,
+        wishlist.cover_image_medium_object_name,
+    ]:
+        if wishlist.cover_image_bucket and obj_name:
+            old_objects.append((wishlist.cover_image_bucket, obj_name))
+    upload_object(bucket, full_name, full_bytes, "image/webp")
+    upload_object(bucket, thumb_name, thumbnail_bytes, "image/webp")
+    upload_object(bucket, medium_name, medium_bytes, "image/webp")
+    wishlist.cover_image_bucket = bucket
+    wishlist.cover_image_object_name = full_name
+    wishlist.cover_image_thumbnail_object_name = thumb_name
+    wishlist.cover_image_medium_object_name = medium_name
+    await db.commit()
+    await db.refresh(wishlist)
+    for b, obj in old_objects:
+        try:
+            delete_object(b, obj)
+        except Exception as exc:
+            logger.warning("failed to delete old cover object %s/%s: %s", b, obj, exc)
+    return _to_response(wishlist)
+
+
+async def delete_wishlist_cover(
+    db: AsyncSession,
+    current_user: User,
+    wishlist_id: UUID,
+) -> WishlistResponse:
+    """remove wishlist cover image"""
+    wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
+    objects_to_delete: list[tuple[str, str]] = []
+    for obj_name in [
+        wishlist.cover_image_object_name,
+        wishlist.cover_image_thumbnail_object_name,
+        wishlist.cover_image_medium_object_name,
+    ]:
+        if wishlist.cover_image_bucket and obj_name:
+            objects_to_delete.append((wishlist.cover_image_bucket, obj_name))
+    wishlist.cover_image_bucket = None
+    wishlist.cover_image_object_name = None
+    wishlist.cover_image_thumbnail_object_name = None
+    wishlist.cover_image_medium_object_name = None
+    await db.commit()
+    await db.refresh(wishlist)
+    for b, obj in objects_to_delete:
+        try:
+            delete_object(b, obj)
+        except Exception as exc:
+            logger.warning("failed to delete cover object %s/%s: %s", b, obj, exc)
+    return _to_response(wishlist)
 
 
 async def _get_owned_wishlist(
@@ -201,6 +279,15 @@ async def get_accessible_wishlist(
 
 def _to_response(wishlist: Wishlist) -> WishlistResponse:
     """build wishlist response"""
+    cover_image_url = None
+    cover_thumbnail_url = None
+    cover_medium_url = None
+    if wishlist.cover_image_bucket and wishlist.cover_image_object_name:
+        cover_image_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_object_name)
+    if wishlist.cover_image_bucket and wishlist.cover_image_thumbnail_object_name:
+        cover_thumbnail_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_thumbnail_object_name)
+    if wishlist.cover_image_bucket and wishlist.cover_image_medium_object_name:
+        cover_medium_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_medium_object_name)
     return WishlistResponse(
         id=wishlist.id,
         owner_user_id=wishlist.owner_user_id,
@@ -208,6 +295,9 @@ def _to_response(wishlist: Wishlist) -> WishlistResponse:
         description=wishlist.description,
         visibility=wishlist.visibility,
         position=wishlist.position,
+        cover_image_url=cover_image_url,
+        cover_thumbnail_url=cover_thumbnail_url,
+        cover_medium_url=cover_medium_url,
         created_at=wishlist.created_at,
         updated_at=wishlist.updated_at,
     )

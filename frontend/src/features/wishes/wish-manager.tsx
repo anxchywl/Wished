@@ -56,7 +56,7 @@ export function WishManager({ wishlistId }: WishManagerProps) {
   const coverStyle = useUIStore((state) => state.coverStyle);
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
-    : isAuthFailure(authStatus) || !accessToken
+    : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
       : "app";
 

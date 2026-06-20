@@ -25,12 +25,10 @@ export function parseWishlistDescription(rawDescription: string | null | undefin
 }
 
 /**
- * format description with cover photo metadata
+ * format description — cover is now stored in MinIO, not embedded in description
  */
-export function formatWishlistDescription(description: string | null | undefined, coverStyle: string): string {
-  const clean = description ? description.trim() : "";
-  const meta = `[cover:${coverStyle}]`;
-  return clean ? `${clean}\n${meta}` : meta;
+export function formatWishlistDescription(description: string | null | undefined): string {
+  return description ? description.trim() : "";
 }
 
 /**

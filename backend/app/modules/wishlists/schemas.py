@@ -87,6 +87,9 @@ class WishlistResponse(BaseModel):
     description: str | None
     visibility: WishlistVisibility
     position: int
+    cover_image_url: str | None = None
+    cover_thumbnail_url: str | None = None
+    cover_medium_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
