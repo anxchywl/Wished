@@ -24,7 +24,7 @@ def test_list_wishes_returns_wishlist_wishes(monkeypatch) -> None:
 
     monkeypatch.setattr("app.api.v1.wishes.router.list_wishlist_wishes", fake_list_wishlist_wishes)
 
-    response = TestClient(app).get(f"/wishlists/{wishlist_id}/wishes")
+    response = TestClient(app).get(f"/api/v1/wishlists/{wishlist_id}/wishes")
 
     assert response.status_code == 200
     assert response.json()["items"][0]["title"] == "Noise-cancelling headphones"
@@ -55,7 +55,7 @@ def test_create_wish_accepts_price_currency_and_priority(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.wishes.router.create_wish", fake_create_wish)
 
     response = TestClient(app).post(
-        f"/wishlists/{wishlist_id}/wishes",
+        f"/api/v1/wishlists/{wishlist_id}/wishes",
         json={
             "title": " Keyboard ",
             "priority": 2,
@@ -88,7 +88,7 @@ def test_patch_wish_can_move_between_wishlists(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.wishes.router.update_wish", fake_update_wish)
 
     response = TestClient(app).patch(
-        f"/wishes/{wish_id}",
+        f"/api/v1/wishes/{wish_id}",
         json={"wishlist_id": str(target_wishlist_id)},
     )
 
@@ -113,7 +113,7 @@ def test_patch_wish_reorder_uses_payload(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.wishes.router.reorder_wishes", fake_reorder_wishes)
 
     response = TestClient(app).patch(
-        f"/wishlists/{wishlist_id}/wishes/reorder",
+        f"/api/v1/wishlists/{wishlist_id}/wishes/reorder",
         json={"wish_ids": [str(wish_id) for wish_id in wish_ids]},
     )
 
@@ -130,7 +130,7 @@ def test_patch_wish_reorder_rejects_duplicate_ids() -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
 
     response = TestClient(app).patch(
-        f"/wishlists/{wishlist_id}/wishes/reorder",
+        f"/api/v1/wishlists/{wishlist_id}/wishes/reorder",
         json={"wish_ids": [str(wish_id), str(wish_id)]},
     )
 
@@ -150,7 +150,7 @@ def test_delete_wish_returns_no_content(monkeypatch) -> None:
 
     monkeypatch.setattr("app.api.v1.wishes.router.delete_wish", fake_delete_wish)
 
-    response = TestClient(app).delete(f"/wishes/{wish_id}")
+    response = TestClient(app).delete(f"/api/v1/wishes/{wish_id}")
 
     assert response.status_code == 204
 
@@ -172,7 +172,7 @@ def test_copy_wish_uses_target_wishlist(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.wishes.router.copy_wish", fake_copy_wish)
 
     response = TestClient(app).post(
-        f"/wishes/{wish_id}/copy",
+        f"/api/v1/wishes/{wish_id}/copy",
         json={"wishlist_id": str(target_wishlist_id)},
     )
 
@@ -187,7 +187,7 @@ def test_create_wish_rejects_price_without_currency() -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
 
     response = TestClient(app).post(
-        f"/wishlists/{uuid4()}/wishes",
+        f"/api/v1/wishlists/{uuid4()}/wishes",
         json={"title": "Keyboard", "price": "129.99"},
     )
 
@@ -200,7 +200,7 @@ def test_create_wish_rejects_invalid_priority() -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
 
     response = TestClient(app).post(
-        f"/wishlists/{uuid4()}/wishes",
+        f"/api/v1/wishlists/{uuid4()}/wishes",
         json={"title": "Keyboard", "priority": 9},
     )
 

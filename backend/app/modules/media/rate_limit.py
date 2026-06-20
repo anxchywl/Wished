@@ -5,11 +5,12 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
 
-UPLOADS_PER_MINUTE = 20
-UPLOADS_PER_HOUR = 100
-
-
-async def check_upload_rate_limit(redis: Redis, user_id: UUID) -> None:
+async def check_upload_rate_limit(
+    redis: Redis,
+    user_id: UUID,
+    requests_per_minute: int,
+    requests_per_hour: int,
+) -> None:
     """increment upload counters and raise 429 if either limit is exceeded"""
     uid = str(user_id)
     per_minute_key = f"media:upload:min:{uid}"
@@ -25,12 +26,12 @@ async def check_upload_rate_limit(redis: Redis, user_id: UUID) -> None:
     minute_count: int = results[0]
     hour_count: int = results[2]
 
-    if minute_count > UPLOADS_PER_MINUTE:
+    if minute_count > requests_per_minute:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="upload rate limit exceeded — try again in a minute",
         )
-    if hour_count > UPLOADS_PER_HOUR:
+    if hour_count > requests_per_hour:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="upload rate limit exceeded — try again later",

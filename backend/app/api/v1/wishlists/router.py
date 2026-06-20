@@ -2,10 +2,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, UploadFile, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
 from app.core.config import get_settings, Settings
 from app.db.models import User
 from app.modules.wishlists import (
@@ -97,10 +99,17 @@ async def post_wishlist_cover(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     settings: Annotated[Settings, Depends(get_settings)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishlistResponse:
     """upload or replace wishlist cover image"""
-    content = await file.read()
-    return await upload_wishlist_cover(db, current_user, wishlist_id, content, settings.minio_media_bucket)
+    return await upload_wishlist_cover(
+        db,
+        current_user,
+        wishlist_id,
+        file,
+        settings,
+        redis,
+    )
 
 
 @router.delete("/{wishlist_id}/cover", response_model=WishlistResponse)

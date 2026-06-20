@@ -9,15 +9,6 @@ class TelegramAuthRequest(BaseModel):
     init_data: str = Field(min_length=1)
 
 
-class RefreshTokenRequest(BaseModel):
-    """refresh token request"""
-    refresh_token: str = Field(min_length=1)
-
-
-class LogoutRequest(BaseModel):
-    """logout request"""
-    refresh_token: str = Field(min_length=1)
-
 
 class UserResponse(BaseModel):
     """auth user response"""
@@ -32,9 +23,8 @@ class UserResponse(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """token response"""
+    """token response — refresh token is delivered as an httpOnly cookie"""
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     access_token_expires_at: datetime
     refresh_token_expires_at: datetime
@@ -42,9 +32,8 @@ class TokenResponse(BaseModel):
 
 
 class RefreshResponse(BaseModel):
-    """refresh response"""
+    """refresh response — new refresh token is delivered as an httpOnly cookie"""
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     access_token_expires_at: datetime
     refresh_token_expires_at: datetime

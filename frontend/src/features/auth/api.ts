@@ -14,11 +14,17 @@ export type UserResponse = {
 
 export type TokenResponse = {
   access_token: string;
-  refresh_token: string;
   token_type: string;
   access_token_expires_at: string;
   refresh_token_expires_at: string;
   user: UserResponse;
+};
+
+export type RefreshResponse = {
+  access_token: string;
+  token_type: string;
+  access_token_expires_at: string;
+  refresh_token_expires_at: string;
 };
 
 /**
@@ -26,12 +32,32 @@ export type TokenResponse = {
  */
 export function authenticateTelegram(initData: string) {
   if (!hasTelegramInitDataHash(initData)) {
-    return Promise.reject(new Error("Telegram init data hash is missing"));
+    return Promise.reject(new Error("Telegram init data missing hash"));
   }
 
   return apiClient<TokenResponse>("/auth/telegram", {
     method: "POST",
     body: { init_data: initData },
+  });
+}
+
+/**
+ * silently refresh the access token using the httpOnly refresh cookie
+ */
+export function refreshAuth() {
+  return apiClient<RefreshResponse>("/auth/refresh", {
+    method: "POST",
+    _skipRefresh: true,
+  });
+}
+
+/**
+ * revoke the refresh cookie and end the session
+ */
+export function logoutAuth() {
+  return apiClient<null>("/auth/logout", {
+    method: "POST",
+    _skipRefresh: true,
   });
 }
 

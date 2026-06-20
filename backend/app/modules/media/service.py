@@ -6,8 +6,6 @@ from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from app.core.config import Settings
 from app.db.models import User, Wish, WishImage, Wishlist
 from app.integrations.minio import delete_object, get_presigned_url, upload_object
@@ -15,6 +13,8 @@ from app.modules.media.processing import process_image
 from app.modules.media.rate_limit import check_upload_rate_limit
 from app.modules.media.schemas import WishImageListResponse, WishImageResponse
 from app.modules.media.validation import validate_image_upload
+
+logger = logging.getLogger(__name__)
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
@@ -47,7 +47,12 @@ async def upload_wish_image(
 ) -> WishImageResponse:
     """upload, validate, process, and store a wish image"""
     # rate limiting before any work
-    await check_upload_rate_limit(redis, current_user.id)
+    await check_upload_rate_limit(
+        redis,
+        current_user.id,
+        settings.upload_rate_per_minute,
+        settings.upload_rate_per_hour,
+    )
 
     await _get_owned_wish(db, current_user, wish_id)
 

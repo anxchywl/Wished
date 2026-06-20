@@ -1,16 +1,19 @@
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
+from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-logger = logging.getLogger(__name__)
-
-from app.db.models import User, Wish, Wishlist
+from app.core.config import Settings
+from app.db.models import User, Wish, WishImage, Wishlist
 from app.integrations.minio import delete_object, get_presigned_url, upload_object
 from app.modules.media.processing import process_image
+from app.modules.media.rate_limit import check_upload_rate_limit
+from app.modules.media.service import MAX_UPLOAD_BYTES
+from app.modules.media.validation import validate_image_upload
 from app.modules.wishlists.schemas import (
     WishlistCreateRequest,
     WishlistListResponse,
@@ -18,6 +21,8 @@ from app.modules.wishlists.schemas import (
     WishlistResponse,
     WishlistUpdateRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def list_current_user_wishlists(db: AsyncSession, current_user: User) -> WishlistListResponse:
@@ -148,7 +153,7 @@ async def delete_wishlist(db: AsyncSession, current_user: User, wishlist_id: UUI
     objects_to_delete: list[tuple[str, str]] = []
     for wish in wishes:
         for img in wish.images:
-            objects_to_delete.append((img.bucket, img.object_name))
+            objects_to_delete.extend(_image_objects(img))
     # collect cover image objects
     for obj_name in [
         wishlist.cover_image_object_name,
@@ -171,13 +176,44 @@ async def upload_wishlist_cover(
     db: AsyncSession,
     current_user: User,
     wishlist_id: UUID,
-    content: bytes,
-    bucket: str,
+    file: UploadFile,
+    settings: Settings,
+    redis: Redis,
 ) -> WishlistResponse:
     """upload and replace wishlist cover image"""
+    await check_upload_rate_limit(
+        redis,
+        current_user.id,
+        settings.upload_rate_per_minute,
+        settings.upload_rate_per_hour,
+    )
     wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
-    thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="uploaded file is empty")
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="file exceeds 5 MB limit",
+        )
+
+    validate_image_upload(
+        filename=file.filename or "",
+        declared_content_type=file.content_type or "",
+        content=content,
+    )
+
+    try:
+        thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
     image_id = uuid4()
+    bucket = settings.minio_media_bucket
     full_name = f"wishlists/{wishlist_id}/{image_id}"
     thumb_name = f"wishlists/{wishlist_id}/{image_id}-t"
     medium_name = f"wishlists/{wishlist_id}/{image_id}-m"
@@ -205,6 +241,15 @@ async def upload_wishlist_cover(
         except Exception as exc:
             logger.warning("failed to delete old cover object %s/%s: %s", b, obj, exc)
     return _to_response(wishlist)
+
+
+def _image_objects(image: WishImage) -> list[tuple[str, str]]:
+    objects = [(image.bucket, image.object_name)]
+    if image.thumbnail_object_name:
+        objects.append((image.bucket, image.thumbnail_object_name))
+    if image.medium_object_name:
+        objects.append((image.bucket, image.medium_object_name))
+    return objects
 
 
 async def delete_wishlist_cover(

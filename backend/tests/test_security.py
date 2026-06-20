@@ -19,7 +19,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import urlencode
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -176,6 +176,43 @@ class TestJWTSecretValidation:
         app = create_app()
         assert app is not None
 
+    def test_create_app_raises_in_production_with_default_postgres_password(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("JWT_SECRET_KEY", "secure-jwt-secret")
+        monkeypatch.setenv("MINIO_SECRET_KEY", "secure-minio-secret")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "wished")
+
+        from app.core.config import get_settings as _gs
+        _gs.cache_clear()
+
+        with pytest.raises(RuntimeError, match="POSTGRES_PASSWORD"):
+            create_app()
+
+        _gs.cache_clear()
+
+    def test_create_app_rejects_long_telegram_replay_window_in_production(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.setenv("JWT_SECRET_KEY", "secure-jwt-secret")
+        monkeypatch.setenv("MINIO_SECRET_KEY", "secure-minio-secret")
+        monkeypatch.setenv("POSTGRES_PASSWORD", "secure-postgres-password")
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+        monkeypatch.setenv("TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "86400")
+
+        from app.core.config import get_settings as _gs
+        _gs.cache_clear()
+
+        with pytest.raises(RuntimeError, match="TELEGRAM_INIT_DATA_MAX_AGE_SECONDS"):
+            create_app()
+
+        _gs.cache_clear()
+
 
 # ---------------------------------------------------------------------------
 # H3 — Telegram initData replay window
@@ -230,7 +267,7 @@ class TestAuthRateLimiting:
         app.dependency_overrides[get_redis] = _fake_redis_minute_exceeded
 
         response = TestClient(app).post(
-            "/auth/telegram",
+            "/api/v1/auth/telegram",
             json={"init_data": "whatever"},
         )
         assert response.status_code == 429
@@ -243,7 +280,7 @@ class TestAuthRateLimiting:
         app.dependency_overrides[get_redis] = _fake_redis_minute_exceeded
 
         response = TestClient(app).post(
-            "/auth/refresh",
+            "/api/v1/auth/refresh",
             json={"refresh_token": "whatever"},
         )
         assert response.status_code == 429
@@ -273,7 +310,6 @@ class TestAuthRateLimiting:
         async def fake_authenticate(db, telegram_user, settings):
             return TokenResponse(
                 access_token="tok",
-                refresh_token="rtok",
                 access_token_expires_at=datetime.now(UTC) + timedelta(minutes=15),
                 refresh_token_expires_at=datetime.now(UTC) + timedelta(days=30),
                 user=UserResponse(
@@ -286,12 +322,12 @@ class TestAuthRateLimiting:
                     language_code=None,
                     is_premium=None,
                 ),
-            )
+            ), "rtok"
 
         monkeypatch.setattr("app.api.v1.auth.router.validate_telegram_init_data", fake_validate)
         monkeypatch.setattr("app.api.v1.auth.router.authenticate_telegram_user", fake_authenticate)
 
-        response = TestClient(app).post("/auth/telegram", json={"init_data": "data"})
+        response = TestClient(app).post("/api/v1/auth/telegram", json={"init_data": "data"})
         assert response.status_code == 200
 
 
@@ -386,7 +422,7 @@ class TestWishURLValidation:
         app.dependency_overrides[get_db_session] = lambda: None
 
         response = TestClient(app).post(
-            f"/wishlists/{uuid4()}/wishes",
+            f"/api/v1/wishlists/{uuid4()}/wishes",
             json={"title": "Bad", "url": "javascript:alert(1)"},
         )
         assert response.status_code == 422
@@ -524,7 +560,7 @@ class TestMediaAccessAuthorization:
         app.dependency_overrides[get_db_session] = lambda: None
 
         response = TestClient(app, raise_server_exceptions=False).get(
-            f"/media/{uuid4()}"
+            f"/api/v1/media/{uuid4()}"
         )
         assert response.status_code == 401
 
@@ -533,7 +569,7 @@ class TestMediaAccessAuthorization:
         app.dependency_overrides[get_db_session] = lambda: None
 
         response = TestClient(app, raise_server_exceptions=False).get(
-            f"/wishes/{uuid4()}/images"
+            f"/api/v1/wishes/{uuid4()}/images"
         )
         assert response.status_code == 401
 
@@ -569,7 +605,7 @@ class TestValidationErrorHandler:
 
         secret_value = "super-secret-init-data-token"
         response = TestClient(app).post(
-            f"/wishlists/{uuid4()}/wishes",
+            f"/api/v1/wishlists/{uuid4()}/wishes",
             json={"title": "test", "url": secret_value},  # url fails scheme validation
         )
 

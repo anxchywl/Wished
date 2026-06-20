@@ -7,6 +7,7 @@ const allowedDevOrigins = process.env.NEXT_PUBLIC_TELEGRAM_DEV_ORIGINS
 const nextConfig: NextConfig = {
   assetPrefix: "/wished-assets-v2",
   devIndicators: false,
+  output: "standalone",
   reactStrictMode: true,
   async headers() {
     const documentHeaders = [

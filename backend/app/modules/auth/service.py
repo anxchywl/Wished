@@ -22,8 +22,8 @@ async def authenticate_telegram_user(
     db: AsyncSession,
     telegram_user: TelegramUserData,
     settings: Settings,
-) -> TokenResponse:
-    """authenticate telegram user"""
+) -> tuple[TokenResponse, str]:
+    """authenticate telegram user; returns (response, refresh_token_plaintext)"""
     user = await _get_or_create_user(db, telegram_user)
     _update_user_from_telegram(user, telegram_user)
     user.last_login_at = datetime.now(UTC)
@@ -37,24 +37,23 @@ async def authenticate_telegram_user(
 
     return TokenResponse(
         access_token=access_token,
-        refresh_token=refresh_token_value,
         access_token_expires_at=access_expires_at,
         refresh_token_expires_at=refresh_expires_at,
         user=_to_user_response(user),
-    )
+    ), refresh_token_value
 
 
 async def refresh_tokens(
     db: AsyncSession,
     refresh_token_value: str,
     settings: Settings,
-) -> RefreshResponse:
-    """rotate refresh token"""
+) -> tuple[RefreshResponse, str]:
+    """rotate refresh token; returns (response, new_refresh_token_plaintext)"""
     existing_token = await _get_active_refresh_token(db, refresh_token_value)
     existing_token.revoked_at = datetime.now(UTC)
 
     access_token, access_expires_at = create_access_token(existing_token.user_id, settings)
-    refresh_token_value, new_refresh_token, refresh_expires_at = _create_refresh_token(
+    new_refresh_token_value, new_refresh_token, refresh_expires_at = _create_refresh_token(
         existing_token.user_id,
         settings,
     )
@@ -64,10 +63,9 @@ async def refresh_tokens(
 
     return RefreshResponse(
         access_token=access_token,
-        refresh_token=refresh_token_value,
         access_token_expires_at=access_expires_at,
         refresh_token_expires_at=refresh_expires_at,
-    )
+    ), new_refresh_token_value
 
 
 async def logout(db: AsyncSession, refresh_token_value: str) -> None:

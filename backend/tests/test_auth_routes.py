@@ -25,7 +25,7 @@ def _fake_redis():
     return r
 
 
-def test_telegram_auth_endpoint_uses_validated_telegram_user(monkeypatch) -> None:
+def test_telegram_auth_sets_access_token_and_refresh_cookie(monkeypatch) -> None:
     app = create_app()
     app.dependency_overrides[get_db_session] = _override_db
     app.dependency_overrides[get_settings] = _override_settings
@@ -33,7 +33,7 @@ def test_telegram_auth_endpoint_uses_validated_telegram_user(monkeypatch) -> Non
 
     async def fake_authenticate_telegram_user(db, telegram_user, settings):
         assert telegram_user.telegram_id == 123456789
-        return _token_response()
+        return _token_response(), "refresh-token"
 
     def fake_validate_telegram_init_data(init_data, bot_token, max_age_seconds):
         assert init_data == "signed-init-data"
@@ -56,12 +56,14 @@ def test_telegram_auth_endpoint_uses_validated_telegram_user(monkeypatch) -> Non
         fake_validate_telegram_init_data,
     )
 
-    response = TestClient(app).post("/auth/telegram", json={"init_data": "signed-init-data"})
+    response = TestClient(app).post("/api/v1/auth/telegram", json={"init_data": "signed-init-data"})
 
     assert response.status_code == 200
-    assert response.json()["access_token"] == "access-token"
-    assert response.json()["refresh_token"] == "refresh-token"
-    assert response.json()["user"]["telegram_id"] == 123456789
+    body = response.json()
+    assert body["access_token"] == "access-token"
+    assert "refresh_token" not in body
+    assert body["user"]["telegram_id"] == 123456789
+    assert "refresh_token" in response.cookies
 
 
 def test_refresh_endpoint_rotates_refresh_token(monkeypatch) -> None:
@@ -74,23 +76,39 @@ def test_refresh_endpoint_rotates_refresh_token(monkeypatch) -> None:
         assert refresh_token == "old-refresh-token"
         return RefreshResponse(
             access_token="new-access-token",
-            refresh_token="new-refresh-token",
             access_token_expires_at=datetime.now(UTC) + timedelta(minutes=15),
             refresh_token_expires_at=datetime.now(UTC) + timedelta(days=30),
-        )
+        ), "new-refresh-token"
 
     monkeypatch.setattr("app.api.v1.auth.router.refresh_tokens", fake_refresh_tokens)
 
-    response = TestClient(app).post("/auth/refresh", json={"refresh_token": "old-refresh-token"})
+    response = TestClient(app).post(
+        "/api/v1/auth/refresh",
+        cookies={"refresh_token": "old-refresh-token"},
+    )
 
     assert response.status_code == 200
-    assert response.json()["access_token"] == "new-access-token"
-    assert response.json()["refresh_token"] == "new-refresh-token"
+    body = response.json()
+    assert body["access_token"] == "new-access-token"
+    assert "refresh_token" not in body
+    assert "refresh_token" in response.cookies
+
+
+def test_refresh_endpoint_returns_401_without_cookie() -> None:
+    app = create_app()
+    app.dependency_overrides[get_db_session] = _override_db
+    app.dependency_overrides[get_settings] = _override_settings
+    app.dependency_overrides[get_redis] = _fake_redis
+
+    response = TestClient(app).post("/api/v1/auth/refresh")
+
+    assert response.status_code == 401
 
 
 def test_logout_endpoint_revokes_refresh_token(monkeypatch) -> None:
     app = create_app()
     app.dependency_overrides[get_db_session] = _override_db
+    app.dependency_overrides[get_settings] = _override_settings
 
     called = False
 
@@ -101,10 +119,32 @@ def test_logout_endpoint_revokes_refresh_token(monkeypatch) -> None:
 
     monkeypatch.setattr("app.api.v1.auth.router.logout", fake_logout)
 
-    response = TestClient(app).post("/auth/logout", json={"refresh_token": "refresh-token"})
+    response = TestClient(app).post(
+        "/api/v1/auth/logout",
+        cookies={"refresh_token": "refresh-token"},
+    )
 
     assert response.status_code == 204
     assert called is True
+
+
+def test_logout_endpoint_succeeds_without_cookie() -> None:
+    app = create_app()
+    app.dependency_overrides[get_db_session] = _override_db
+    app.dependency_overrides[get_settings] = _override_settings
+
+    response = TestClient(app).post("/api/v1/auth/logout")
+
+    assert response.status_code == 204
+
+
+def test_unversioned_auth_route_is_not_registered() -> None:
+    response = TestClient(create_app()).post(
+        "/auth/telegram",
+        json={"init_data": "signed-init-data"},
+    )
+
+    assert response.status_code == 404
 
 
 async def _override_db():
@@ -121,7 +161,6 @@ def _override_settings() -> Settings:
 def _token_response() -> TokenResponse:
     return TokenResponse(
         access_token="access-token",
-        refresh_token="refresh-token",
         access_token_expires_at=datetime.now(UTC) + timedelta(minutes=15),
         refresh_token_expires_at=datetime.now(UTC) + timedelta(days=30),
         user=UserResponse(

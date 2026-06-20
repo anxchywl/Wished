@@ -1,0 +1,34 @@
+{$CADDY_DOMAIN} {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    request_body {
+        max_size 10MB
+    }
+
+    # API requests to the backend
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    # MinIO media objects — presigned URLs use this origin as the public endpoint.
+    # Set MINIO_PUBLIC_ENDPOINT=https://{$CADDY_DOMAIN} so generated URLs resolve here.
+    handle /wished-media/* {
+        reverse_proxy minio:9000
+    }
+
+    # Everything else goes to the frontend
+    handle {
+        reverse_proxy frontend:3000
+    }
+
+    log {
+        output stderr
+        format json
+    }
+}

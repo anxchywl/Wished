@@ -1,18 +1,29 @@
 services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wished-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: /api/v1
+    restart: unless-stopped
+    networks:
+      - wished-app
+
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.production
     container_name: wished-backend
     environment:
-      APP_ENV: ${APP_ENV:-development}
+      APP_ENV: production
       APP_NAME: ${APP_NAME:-Wished API}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
-      DEBUG: ${DEBUG:-false}
+      DEBUG: "false"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN must be set}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-30}
@@ -21,25 +32,21 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-wished}
       POSTGRES_USER: ${POSTGRES_USER:-wished}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wished}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD:-wished}@postgres:5432/${POSTGRES_DB:-wished}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wished}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_URL: redis://redis:6379/${REDIS_DB:-0}
       MINIO_ENDPOINT: minio:9000
-      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-wished}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-wished-password}
-      MINIO_SECURE: ${MINIO_SECURE:-false}
+      MINIO_PUBLIC_ENDPOINT: https://${CADDY_DOMAIN:?CADDY_DOMAIN must be set}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}
+      MINIO_SECURE: "false"
       MINIO_MEDIA_BUCKET: ${MINIO_MEDIA_BUCKET:-wished-media}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-[]}
       ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
-    volumes:
-      - ./backend/app:/app/app
-    ports:
-      - "${BACKEND_PORT:-8001}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,22 +54,28 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - wished-app
       - wished-data
-
 
   caddy:
     image: caddy:2-alpine
     container_name: wished-caddy
     ports:
-      - "8002:8000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
     volumes:
-      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - ./infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      CADDY_DOMAIN: ${CADDY_DOMAIN}
     depends_on:
       - backend
+      - frontend
+    restart: unless-stopped
     networks:
       - wished-app
       - wished-data
@@ -73,7 +86,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wished}
       POSTGRES_USER: ${POSTGRES_USER:-wished}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wished}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -81,6 +94,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
     networks:
       - wished-data
 
@@ -94,6 +108,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
     networks:
       - wished-data
 
@@ -102,10 +117,8 @@ services:
     container_name: wished-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-wished}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wished-password}
-    ports:
-      - "9000:9000"
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}
     volumes:
       - minio-data:/data
     healthcheck:
@@ -113,40 +126,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
     networks:
       - wished-data
 
   bot:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.production
     container_name: wished-bot
     command: python -m app.workers.bot
     environment:
-      APP_ENV: ${APP_ENV:-development}
+      APP_ENV: production
       APP_NAME: ${APP_NAME:-Wished Bot}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME}
-      TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN must be set}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+      TELEGRAM_MINI_APP_URL: ${TELEGRAM_MINI_APP_URL:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-wished}
       POSTGRES_USER: ${POSTGRES_USER:-wished}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wished}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD:-wished}@postgres:5432/${POSTGRES_DB:-wished}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wished}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_URL: redis://redis:6379/${REDIS_DB:-0}
-    volumes:
-      - ./backend/app:/app/app
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
     networks:
       - wished-app
       - wished-data
@@ -155,6 +168,8 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
+  caddy-data:
+  caddy-config:
 
 networks:
   wished-app:

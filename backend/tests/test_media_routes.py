@@ -1,5 +1,4 @@
 """media route tests"""
-import struct
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -88,7 +87,7 @@ def test_upload_wish_image_accepts_valid_jpeg(monkeypatch) -> None:
 
     app, _ = _make_app(monkeypatch, {"upload_wish_image": fake_upload})
     resp = TestClient(app).post(
-        f"/wishes/{wish_id}/images",
+        f"/api/v1/wishes/{wish_id}/images",
         files={"file": ("photo.jpg", b"\xff\xd8\xff" + b"\x00" * 100, "image/jpeg")},
     )
     assert resp.status_code == 201
@@ -107,7 +106,7 @@ def test_upload_wish_image_accepts_valid_png(monkeypatch) -> None:
 
     app, _ = _make_app(monkeypatch, {"upload_wish_image": fake_upload})
     resp = TestClient(app).post(
-        f"/wishes/{wish_id}/images",
+        f"/api/v1/wishes/{wish_id}/images",
         files={"file": ("photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
     )
     assert resp.status_code == 201
@@ -120,7 +119,7 @@ def test_upload_wish_image_rejects_missing_file() -> None:
     app.dependency_overrides[get_settings] = _settings
     app.dependency_overrides[get_redis] = _fake_redis
 
-    resp = TestClient(app).post(f"/wishes/{uuid4()}/images")
+    resp = TestClient(app).post(f"/api/v1/wishes/{uuid4()}/images")
     assert resp.status_code == 422
 
 
@@ -133,7 +132,7 @@ def test_delete_wish_image_returns_no_content(monkeypatch) -> None:
         assert iid == image_id
 
     app, _ = _make_app(monkeypatch, {"delete_wish_image": fake_delete})
-    resp = TestClient(app).delete(f"/wishes/{wish_id}/images/{image_id}")
+    resp = TestClient(app).delete(f"/api/v1/wishes/{wish_id}/images/{image_id}")
     assert resp.status_code == 204
 
 
@@ -250,7 +249,7 @@ async def test_rate_limit_raises_429_when_per_minute_exceeded() -> None:
     redis.pipeline = MagicMock(return_value=pipe)
 
     with pytest.raises(HTTPException) as exc_info:
-        await check_upload_rate_limit(redis, uuid4())
+        await check_upload_rate_limit(redis, uuid4(), 20, 100)
     assert exc_info.value.status_code == 429
 
 
@@ -270,7 +269,7 @@ async def test_rate_limit_raises_429_when_per_hour_exceeded() -> None:
     redis.pipeline = MagicMock(return_value=pipe)
 
     with pytest.raises(HTTPException) as exc_info:
-        await check_upload_rate_limit(redis, uuid4())
+        await check_upload_rate_limit(redis, uuid4(), 20, 100)
     assert exc_info.value.status_code == 429
 
 
@@ -288,4 +287,4 @@ async def test_rate_limit_passes_within_limits() -> None:
     redis.pipeline = MagicMock(return_value=pipe)
 
     # should not raise
-    await check_upload_rate_limit(redis, uuid4())
+    await check_upload_rate_limit(redis, uuid4(), 20, 100)

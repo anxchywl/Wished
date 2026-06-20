@@ -38,7 +38,7 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
-    response = TestClient(app).get("/users/bob")
+    response = TestClient(app).get("/api/v1/users/bob")
 
     assert response.status_code == 200
     assert response.json()["username"] == "bob"
@@ -68,7 +68,7 @@ def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
-    response = TestClient(app).get("/users/bob")
+    response = TestClient(app).get("/api/v1/users/bob")
 
     assert response.status_code == 404
 
@@ -105,7 +105,7 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
     monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
-    response = TestClient(app).get("/users/bob/wishlists")
+    response = TestClient(app).get("/api/v1/users/bob/wishlists")
 
     assert response.status_code == 200
     assert response.json() == {"items": []}

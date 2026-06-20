@@ -14,7 +14,7 @@ def test_get_me_returns_current_profile() -> None:
     user = _user()
     app.dependency_overrides[get_current_user] = lambda: user
 
-    response = TestClient(app).get("/me")
+    response = TestClient(app).get("/api/v1/me")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -47,7 +47,7 @@ def test_patch_me_updates_profile_fields() -> None:
     app.dependency_overrides[get_db_session] = lambda: db
 
     response = TestClient(app).patch(
-        "/me",
+        "/api/v1/me",
         json={
             "birthday": None,
             "privacy": {
@@ -77,7 +77,7 @@ def test_patch_me_rejects_future_birthday() -> None:
     app.dependency_overrides[get_current_user] = lambda: _user()
     app.dependency_overrides[get_db_session] = lambda: FakeDb()
 
-    response = TestClient(app).patch("/me", json={"birthday": "2999-01-01"})
+    response = TestClient(app).patch("/api/v1/me", json={"birthday": "2999-01-01"})
 
     assert response.status_code == 422
 
@@ -87,7 +87,7 @@ def test_patch_me_rejects_read_only_telegram_fields() -> None:
     app.dependency_overrides[get_current_user] = lambda: _user()
     app.dependency_overrides[get_db_session] = lambda: FakeDb()
 
-    response = TestClient(app).patch("/me", json={"username": "mallory"})
+    response = TestClient(app).patch("/api/v1/me", json={"username": "mallory"})
 
     assert response.status_code == 422
 
