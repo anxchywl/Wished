@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 
 type BirthdayPickerProps = {
@@ -8,6 +9,7 @@ type BirthdayPickerProps = {
   initial?: string | null;
   onClose: () => void;
   onSave: (date: string) => void;
+  onClear?: () => void;
 };
 
 const currentYear = new Date().getFullYear();
@@ -17,7 +19,7 @@ const defaultBirthday = { year: 2007, month: 11, day: 22 };
 /**
  * birthday date picker bottom sheet
  */
-export function BirthdayPicker({ open, initial, onClose, onSave }: BirthdayPickerProps) {
+export function BirthdayPicker({ open, initial, onClose, onSave, onClear }: BirthdayPickerProps) {
   const { t } = useTranslation();
   const backdropRef = useRef<HTMLDivElement>(null);
   const yearRef = useRef<HTMLDivElement>(null);
@@ -98,7 +100,7 @@ export function BirthdayPicker({ open, initial, onClose, onSave }: BirthdayPicke
 
   if (!open) return null;
 
-  return (
+  const picker = (
     <div
       ref={backdropRef}
       className={`birthday-picker-backdrop ${visible ? "visible" : ""}`}
@@ -108,7 +110,24 @@ export function BirthdayPicker({ open, initial, onClose, onSave }: BirthdayPicke
     >
       <div className={`birthday-picker-sheet ${visible ? "visible" : ""}`}>
         <div className="birthday-picker-handle" />
-        <p className="birthday-picker-title">{t("birthday")}</p>
+        <div className="birthday-picker-header">
+          {initial && onClear ? (
+            <button
+              className="birthday-picker-clear"
+              type="button"
+              onClick={onClear}
+              aria-label={t("removeBirthday")}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" d="M7 12h10" />
+              </svg>
+            </button>
+          ) : (
+            <span className="birthday-picker-header-spacer" />
+          )}
+          <p className="birthday-picker-title">{t("birthday")}</p>
+          <span className="birthday-picker-header-spacer" />
+        </div>
 
         <div className="birthday-picker-wheel" aria-label="Birthday chooser">
           <div className="birthday-picker-selection" />
@@ -194,4 +213,6 @@ export function BirthdayPicker({ open, initial, onClose, onSave }: BirthdayPicke
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(picker, document.body) : null;
 }

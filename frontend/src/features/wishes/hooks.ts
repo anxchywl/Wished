@@ -2,12 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  completeWish,
   createWish,
   copyWish,
   deleteWish,
   deleteWishImage,
   listWishes,
   reorderWishes,
+  uncompleteWish,
   updateWish,
   uploadWishImage,
 } from "@/features/wishes/api";
@@ -20,6 +22,10 @@ import type {
   WishUpdateInput,
 } from "@/features/wishes/types";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
+import {
+  bookedWishesQueryKey,
+  reservationQueryKeys,
+} from "@/features/reservations/hooks";
 import { useAuthStore } from "@/stores/auth-store";
 
 /**
@@ -28,13 +34,49 @@ import { useAuthStore } from "@/stores/auth-store";
 export function useWishesQuery(wishlistId: string, enabled = true) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: wishQueryKeys.list(wishlistId),
-    queryFn: () => listWishes(accessToken ?? "", wishlistId),
+    queryFn: async () => {
+      const response = await listWishes(accessToken ?? "", wishlistId);
+      const cached = queryClient.getQueryData<WishListResponse>(wishQueryKeys.list(wishlistId));
+      return preserveWishImageUrls(response, cached);
+    },
     enabled: Boolean(enabled && authStatus === "authenticated" && accessToken && wishlistId),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 1_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: "always",
   });
+}
+
+function preserveWishImageUrls(
+  response: WishListResponse,
+  cached: WishListResponse | undefined,
+): WishListResponse {
+  if (!cached) return response;
+
+  const cachedImages = new Map(
+    cached.items.flatMap((wish) => wish.images.map((image) => [image.id, image] as const)),
+  );
+
+  return {
+    items: response.items.map((wish) => ({
+      ...wish,
+      images: wish.images.map((image) => {
+        const cachedImage = cachedImages.get(image.id);
+        return cachedImage
+          ? {
+              ...image,
+              url: cachedImage.url,
+              thumbnail_url: cachedImage.thumbnail_url,
+              medium_url: cachedImage.medium_url,
+            }
+          : image;
+      }),
+    })),
+  };
 }
 
 /**
@@ -62,6 +104,7 @@ export function useCreateWishMutation(wishlistId: string) {
         position: -1,
         price: input.price ?? null,
         currency: input.currency ?? null,
+        status: "active",
         images: [],
         created_at: timestamp,
         updated_at: timestamp,
@@ -260,22 +303,71 @@ export function useUploadWishImageMutation(wishlistId: string) {
         queryClient.setQueryData(wishQueryKeys.list(wishlistId), context.previousWishes);
       }
     },
-    onSuccess: (image, variables, context) => {
-      const imageUrl = context?.previewUrl && (image.url.includes("localhost") || image.url.includes("minio:9000") || image.url.includes("127.0.0.1")) ? context.previewUrl : image.url;
+    onSuccess: async (image, variables, context) => {
+      const displayedImage = context?.previewUrl
+        ? {
+            ...image,
+            url: context.previewUrl,
+            thumbnail_url: context.previewUrl,
+            medium_url: context.previewUrl,
+          }
+        : image;
       queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => ({
         items: (current?.items ?? []).map((item) =>
           item.id === variables.wishId
             ? {
                 ...item,
                 images: [
-                  { ...image, url: imageUrl },
+                  displayedImage,
                   ...item.images.filter((currentImage) => currentImage.id !== image.id && !currentImage.id.startsWith("preview-")),
                 ],
               }
             : item
         ),
       }));
-      // queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      await queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+    },
+  });
+}
+
+/**
+ * complete wish mutation (mark as fulfilled)
+ */
+export function useCompleteWishMutation(wishlistId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (wishId: string) => completeWish(accessToken ?? "", wishId),
+    onSuccess: (data) => {
+      queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => {
+        if (!current) return current;
+        return { items: current.items.map((item) => (item.id === data.id ? data : item)) };
+      });
+      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(data.id) });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+    },
+  });
+}
+
+/**
+ * uncomplete wish mutation (restore to active)
+ */
+export function useUncompleteWishMutation(wishlistId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (wishId: string) => uncompleteWish(accessToken ?? "", wishId),
+    onSuccess: (data) => {
+      queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => {
+        if (!current) return current;
+        return { items: current.items.map((item) => (item.id === data.id ? data : item)) };
+      });
+      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(data.id) });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }
@@ -307,9 +399,6 @@ export function useDeleteWishImageMutation(wishlistId: string) {
       if (context?.previousWishes) {
         queryClient.setQueryData(wishQueryKeys.list(wishlistId), context.previousWishes);
       }
-    },
-    onSuccess: () => {
-      // queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
     },
   });
 }

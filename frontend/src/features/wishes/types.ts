@@ -21,6 +21,7 @@ export type Wish = {
   position: number;
   price: string | null;
   currency: string | null;
+  status: string;
   images: WishImage[];
   created_at: string;
   updated_at: string;

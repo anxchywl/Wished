@@ -91,6 +91,7 @@ async def test_users_shared_handler_matches_selected_users(monkeypatch) -> None:
     await bot.users_shared_handler(message)
 
     assert message.answers[0]["text"] == "Alice is registered in Wished."
+    assert message.answers[0]["message_effect_id"] == "5046509860389126442"
     assert message.deleted is False
     button = message.answers[0]["reply_markup"].inline_keyboard[0][0]
     assert button.web_app.url == "https://example.com/users?profile=alice&profile_token=test-token"
@@ -132,9 +133,9 @@ class FakeMessage:
         self.answers = []
         self.deleted = False
 
-    async def answer(self, text, reply_markup=None) -> None:
+    async def answer(self, text, reply_markup=None, **kwargs) -> None:
         """capture answer"""
-        self.answers.append({"text": text, "reply_markup": reply_markup})
+        self.answers.append({"text": text, "reply_markup": reply_markup, **kwargs})
 
     async def delete(self) -> None:
         """capture deletion"""

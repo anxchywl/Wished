@@ -64,11 +64,17 @@ import { useModalFocusMode } from "./use-modal-focus-mode";
 import { ImageCropperModal } from "@/components/ui/image-cropper";
 import { useProfileQuery } from "@/features/profile/hooks";
 import { logStartup } from "@/lib/debug/startup-log";
+import { encodeWishlistStartParam } from "@/lib/telegram/start-param";
 import {
   useCreateReservationMutation,
   useCancelReservationMutation,
+  useRemoveWishReservationMutation,
   useReservationStatusQuery,
 } from "@/features/reservations/hooks";
+import {
+  useCompleteWishMutation,
+  useUncompleteWishMutation,
+} from "@/features/wishes/hooks";
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
@@ -274,12 +280,17 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     });
   }
 
-  // share profile to telegram
+  // share wishlist to telegram
   function handleShare() {
     const username = profileQuery.data?.username;
-    if (!username) return;
-    const shareUrl = `${window.location.origin}/users/${encodeURIComponent(username)}`;
-    const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}`;
+    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
+    if (!username || !botUsername) return;
+    const startParam = encodeWishlistStartParam(username, wishlistId);
+    const miniAppUrl = `https://t.me/${botUsername}?startapp=${encodeURIComponent(startParam)}`;
+    const shareText = t("shareWishlistText").replace("{wishlist}", wishlist?.title ?? "");
+    const tgShareUrl =
+      `https://t.me/share/url?url=${encodeURIComponent(miniAppUrl)}` +
+      `&text=${encodeURIComponent(shareText)}`;
     const win = window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } };
     if (typeof window !== "undefined" && win.Telegram?.WebApp?.openTelegramLink) {
       win.Telegram.WebApp.openTelegramLink(tgShareUrl);
@@ -566,24 +577,47 @@ function WishRowOverlay({ wish }: { wish: Wish }) {
 }
 
 function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: boolean; isLast: boolean; onClick: () => void }) {
+  const isCompleted = wish.status === "completed";
+  const reservationStatus = useReservationStatusQuery(wish.id);
+  const isBooked = reservationStatus.data?.is_reserved ?? false;
+  const isMine = reservationStatus.data?.is_mine ?? false;
+  const ownerBookingVisibility = reservationStatus.data?.owner_booking_visibility ?? "hide";
+  const showBooked = !isCompleted && isBooked && (isMine || ownerBookingVisibility !== "hide");
   return (
     <div
       onClick={onClick}
       onContextMenu={(event) => {
         if (isOwner) event.preventDefault();
       }}
-      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isOwner ? "cursor-grab" : "cursor-pointer"} ${isLast ? "" : "border-b border-border/60"}`}
+      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"} ${isLast ? "" : "border-b border-border/60"}`}
     >
       <div className="flex items-center gap-3 pointer-events-none">
-        <WishImageThumb
-          id={wish.id}
-          title={wish.title}
-          imageUrl={wish.images?.[0]?.url}
-          className="w-12 h-12 rounded-xl object-cover"
-        />
+        <div className="relative">
+          <WishImageThumb
+            id={wish.id}
+            title={wish.title}
+            imageUrl={wish.images?.[0]?.url}
+            className="w-12 h-12 rounded-xl object-cover"
+          />
+          {isCompleted && (
+            <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/30">
+              <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+          {showBooked && (
+            <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-slate-700/35">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <rect x="6" y="10" width="12" height="9" rx="2" />
+                <path strokeLinecap="round" d="M9 10V7a3 3 0 0 1 6 0v3" />
+              </svg>
+            </div>
+          )}
+        </div>
         <div className="flex flex-col">
           <span className="font-semibold text-sm text-foreground">{wish.title}</span>
-          {wish.price && (
+          {wish.price && !isCompleted && (
             <span className="text-xs text-muted mt-0.5">
               {formatPrice(wish.price, wish.currency)}
             </span>
@@ -613,22 +647,40 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
+  const removeReservation = useRemoveWishReservationMutation(wishlistId);
+  const completeWishMutation = useCompleteWishMutation(wishlistId);
+  const uncompleteWishMutation = useUncompleteWishMutation(wishlistId);
   const copyWish = useCopyWishMutation(wishlistId);
 
   useEffect(() => {
-    setActive(open);
+    if (open) {
+      requestAnimationFrame(() => setActive(true));
+    } else {
+      setActive(false);
+    }
+    if (!open) setRemoveBookingConfirming(false);
   }, [open]);
 
   if (!open || !wish) return null;
 
-  const status = reservationStatus.data;
-  const isReserved = status?.is_reserved ?? false;
-  const isMine = status?.is_mine ?? false;
-  const reservationId = status?.reservation_id ?? null;
+  function handleClose() {
+    setActive(false);
+    window.setTimeout(onClose, 340);
+  }
 
+  const reservStatus = reservationStatus.data;
+  const isReserved = reservStatus?.is_reserved ?? false;
+  const isMine = reservStatus?.is_mine ?? false;
+  const reservationId = reservStatus?.reservation_id ?? null;
+  const ownerBookingVisibility = reservStatus?.owner_booking_visibility ?? "hide";
+  const reserverDisplayName = reservStatus?.reserver_display_name ?? null;
+  const isCompleted = wish.status === "completed";
+
+  // booking actions available to non-owner viewer
   function handleBookToggle() {
     if (isMine && reservationId) {
       cancelReservation.mutate({ reservationId, wishId: wish!.id });
@@ -637,7 +689,16 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     }
   }
 
-  const isBusy = createReservation.isPending || cancelReservation.isPending;
+  // owner self-booking
+  function handleOwnerBook() {
+    if (isMine && reservationId) {
+      cancelReservation.mutate({ reservationId, wishId: wish!.id });
+    } else if (!isReserved) {
+      createReservation.mutate(wish!.id);
+    }
+  }
+
+  const isBusy = createReservation.isPending || cancelReservation.isPending || removeReservation.isPending;
 
   function bookButtonLabel() {
     if (createReservation.isPending) return t("reserving");
@@ -653,22 +714,52 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     return "w-full h-12 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center justify-center";
   }
 
+  const isCompletePending = completeWishMutation.isPending || uncompleteWishMutation.isPending;
+
   return (
     <div
       className={`modal-backdrop ${active ? "visible" : ""}`}
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className={`modal-sheet ${active ? "visible" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className="flex items-center justify-between mb-4">
-          <span className="w-10" />
+        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
+          {isOwner && !removeBookingConfirming ? (
+            <button
+              type="button"
+              className={`pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-sm font-bold ${isCompleted ? "text-green-500" : "text-muted"}`}
+              disabled={isCompletePending}
+              onClick={() => {
+                if (isCompleted) {
+                  uncompleteWishMutation.mutate(wish.id);
+                } else {
+                  completeWishMutation.mutate(wish.id);
+                }
+              }}
+              aria-label={isCompleted ? t("unfulfill") : t("markFulfilled")}
+              title={isCompleted ? t("unfulfill") : t("markFulfilled")}
+            >
+              {isCompleted ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+                </svg>
+              )}
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-1">
             {wish.title}
           </h3>
-          {isOwner ? (
+          {isOwner && !removeBookingConfirming ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-primary"
@@ -684,7 +775,46 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
         </div>
 
-        <div className="flex flex-col items-center gap-4">
+        <div
+          className={`modal-footer-transition ${
+            removeBookingConfirming
+              ? "opacity-100 max-h-40 scale-100"
+              : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+          }`}
+        >
+          <div className="flex flex-col gap-3 py-1">
+            <p className="text-sm text-muted text-center leading-6">{t("removeBookingWarning")}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+                onClick={() => setRemoveBookingConfirming(false)}
+              >
+                {t("cancelButton")}
+              </button>
+              <button
+                type="button"
+                className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold"
+                disabled={removeReservation.isPending}
+                onClick={() => {
+                  removeReservation.mutate(wish.id, {
+                    onSuccess: () => setRemoveBookingConfirming(false),
+                  });
+                }}
+              >
+                {removeReservation.isPending ? t("deleting") : t("removeBookingConfirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div
+          className={`modal-footer-transition ${
+            !removeBookingConfirming
+              ? "opacity-100 max-h-[620px] scale-100"
+              : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+          }`}
+        >
+        <div className={`flex flex-col items-center gap-4 ${isCompleted ? "opacity-60" : ""}`}>
           <div className="relative w-full max-w-[210px] aspect-square rounded-3xl overflow-hidden border border-border shadow-lg">
             <WishImageThumb
               id={wish.id}
@@ -693,11 +823,52 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               className="w-full h-full object-cover"
             />
           </div>
+          {isCompleted ? (
+            <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
+          ) : null}
 
           {wish.price ? (
             <p className="text-lg font-extrabold text-primary">{formatPrice(wish.price, wish.currency)}</p>
           ) : null}
 
+          {/* owner self-booking controls */}
+          {isOwner && !isCompleted && (isMine || ownerBookingVisibility !== "hide") && (
+            <div className="w-full flex flex-col gap-2">
+              {isMine ? (
+                <button
+                  type="button"
+                  className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold inline-flex items-center justify-center"
+                  onClick={handleOwnerBook}
+                  disabled={isBusy}
+                >
+                  {cancelReservation.isPending ? t("cancellingReservation") : t("wishBookedByYou")}
+                </button>
+              ) : isReserved ? (
+                <button
+                  type="button"
+                  className="w-full h-12 rounded-xl bg-muted/20 text-foreground text-sm font-bold inline-flex items-center justify-center gap-2"
+                  onClick={() => setRemoveBookingConfirming(true)}
+                >
+                  <span>
+                    {ownerBookingVisibility === "names" && reserverDisplayName
+                      ? `${t("wishBookedBySomeone")} · ${reserverDisplayName}`
+                      : t("wishBookedBySomeone")}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full h-12 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center justify-center"
+                  onClick={handleOwnerBook}
+                  disabled={isBusy}
+                >
+                  {createReservation.isPending ? t("reserving") : t("book")}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* non-owner booking controls */}
           {!isOwner && (
             <div className="w-full flex flex-col gap-2">
               <button
@@ -726,6 +897,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               </p>
             </div>
           ) : null}
+        </div>
         </div>
       </div>
       <CopyWishModal

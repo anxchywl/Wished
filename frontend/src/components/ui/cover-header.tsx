@@ -11,12 +11,13 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 type CoverHeaderProps = {
   title: string;
   hideProfile?: boolean;
+  extraControls?: React.ReactNode;
 };
 
 /**
  * gradient cover header with user profile row
  */
-export function CoverHeader({ title, hideProfile = false }: CoverHeaderProps) {
+export function CoverHeader({ title, hideProfile = false, extraControls }: CoverHeaderProps) {
   const { t } = useTranslation();
   const accessToken = useAuthStore((state) => state.accessToken);
   const coverStyle = useUIStore((state) => state.coverStyle);
@@ -47,8 +48,18 @@ export function CoverHeader({ title, hideProfile = false }: CoverHeaderProps) {
 
   function handleSave(date: string) {
     if (!accessToken) return;
-    updateBirthday.mutate({ accessToken, birthday: date });
-    setPickerOpen(false);
+    updateBirthday.mutate(
+      { accessToken, birthday: date },
+      { onSuccess: () => setPickerOpen(false) },
+    );
+  }
+
+  function handleClear() {
+    if (!accessToken) return;
+    updateBirthday.mutate(
+      { accessToken, birthday: null },
+      { onSuccess: () => setPickerOpen(false) },
+    );
   }
 
   return (
@@ -63,7 +74,7 @@ export function CoverHeader({ title, hideProfile = false }: CoverHeaderProps) {
           "--fallback-d": coverStyle.d,
         } as React.CSSProperties}
       >
-        <UIControls />
+        <UIControls prepend={extraControls} />
 
         {/* profile row */}
         {profile && !hideProfile && (
@@ -121,6 +132,7 @@ export function CoverHeader({ title, hideProfile = false }: CoverHeaderProps) {
         initial={profile?.birthday}
         onClose={() => setPickerOpen(false)}
         onSave={handleSave}
+        onClear={handleClear}
       />
     </>
   );

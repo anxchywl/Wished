@@ -13,8 +13,15 @@ const captureTelegramInitDataScript = `
     var searchParams = new URLSearchParams(url.search);
     var hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
     var fromUrl = searchParams.get("tgWebAppData") || hashParams.get("tgWebAppData");
+    var startParam =
+      searchParams.get("tgWebAppStartParam") ||
+      hashParams.get("tgWebAppStartParam");
     var webApp = window.Telegram && window.Telegram.WebApp;
     var fromWebApp = webApp && webApp.initData;
+    var startParamFromWebApp =
+      webApp &&
+      webApp.initDataUnsafe &&
+      webApp.initDataUnsafe.start_param;
 
     if (fromUrl === TELEGRAM_INIT_DATA_TEST_TRIGGER) {
       if (searchParams.get("tgWebAppData") === TELEGRAM_INIT_DATA_TEST_TRIGGER) {
@@ -31,6 +38,9 @@ const captureTelegramInitDataScript = `
     var raw = fromUrl === TELEGRAM_INIT_DATA_TEST_TRIGGER ? fromWebApp : fromUrl || fromWebApp;
     if (raw) {
       sessionStorage.setItem("wished/tgInitDataRaw", raw);
+    }
+    if (startParam || startParamFromWebApp) {
+      sessionStorage.setItem("wished/tgStartParam", startParam || startParamFromWebApp);
     }
     if (webApp) {
       if (typeof webApp.expand === "function") webApp.expand();

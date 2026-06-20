@@ -8,11 +8,13 @@ from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
 from app.db.models import User
 from app.modules.wishes import (
+    complete_wish,
     copy_wish,
     create_wish,
     delete_wish,
     list_wishlist_wishes,
     reorder_wishes,
+    uncomplete_wish,
     update_wish,
 )
 from app.modules.wishes.schemas import (
@@ -94,3 +96,23 @@ async def remove_wish(
     """delete wish"""
     await delete_wish(db, current_user, wish_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/wishes/{wish_id}/complete", response_model=WishResponse)
+async def post_wish_complete(
+    wish_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WishResponse:
+    """mark wish as fulfilled"""
+    return await complete_wish(db, current_user, wish_id)
+
+
+@router.delete("/wishes/{wish_id}/complete", response_model=WishResponse)
+async def delete_wish_complete(
+    wish_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WishResponse:
+    """restore fulfilled wish to active"""
+    return await uncomplete_wish(db, current_user, wish_id)

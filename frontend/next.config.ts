@@ -33,7 +33,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/wished-media/:path*",
-        destination: "http://127.0.0.1:9000/wished-media/:path*",
+        destination: "http://localhost:9000/wished-media/:path*",
       },
     ];
   },

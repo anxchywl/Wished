@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 logger = logging.getLogger(__name__)
 
 from app.core.config import get_settings
-from app.db.models import User, Wish, WishImage, Wishlist
+from app.db.models import Reservation, User, Wish, WishImage, Wishlist
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
 from app.modules.media.schemas import WishImageResponse
 from app.modules.wishes.schemas import (
@@ -29,13 +29,14 @@ async def list_wishlist_wishes(
     wishlist_id: UUID,
 ) -> WishListResponse:
     """list wishlist wishes"""
-    await get_accessible_wishlist(db, current_user, wishlist_id)
-    result = await db.execute(
+    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id)
+    query = (
         select(Wish)
         .options(selectinload(Wish.images))
         .where(Wish.wishlist_id == wishlist_id)
-        .order_by(Wish.position.asc())
     )
+    query = query.order_by(Wish.position.asc())
+    result = await db.execute(query)
     return WishListResponse(items=[_to_response(wish) for wish in result.scalars().all()])
 
 
@@ -191,6 +192,47 @@ async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> No
             delete_object(bucket, obj)
         except Exception as exc:
             logger.error("failed to delete minio object %s/%s: %s", bucket, obj, exc)
+
+
+async def complete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> WishResponse:
+    """mark wish as completed and cancel its active reservation"""
+    wish = await _get_owned_wish(db, current_user, wish_id)
+    if wish.status == "completed":
+        return _to_response(wish)
+    if wish.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only active wishes can be marked as fulfilled",
+        )
+    wish.status = "completed"
+    result = await db.execute(
+        select(Reservation).where(
+            Reservation.wish_id == wish_id,
+            Reservation.status == "active",
+        )
+    )
+    reservation = result.scalar_one_or_none()
+    if reservation is not None:
+        reservation.status = "cancelled"
+    await db.commit()
+    wish = await _get_owned_wish(db, current_user, wish_id)
+    return _to_response(wish)
+
+
+async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> WishResponse:
+    """restore a completed wish to active"""
+    wish = await _get_owned_wish(db, current_user, wish_id)
+    if wish.status == "active":
+        return _to_response(wish)
+    if wish.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only completed wishes can be restored to active",
+        )
+    wish.status = "active"
+    await db.commit()
+    wish = await _get_owned_wish(db, current_user, wish_id)
+    return _to_response(wish)
 
 
 async def _get_owned_wishlist(

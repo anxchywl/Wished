@@ -202,8 +202,9 @@ html[data-theme="dark"] .auth-loading-screen {
 .discover-content {
   min-height: 320px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .discover-launch {
@@ -214,6 +215,13 @@ html[data-theme="dark"] .auth-loading-screen {
   gap: 24px;
   padding: 36px 20px;
   text-align: center;
+  margin: auto;
+}
+
+.discover-launch-after-bookings {
+  width: 100%;
+  margin: 0;
+  padding: 24px 20px;
 }
 
 
@@ -716,7 +724,7 @@ html.theme-transitioning .bottom-nav-tab {
 .birthday-picker-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 300;
   background: rgba(0, 0, 0, 0);
   transition: background 0.28s ease;
   display: flex;
@@ -724,7 +732,7 @@ html.theme-transitioning .bottom-nav-tab {
 }
 
 .birthday-picker-backdrop.visible {
-  background: rgba(0, 0, 0, 0.44);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .birthday-picker-sheet {
@@ -755,12 +763,41 @@ html[data-theme="dark"] .birthday-picker-sheet {
   margin: 0 auto 14px;
 }
 
+.birthday-picker-header {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
 .birthday-picker-title {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 1.1rem;
   font-weight: 800;
   color: rgb(var(--color-foreground));
   text-align: center;
+}
+
+.birthday-picker-clear,
+.birthday-picker-header-spacer {
+  width: 40px;
+  height: 40px;
+}
+
+.birthday-picker-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgb(var(--color-primary));
+}
+
+.birthday-picker-clear svg {
+  width: 17px;
+  height: 17px;
 }
 
 .birthday-picker-wheel {
@@ -1066,6 +1103,23 @@ html[data-theme="dark"] .modal-sheet {
 
 .modal-sheet.visible {
   transform: translateY(0);
+}
+
+.wish-booking-pane {
+  animation: wish-booking-pane-in 0.24s ease both;
+}
+
+.wish-image-fulfilled {
+  filter: saturate(0.82) brightness(0.82) sepia(0.12) hue-rotate(72deg);
+}
+
+@keyframes wish-booking-pane-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-sheet.keyboard-focus-mode {
@@ -1711,15 +1765,21 @@ html[data-theme="dark"] .privacy-option-btn {
   transition: opacity 0.28s ease;
 }
 
-body:has(.modal-backdrop.visible) .app-route-transition {
+body:has(.modal-backdrop.visible) .app-route-transition,
+body:has(.birthday-picker-backdrop.visible) .app-route-transition {
   position: relative;
   z-index: 200;
 }
 
 body:has(.modal-backdrop.visible) .cover-profile-row,
-body:has(.modal-backdrop.visible) .bottom-nav {
+body:has(.birthday-picker-backdrop.visible) .cover-profile-row {
   pointer-events: none !important;
   opacity: 0.5;
+}
+
+body:has(.modal-backdrop.visible) .bottom-nav {
+  pointer-events: none !important;
+  opacity: 0;
 }
 
 body:has(.modal-backdrop.visible) .top-controls {

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 FIND_FRIENDS_REQUEST_ID = 1
 FIND_FRIENDS_RATE_LIMIT = 10
 FIND_FRIENDS_RATE_WINDOW_SECONDS = 60
+CONFETTI_MESSAGE_EFFECT_ID = "5046509860389126442"
 BOT_TEXT = {
     "en": {
         "find_friends": "Find friends",
@@ -203,6 +204,7 @@ async def users_shared_handler(message: types.Message) -> None:
                 await message.answer(
                     text["registered"].format(name=display_name),
                     reply_markup=keyboard,
+                    message_effect_id=CONFETTI_MESSAGE_EFFECT_ID,
                 )
                 continue
 

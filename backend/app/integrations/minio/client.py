@@ -1,6 +1,7 @@
 import json
 from datetime import timedelta
 from io import BytesIO
+from urllib.parse import urlparse
 
 from minio import Minio
 from minio.commonconfig import CopySource
@@ -71,11 +72,18 @@ def copy_object(
 
 
 def get_presigned_url(bucket: str, object_name: str, expires_seconds: int | None = None) -> str:
-    """generate a presigned GET URL for a private object"""
+    """generate a presigned GET URL for the browser-accessible endpoint"""
     settings = get_settings()
     ttl = expires_seconds if expires_seconds is not None else settings.minio_presigned_url_expires_seconds
-    client = get_minio_client()
-    return client.presigned_get_object(
+    public_endpoint = urlparse(settings.minio_public_endpoint)
+    signing_client = Minio(
+        endpoint=public_endpoint.netloc,
+        access_key=settings.minio_access_key,
+        secret_key=settings.minio_secret_key,
+        secure=public_endpoint.scheme == "https",
+        region="us-east-1",
+    )
+    return signing_client.presigned_get_object(
         bucket_name=bucket,
         object_name=object_name,
         expires=timedelta(seconds=ttl),

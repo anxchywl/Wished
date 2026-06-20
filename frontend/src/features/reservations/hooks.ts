@@ -2,9 +2,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  type WishReservationStatusResponse,
+  type BookedWishListResponse,
   cancelReservation,
   createReservation,
+  getBookedWishes,
   getReservationStatus,
+  removeWishReservation,
 } from "@/features/reservations/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
@@ -12,6 +16,8 @@ import { useAuthStore } from "@/stores/auth-store";
 export const reservationQueryKeys = {
   status: (wishId: string) => ["reservations", "status", wishId] as const,
 };
+
+export const bookedWishesQueryKey = ["reservations", "booked"] as const;
 
 /**
  * load reservation status for a wish
@@ -24,7 +30,52 @@ export function useReservationStatusQuery(wishId: string) {
     queryKey: reservationQueryKeys.status(wishId),
     queryFn: () => getReservationStatus(accessToken ?? "", wishId),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
-    staleTime: 15 * 1000,
+    staleTime: 0,
+    refetchInterval: 1_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: "always",
+  });
+}
+
+/**
+ * list wishes booked by the current user
+ */
+export function useBookedWishesQuery() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    queryKey: bookedWishesQueryKey,
+    queryFn: async () => {
+      const response = await getBookedWishes(accessToken ?? "");
+      const cached = queryClient.getQueryData<BookedWishListResponse>(bookedWishesQueryKey);
+      if (!cached) return response;
+
+      const cachedImages = new Map(
+        cached.items.flatMap((item) => item.images.map((image) => [image.id, image] as const)),
+      );
+      return {
+        items: response.items.map((item) => ({
+          ...item,
+          images: item.images.map((image) => {
+            const cachedImage = cachedImages.get(image.id);
+            return cachedImage
+              ? {
+                  ...image,
+                  url: cachedImage.url,
+                  thumbnail_url: cachedImage.thumbnail_url,
+                  medium_url: cachedImage.medium_url,
+                }
+              : image;
+          }),
+        })),
+      };
+    },
+    enabled: Boolean(authStatus === "authenticated" && accessToken),
+    staleTime: 30 * 1000,
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: "always",
   });
 }
 
@@ -37,9 +88,48 @@ export function useCreateReservationMutation(wishlistId: string) {
 
   return useMutation({
     mutationFn: (wishId: string) => createReservation(accessToken ?? "", wishId),
-    onSuccess: (_data, wishId) => {
-      queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(wishId) });
+    onSuccess: (reservation, wishId) => {
+      queryClient.setQueryData<WishReservationStatusResponse>(
+        reservationQueryKeys.status(wishId),
+        {
+          wish_id: wishId,
+          is_reserved: true,
+          is_mine: true,
+          reservation_id: reservation.id,
+          owner_booking_visibility: null,
+          reserver_display_name: null,
+        },
+      );
       queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+    },
+  });
+}
+
+/**
+ * wish owner removes any reservation on their wish
+ */
+export function useRemoveWishReservationMutation(wishlistId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (wishId: string) => removeWishReservation(accessToken ?? "", wishId),
+    onSuccess: (_data, wishId) => {
+      queryClient.setQueryData<WishReservationStatusResponse>(
+        reservationQueryKeys.status(wishId),
+        (current) => current
+          ? {
+              ...current,
+              is_reserved: false,
+              is_mine: false,
+              reservation_id: null,
+              reserver_display_name: null,
+            }
+          : current,
+      );
+      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }
@@ -57,6 +147,7 @@ export function useCancelReservationMutation(wishlistId: string) {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(variables.wishId) });
       queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }

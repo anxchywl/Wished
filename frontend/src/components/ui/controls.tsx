@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { useUIStore } from "@/stores/ui-store";
 
+type UIControlsProps = {
+  prepend?: React.ReactNode;
+};
+
 /**
  * ui controls component
  */
-export function UIControls() {
+export function UIControls({ prepend }: UIControlsProps = {}) {
   const { lang, toggleTheme, toggleLang } = useUIStore();
   const [themeSwitching, setThemeSwitching] = useState(false);
   const [langSwitching, setLangSwitching] = useState(false);
@@ -31,6 +35,7 @@ export function UIControls() {
 
   return (
     <div className="top-controls">
+      {prepend}
       <button
         className={themeSwitching ? "theme-toggle theme-switching" : "theme-toggle"}
         type="button"

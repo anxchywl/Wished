@@ -27,9 +27,12 @@ import { userQueryKeys, useFollowingQuery } from "@/features/users/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
+import { BookingVisibilityHeaderButton } from "@/features/users/user-discovery-manager";
+import { useBookedWishesQuery } from "@/features/reservations/hooks";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
 import { extractTgUserIdFromInitData } from "@/lib/telegram/capture-init-data";
+import { decodeWishlistStartParam } from "@/lib/telegram/start-param";
 import { isAuthPending } from "@/stores/auth-store";
 import { clearPersistedCache } from "@/lib/query/cache-persister";
 
@@ -60,6 +63,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   const [initialWishesLoaded, setInitialWishesLoaded] = useState(false);
   const lastLoginInitDataRef = useRef<string | null>(null);
   const followingQuery = useFollowingQuery();
+  const bookedWishesQuery = useBookedWishesQuery();
 
   const loginMutationRef = useRef(loginMutation);
   loginMutationRef.current = loginMutation;
@@ -213,7 +217,8 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   let hideProfile = false;
 
   const followedUsersCount = followingQuery.data?.items?.length ?? 0;
-  const showDiscoverTitle = followedUsersCount >= 1;
+  const bookedWishesCount = bookedWishesQuery.data?.items?.length ?? 0;
+  const showDiscoverTitle = followedUsersCount >= 1 || bookedWishesCount >= 1;
 
   if (pathname === "/wishlists" || pathname === "/") {
     title = t("wishlists");
@@ -224,9 +229,11 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     hideProfile = true;
   }
 
+  const extraControls = pathname === "/users" ? <BookingVisibilityHeaderButton /> : undefined;
+
   return (
     <div className="min-h-dvh flex flex-col">
-      <CoverHeader title={title} hideProfile={hideProfile} />
+      <CoverHeader title={title} hideProfile={hideProfile} extraControls={extraControls} />
       {children}
       <BottomNav />
     </div>
@@ -276,6 +283,22 @@ type DeepLinkWindow = Window & {
   };
 };
 
+function getTelegramStartParam() {
+  const webAppStartParam = (window as DeepLinkWindow).Telegram?.WebApp?.initDataUnsafe?.start_param;
+  const searchParams = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const startParam =
+    webAppStartParam ||
+    searchParams.get("tgWebAppStartParam") ||
+    hashParams.get("tgWebAppStartParam") ||
+    window.sessionStorage.getItem("wished/tgStartParam");
+
+  if (startParam) {
+    window.sessionStorage.setItem("wished/tgStartParam", startParam);
+  }
+  return startParam;
+}
+
 // handle startapp deep links to open profile popups
 function TelegramDeepLinkHandler() {
   const router = useRouter();
@@ -284,11 +307,29 @@ function TelegramDeepLinkHandler() {
     if (typeof window === "undefined") return;
 
     function handleDeepLink() {
-      const startParam = (window as DeepLinkWindow).Telegram?.WebApp?.initDataUnsafe?.start_param;
-      if (!startParam || startParam.length <= PROFILE_TOKEN_LENGTH) return;
+      const startParam = getTelegramStartParam();
+      if (!startParam) return;
+
+      const wishlistTarget = decodeWishlistStartParam(startParam);
+      if (wishlistTarget) {
+        window.sessionStorage.removeItem("wished/tgStartParam");
+        const current = new URLSearchParams(window.location.search);
+        const isCurrentTarget =
+          current.get("profile")?.toLowerCase() === wishlistTarget.username.toLowerCase() &&
+          current.get("wishlist") === wishlistTarget.wishlistId;
+        if (isCurrentTarget) return;
+        router.replace(
+          `/users?profile=${encodeURIComponent(wishlistTarget.username)}` +
+            `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`,
+        );
+        return;
+      }
+
+      if (startParam.length <= PROFILE_TOKEN_LENGTH) return;
       const token = startParam.slice(0, PROFILE_TOKEN_LENGTH);
       const username = startParam.slice(PROFILE_TOKEN_LENGTH);
       if (!username) return;
+      window.sessionStorage.removeItem("wished/tgStartParam");
       const current = new URLSearchParams(window.location.search);
       if (current.get("profile")?.toLowerCase() === username.toLowerCase()) return;
       router.replace(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);

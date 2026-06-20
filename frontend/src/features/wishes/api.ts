@@ -92,3 +92,23 @@ export function deleteWishImage(accessToken: string, wishId: string, imageId: st
     accessToken,
   });
 }
+
+/**
+ * mark wish as fulfilled
+ */
+export function completeWish(accessToken: string, wishId: string) {
+  return apiClient<Wish>(`/wishes/${wishId}/complete`, {
+    method: "POST",
+    accessToken,
+  });
+}
+
+/**
+ * restore fulfilled wish to active
+ */
+export function uncompleteWish(accessToken: string, wishId: string) {
+  return apiClient<Wish>(`/wishes/${wishId}/complete`, {
+    method: "DELETE",
+    accessToken,
+  });
+}

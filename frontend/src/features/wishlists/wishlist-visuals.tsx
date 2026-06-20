@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type React from "react";
 
 import { DEFAULT_COVER_GRADIENT } from "@/features/wishlists/utils";
+import { useAuthStore } from "@/stores/auth-store";
 
 type WishVisualProps = {
   id: string;
@@ -33,6 +34,59 @@ const wishPlaceholderPalette = [
   ["#fde68a", "#f9a8d4", "#38bdf8"],
   ["#bbf7d0", "#a78bfa", "#fda4af"],
 ];
+
+const imageObjectUrlCache = new Map<string, string>();
+const imageObjectUrlRequests = new Map<string, Promise<string>>();
+const PERSISTENT_IMAGE_CACHE = "wished-images-v1";
+
+function stableImageCacheKey(url: string, accountId: number | null): string {
+  const resolvedUrl = resolveImageUrl(url);
+  try {
+    const parsed = new URL(resolvedUrl, window.location.origin);
+    return `${accountId ?? "anonymous"}:${parsed.pathname}`;
+  } catch {
+    return `${accountId ?? "anonymous"}:${resolvedUrl.split("?")[0]}`;
+  }
+}
+
+async function loadCachedImage(url: string, accountId: number | null): Promise<string> {
+  const resolvedUrl = resolveImageUrl(url);
+  const cacheKey = stableImageCacheKey(url, accountId);
+  const cached = imageObjectUrlCache.get(cacheKey);
+  if (cached) return cached;
+
+  const pending = imageObjectUrlRequests.get(cacheKey);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const persistentCache = "caches" in window
+      ? await caches.open(PERSISTENT_IMAGE_CACHE)
+      : null;
+    const persistentRequest = new Request(
+      `${window.location.origin}/wished-image-cache/${encodeURIComponent(cacheKey)}`,
+    );
+    const storedResponse = await persistentCache?.match(persistentRequest);
+    const response = storedResponse ?? await fetch(resolvedUrl);
+    if (!response.ok) throw new Error(`image request failed: ${response.status}`);
+    if (!storedResponse && persistentCache) {
+      await persistentCache.put(persistentRequest, response.clone());
+    }
+    return response.blob();
+  })()
+    .then((blob) => {
+      const objectUrl = URL.createObjectURL(blob);
+      imageObjectUrlCache.set(cacheKey, objectUrl);
+      imageObjectUrlRequests.delete(cacheKey);
+      return objectUrl;
+    })
+    .catch((error) => {
+      imageObjectUrlRequests.delete(cacheKey);
+      throw error;
+    });
+
+  imageObjectUrlRequests.set(cacheKey, request);
+  return request;
+}
 
 /**
  * build cover gradient
@@ -123,19 +177,49 @@ export function resolveImageUrl(url?: string | null): string {
  * wish image thumbnail
  */
 export function WishImageThumb({ id, title, imageUrl, className = "" }: WishVisualProps) {
+  const accountId = useAuthStore((state) => state.tgUserId);
   const [failed, setFailed] = useState(false);
+  const [displayUrl, setDisplayUrl] = useState("");
 
   useEffect(() => {
     setFailed(false);
-  }, [imageUrl]);
+    if (!imageUrl) {
+      setDisplayUrl("");
+      return;
+    }
+
+    if (imageUrl.startsWith("data:") || imageUrl.startsWith("blob:")) {
+      setDisplayUrl(imageUrl);
+      return;
+    }
+
+    let active = true;
+    const cacheKey = stableImageCacheKey(imageUrl, accountId);
+    setDisplayUrl(imageObjectUrlCache.get(cacheKey) ?? "");
+    loadCachedImage(imageUrl, accountId)
+      .then((url) => {
+        if (active) setDisplayUrl(url);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [accountId, imageUrl]);
 
   if (!imageUrl || failed) {
     return <WishImagePlaceholder id={id} title={title} className={className} />;
   }
 
+  if (!displayUrl) {
+    return <WishImagePlaceholder id={id} title={title} className={className} />;
+  }
+
   return (
     <img
-      src={resolveImageUrl(imageUrl)}
+      src={displayUrl}
       alt={title}
       className={className}
       onError={() => setFailed(true)}

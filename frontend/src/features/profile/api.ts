@@ -15,6 +15,7 @@ export type ProfileResponse = {
     profile_visibility: string;
     birthday_visibility: string;
     wishlist_visibility: string;
+    booking_visibility: "hide" | "anonymous" | "names";
   };
 };
 
@@ -28,10 +29,29 @@ export function getProfile(accessToken: string) {
 /**
  * update profile birthday
  */
-export function patchProfile(accessToken: string, birthday: string) {
+export function patchProfile(accessToken: string, birthday: string | null) {
   return apiClient<ProfileResponse>("/me", {
     method: "PATCH",
     accessToken,
     body: { birthday },
+  });
+}
+
+/**
+ * update privacy settings
+ */
+export function patchPrivacy(
+  accessToken: string,
+  privacy: {
+    profile_visibility?: string;
+    birthday_visibility?: string;
+    wishlist_visibility?: string;
+    booking_visibility?: string;
+  },
+) {
+  return apiClient<ProfileResponse>("/me", {
+    method: "PATCH",
+    accessToken,
+    body: { privacy },
   });
 }

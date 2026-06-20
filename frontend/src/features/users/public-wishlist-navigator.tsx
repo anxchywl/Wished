@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
-import { useReservationStatusQuery, useCancelReservationMutation, useCreateReservationMutation } from "@/features/reservations/hooks";
+import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, type UserProfileResponse } from "@/features/users/api";
 import { userQueryKeys, useFollowMutation, useUserProfileQuery } from "@/features/users/hooks";
@@ -28,6 +28,8 @@ type PublicWishlistNavigatorProps = {
   username: string | null;
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
+  initialWishlistId?: string | null;
+  initialWishId?: string | null;
   onClose: () => void;
 };
 
@@ -45,7 +47,15 @@ type NavigationDirection = "forward" | "back";
 /**
  * navigate public wishlists
  */
-export function PublicWishlistNavigator({ open, username, profileToken, initialUser, onClose }: PublicWishlistNavigatorProps) {
+export function PublicWishlistNavigator({
+  open,
+  username,
+  profileToken,
+  initialUser,
+  initialWishlistId,
+  initialWishId,
+  onClose,
+}: PublicWishlistNavigatorProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
   const [active, setActive] = useState(false);
@@ -58,11 +68,24 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
   useEffect(() => {
     setActive(open);
     if (open) {
-      setStack([{ view: "user" }]);
+      setStack(
+        initialWishlistId && initialWishId
+          ? [
+              { view: "user" },
+              { view: "wishlist", wishlistId: initialWishlistId },
+              { view: "wish", wishlistId: initialWishlistId, wishId: initialWishId },
+            ]
+          : initialWishlistId
+            ? [
+                { view: "user" },
+                { view: "wishlist", wishlistId: initialWishlistId },
+              ]
+          : [{ view: "user" }],
+      );
       setDirection("forward");
       setPreviousFrame(null);
     }
-  }, [open, username]);
+  }, [initialWishlistId, initialWishId, open, username]);
 
   if (!open || !username) return null;
 
@@ -79,9 +102,14 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
     hasAccessToken: Boolean(accessToken),
   });
 
+  function handleClose() {
+    setActive(false);
+    window.setTimeout(onClose, 340);
+  }
+
   function handleBack() {
     if (stack.length === 1) {
-      onClose();
+      handleClose();
       return;
     }
     setDirection("back");
@@ -102,7 +130,7 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
   }
 
   function handleCopySuccess() {
-    onClose();
+    handleClose();
   }
 
   function handleWishOpen(wishlistId: string, wishId: string, wishTitle?: string) {
@@ -119,7 +147,7 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
           profileToken={profileToken}
           initialUser={initialUser}
           onOpenWishlist={handleWishlistOpen}
-          onClose={onClose}
+          onClose={handleClose}
         />
       );
     }
@@ -129,7 +157,7 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
     }
 
     if (frame.view === "wish" && frame.wishlistId && frame.wishId) {
-      return <PublicWishView wishlistId={frame.wishlistId} wishId={frame.wishId} onOpenCopy={handleCopyOpen} />;
+      return <PublicWishView wishlistId={frame.wishlistId} wishId={frame.wishId} />;
     }
 
     if (frame.view === "copy" && frame.wishlistId && frame.wishId) {
@@ -140,7 +168,7 @@ export function PublicWishlistNavigator({ open, username, profileToken, initialU
   }
 
   return (
-    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={onClose}>
+    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div
         className={`modal-sheet public-nav-sheet ${active ? "visible" : ""}`}
         onClick={(event) => event.stopPropagation()}
@@ -322,13 +350,14 @@ function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, o
                 {profile.is_following ? t("following") : t("follow")}
               </button>
             ) : null}
-            {profile.birthday ? (
-              <div className="text-right">
-                <span className="block text-[9px] font-extrabold text-muted uppercase tracking-wider">{t("birthday") ?? "Birthday"}</span>
-                <span className="block text-xs font-semibold text-foreground mt-0.5">{formatBirthday(profile.birthday)}</span>
-              </div>
-            ) : null}
           </div>
+        </div>
+      ) : null}
+
+      {profile?.birthday ? (
+        <div className="mx-2 mt-2 rounded-2xl border border-border bg-muted/10 px-4 py-3">
+          <span className="block text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("birthday")}</span>
+          <span className="block text-sm font-semibold text-foreground mt-1">{formatBirthday(profile.birthday)}</span>
         </div>
       ) : null}
 
@@ -464,6 +493,9 @@ type PublicWishRowProps = {
  * public wish row
  */
 function PublicWishRow({ wish, onOpen, onPrefetch }: PublicWishRowProps) {
+  const isCompleted = wish.status === "completed";
+  const reservationStatus = useReservationStatusQuery(wish.id);
+  const isBooked = reservationStatus.data?.is_reserved ?? false;
   return (
     <button
       type="button"
@@ -474,10 +506,25 @@ function PublicWishRow({ wish, onOpen, onPrefetch }: PublicWishRowProps) {
       onTouchStart={onPrefetch}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-border">
+        <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-border">
           <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.url} className="w-full h-full object-cover" />
+          {isCompleted ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30">
+              <svg className="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+              </svg>
+            </div>
+          ) : null}
+          {!isCompleted && isBooked ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-700/35">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <rect x="6" y="10" width="12" height="9" rx="2" />
+                <path strokeLinecap="round" d="M9 10V7a3 3 0 0 1 6 0v3" />
+              </svg>
+            </div>
+          ) : null}
         </div>
-        <div className="min-w-0 text-left">
+        <div className={`min-w-0 text-left ${!isCompleted && isBooked ? "opacity-50" : ""}`}>
           <span className="font-semibold text-sm text-foreground line-clamp-1">{wish.title}</span>
           {wish.description ? <span className="text-xs text-muted line-clamp-1 mt-1">{wish.description}</span> : null}
         </div>
@@ -488,7 +535,6 @@ function PublicWishRow({ wish, onOpen, onPrefetch }: PublicWishRowProps) {
 }
 
 type PublicWishViewProps = {
-  onOpenCopy: (wishlistId: string, wishId: string) => void;
   wishlistId: string;
   wishId: string;
 };
@@ -496,7 +542,7 @@ type PublicWishViewProps = {
 /**
  * show public wish
  */
-function PublicWishView({ wishlistId, wishId, onOpenCopy }: PublicWishViewProps) {
+function PublicWishView({ wishlistId, wishId }: PublicWishViewProps) {
   const wishesQuery = useWishesQuery(wishlistId);
   const wish = useMemo(
     () => wishesQuery.data?.items.find((item) => item.id === wishId) ?? null,
@@ -505,25 +551,19 @@ function PublicWishView({ wishlistId, wishId, onOpenCopy }: PublicWishViewProps)
   const { t } = useTranslation();
   const reservationStatus = useReservationStatusQuery(wishId);
   const createReservation = useCreateReservationMutation(wishlistId);
-  const cancelReservation = useCancelReservationMutation(wishlistId);
   const status = reservationStatus.data;
   const isReserved = status?.is_reserved ?? false;
-  const isMine = status?.is_mine ?? false;
-  const reservationId = status?.reservation_id ?? null;
-  const isBusy = createReservation.isPending || cancelReservation.isPending;
+  const isBusy = createReservation.isPending;
+  const isCompleted = wish?.status === "completed";
 
-  function handleBookToggle() {
-    if (isMine && reservationId) {
-      cancelReservation.mutate({ reservationId, wishId });
-    } else if (!isReserved) {
+  function handleBook() {
+    if (!isReserved && !isCompleted) {
       createReservation.mutate(wishId);
     }
   }
 
   function bookButtonLabel() {
     if (createReservation.isPending) return t("reserving");
-    if (cancelReservation.isPending) return t("cancellingReservation");
-    if (isMine) return t("cancelReservation");
     if (isReserved) return t("wishReservedByOther");
     return t("book");
   }
@@ -539,9 +579,12 @@ function PublicWishView({ wishlistId, wishId, onOpenCopy }: PublicWishViewProps)
   return (
     <div className="public-nav-content">
       <section className="flex flex-col items-center gap-4">
-        <div className="public-wish-gallery">
-          <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.url} className="w-full h-full object-cover" />
+        <div className="public-wish-gallery relative">
+          <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.url} className={`w-full h-full object-cover ${isCompleted ? "wish-image-fulfilled" : ""}`} />
         </div>
+        {isCompleted ? (
+          <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
+        ) : null}
         {wish.images.length > 1 ? (
           <div className="grid grid-cols-4 gap-2 w-full">
             {wish.images.slice(0, 4).map((image) => (
@@ -556,23 +599,16 @@ function PublicWishView({ wishlistId, wishId, onOpenCopy }: PublicWishViewProps)
         </div>
       </section>
 
-      <section className="flex flex-col gap-2 w-full mt-4 px-4">
+      {!isCompleted ? <section className="flex flex-col gap-2 w-full mt-4 px-4">
         <button
           type="button"
-          className={isMine ? "public-action-button public-action-danger" : "public-action-button public-action-primary"}
-          onClick={handleBookToggle}
-          disabled={isBusy || (isReserved && !isMine)}
+          className="public-action-button public-action-primary"
+          onClick={handleBook}
+          disabled={isBusy || isReserved}
         >
           {bookButtonLabel()}
         </button>
-        <button
-          type="button"
-          className="w-full h-[46px] rounded-[14px] border border-border bg-background text-primary text-[0.9rem] font-extrabold inline-flex items-center justify-center transition-all active:scale-[0.98]"
-          onClick={() => onOpenCopy(wishlistId, wishId)}
-        >
-          <span>{t("copyToMyWishlist")}</span>
-        </button>
-      </section>
+      </section> : null}
 
       {wish.description ? (
         <section className="flex flex-col px-4 mt-2">
