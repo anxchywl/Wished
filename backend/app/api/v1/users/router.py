@@ -80,7 +80,7 @@ async def post_user_follow(
     has_discovery_access = await validate_discovery_token(
         redis, profile_token, current_user.telegram_id, target.telegram_id, db=db,
     )
-    return await follow_user(db, current_user, username, has_discovery_access=has_discovery_access)
+    return await follow_user(db, current_user, username, has_discovery_access=has_discovery_access, redis=redis)
 
 
 @router.delete("/users/{username}/follow", status_code=status.HTTP_204_NO_CONTENT)

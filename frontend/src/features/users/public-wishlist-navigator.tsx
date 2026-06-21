@@ -611,12 +611,12 @@ function PublicWishView({ wishlistId, wishId }: PublicWishViewProps) {
       </section> : null}
 
       {wish.original_product_url ? (
-        <section className="flex flex-col px-4 mt-2">
+        <section className="flex flex-col items-center px-4 mt-2">
           <a
             href={wish.original_product_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-primary underline underline-offset-2"
+            className="text-sm text-primary underline underline-offset-2 text-center"
           >
             {t("openProductPage") ?? "Open wish's page"}
           </a>

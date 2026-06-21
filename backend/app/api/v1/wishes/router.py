@@ -108,9 +108,10 @@ async def post_wish_complete(
     wish_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishResponse:
     """mark wish as fulfilled"""
-    return await complete_wish(db, current_user, wish_id)
+    return await complete_wish(db, current_user, wish_id, redis=redis)
 
 
 @router.delete("/wishes/{wish_id}/complete", response_model=WishResponse)

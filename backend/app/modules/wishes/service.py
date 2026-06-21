@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 from app.core.config import Settings, get_settings
 from app.db.models import Reservation, User, Wish, WishImage, Wishlist
+from app.modules.events import publish_event
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
 from app.modules.media.schemas import WishImageResponse
 from app.modules.wishes.schemas import (
@@ -130,6 +131,14 @@ async def create_wish(
 
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish.id)
+
+    if redis is not None:
+        await publish_event(redis, "WISH_CREATED", {
+            "wish_id": wish.id,
+            "wishlist_id": wish.wishlist_id,
+            "owner_user_id": current_user.id,
+        })
+
     return _to_response(wish)
 
 
@@ -241,7 +250,12 @@ async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> No
             logger.error("failed to delete minio object %s/%s: %s", bucket, obj, exc)
 
 
-async def complete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> WishResponse:
+async def complete_wish(
+    db: AsyncSession,
+    current_user: User,
+    wish_id: UUID,
+    redis: Redis | None = None,
+) -> WishResponse:
     """mark wish as completed and cancel its active reservation"""
     wish = await _get_owned_wish(db, current_user, wish_id)
     if wish.status == "completed":
@@ -251,6 +265,7 @@ async def complete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> 
             status_code=status.HTTP_409_CONFLICT,
             detail="Only active wishes can be marked as fulfilled",
         )
+    wishlist_id = wish.wishlist_id
     wish.status = "completed"
     result = await db.execute(
         select(Reservation).where(
@@ -263,6 +278,14 @@ async def complete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> 
         reservation.status = "cancelled"
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish_id)
+
+    if redis is not None:
+        await publish_event(redis, "WISH_FULFILLED", {
+            "wish_id": wish.id,
+            "wishlist_id": wishlist_id,
+            "owner_user_id": current_user.id,
+        })
+
     return _to_response(wish)
 
 

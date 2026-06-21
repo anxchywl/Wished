@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.db.models import User
 from app.db.session import async_session_factory, dispose_db
 from app.integrations.redis import close_redis, get_redis_client
+from app.modules.notifications.worker import run_notification_worker
 from app.modules.users.discovery import create_discovery_token
 
 logging.basicConfig(
@@ -302,10 +303,20 @@ async def main() -> None:
         )
     )
 
+    redis = get_redis_client()
+    notification_task = asyncio.create_task(
+        run_notification_worker(redis, bot, async_session_factory, web_app_url)
+    )
+
     logger.info("starting telegram bot polling")
     try:
         await dp.start_polling(bot)
     finally:
+        notification_task.cancel()
+        try:
+            await notification_task
+        except asyncio.CancelledError:
+            pass
         await dispose_db()
         await close_redis()
 

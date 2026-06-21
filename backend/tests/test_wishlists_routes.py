@@ -41,8 +41,9 @@ def test_create_wishlist_uses_payload_and_current_user(monkeypatch) -> None:
     user = _user()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = lambda: AsyncMock()
 
-    async def fake_create_wishlist(db, current_user, payload):
+    async def fake_create_wishlist(db, current_user, payload, redis=None):
         assert current_user is user
         assert payload.title == "Books"
         assert payload.description == "Things to read"

@@ -2,11 +2,13 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow, User
+from app.modules.events import publish_event
 from app.modules.users.schemas import FollowedUserListResponse, FollowedUserResponse, UserProfileResponse
 
 
@@ -55,6 +57,7 @@ async def follow_user(
     current_user: User,
     username: str,
     has_discovery_access: bool = False,
+    redis: Redis | None = None,
 ) -> UserProfileResponse:
     """follow user"""
     target = await get_user_by_username(db, username)
@@ -63,11 +66,20 @@ async def follow_user(
     if target.profile_visibility != "public" and not has_discovery_access:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    already_following = False
     db.add(Follow(follower_user_id=current_user.id, followed_user_id=target.id))
     try:
         await db.commit()
     except IntegrityError:
         await db.rollback()
+        already_following = True
+
+    if not already_following and redis is not None:
+        await publish_event(redis, "FOLLOWED", {
+            "follower_user_id": current_user.id,
+            "followed_user_id": target.id,
+        })
+
     return build_user_profile_response(target, current_user, is_following=True)
 
 

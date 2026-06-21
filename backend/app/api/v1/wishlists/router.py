@@ -62,9 +62,10 @@ async def post_wishlist(
     payload: WishlistCreateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishlistResponse:
     """create wishlist"""
-    return await create_wishlist(db, current_user, payload)
+    return await create_wishlist(db, current_user, payload, redis=redis)
 
 
 @router.patch("/reorder", response_model=WishlistListResponse)

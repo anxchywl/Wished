@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.db.models import User, Wish, WishImage, Wishlist
+from app.modules.events import publish_event
 from app.integrations.minio import delete_object, get_presigned_url, upload_object
 from app.modules.media.processing import process_image
 from app.modules.media.rate_limit import check_upload_rate_limit
@@ -79,6 +80,7 @@ async def create_wishlist(
     db: AsyncSession,
     current_user: User,
     payload: WishlistCreateRequest,
+    redis: Redis | None = None,
 ) -> WishlistResponse:
     """create wishlist"""
     next_position = await _next_wishlist_position(db, current_user)
@@ -92,6 +94,13 @@ async def create_wishlist(
     db.add(wishlist)
     await db.commit()
     await db.refresh(wishlist)
+
+    if redis is not None:
+        await publish_event(redis, "WISHLIST_CREATED", {
+            "wishlist_id": wishlist.id,
+            "owner_user_id": current_user.id,
+        })
+
     return _to_response(wishlist)
 
 
