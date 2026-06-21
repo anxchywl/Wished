@@ -512,6 +512,13 @@ html.theme-transitioning body,
 html.theme-transitioning main,
 html.theme-transitioning header,
 html.theme-transitioning section,
+html.theme-transitioning h1,
+html.theme-transitioning h2,
+html.theme-transitioning h3,
+html.theme-transitioning h4,
+html.theme-transitioning p,
+html.theme-transitioning label,
+html.theme-transitioning span,
 html.theme-transitioning svg,
 html.theme-transitioning path,
 html.theme-transitioning circle {
@@ -1439,19 +1446,20 @@ html[data-theme="dark"] .modal-sheet {
 
 .modal-focus-section,
 .modal-focus-collapsed {
-  max-height: 560px;
+  max-height: 300px;
   transform-origin: top;
+  /* expand direction: height first, then content fades in */
   transition:
-    max-height 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-    margin 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.26s cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: max-height, opacity, transform, margin, padding;
+    max-height 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1) 0.06s,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1) 0.04s,
+    margin 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
 .keyboard-focus-mode .modal-focus-section {
-  max-height: 560px;
+  max-height: 300px;
   opacity: 1;
   overflow: visible;
   transform: translateY(0) scale(1);
@@ -1472,6 +1480,13 @@ html[data-theme="dark"] .modal-sheet {
   overflow: hidden;
   pointer-events: none;
   transform: translateY(-8px) scale(0.96);
+  /* collapse direction: content fades first, then height collapses instantly */
+  transition:
+    opacity 0.14s cubic-bezier(0.4, 0, 1, 1),
+    transform 0.16s cubic-bezier(0.4, 0, 1, 1),
+    max-height 0.01s linear 0.14s,
+    margin 0.01s linear 0.14s,
+    padding 0.01s linear 0.14s;
 }
 
 .keyboard-focus-mode [data-active-section="true"] {

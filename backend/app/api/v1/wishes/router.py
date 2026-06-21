@@ -2,10 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
+from app.core.config import Settings, get_settings
 from app.db.models import User
 from app.modules.wishes import (
     complete_wish,
@@ -49,9 +52,11 @@ async def post_wish(
     payload: WishCreateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> WishResponse:
     """create wish"""
-    return await create_wish(db, current_user, wishlist_id, payload)
+    return await create_wish(db, current_user, wishlist_id, payload, settings, redis)
 
 
 @router.patch("/wishlists/{wishlist_id}/wishes/reorder", response_model=WishListResponse)

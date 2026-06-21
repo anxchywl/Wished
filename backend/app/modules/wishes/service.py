@@ -2,13 +2,14 @@ import logging
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.db.models import Reservation, User, Wish, WishImage, Wishlist
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
 from app.modules.media.schemas import WishImageResponse
@@ -60,6 +61,8 @@ async def copy_wish(
         position=next_position,
         price=source.price,
         currency=source.currency,
+        original_product_url=source.original_product_url,
+        source_marketplace=source.source_marketplace,
     )
     db.add(copied)
     await db.flush()
@@ -101,6 +104,8 @@ async def create_wish(
     current_user: User,
     wishlist_id: UUID,
     payload: WishCreateRequest,
+    settings: Settings | None = None,
+    redis: Redis | None = None,
 ) -> WishResponse:
     """create wish"""
     await _get_owned_wishlist(db, current_user, wishlist_id)
@@ -114,11 +119,51 @@ async def create_wish(
         position=next_position,
         price=payload.price,
         currency=payload.currency,
+        original_product_url=payload.original_product_url,
+        source_marketplace=payload.source_marketplace,
     )
     db.add(wish)
+    await db.flush()
+
+    if payload.pending_marketplace_image_id and redis is not None and settings is not None:
+        await _attach_marketplace_image(db, current_user.id, wish.id, payload.pending_marketplace_image_id, settings, redis)
+
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish.id)
     return _to_response(wish)
+
+
+async def _attach_marketplace_image(
+    db: AsyncSession,
+    user_id: UUID,
+    wish_id: UUID,
+    pending_image_id: UUID,
+    settings: Settings,
+    redis: Redis,
+) -> None:
+    """attach a marketplace-imported temp image to a newly created wish"""
+    from app.modules.marketplace.service import get_pending_image_meta
+    meta = await get_pending_image_meta(redis, user_id, pending_image_id)
+    if meta is None:
+        # pending image expired or invalid — silently skip
+        logger.warning("pending marketplace image not found: user=%s image=%s", user_id, pending_image_id)
+        return
+    try:
+        image = WishImage(
+            id=pending_image_id,
+            wish_id=wish_id,
+            bucket=meta["bucket"],
+            object_name=meta["full_key"],
+            thumbnail_object_name=meta["thumb_key"],
+            medium_object_name=meta["medium_key"],
+            file_name=f"{pending_image_id}.webp",
+            content_type="image/webp",
+            size_bytes=meta.get("size_bytes", 0),
+            status="ready",
+        )
+        db.add(image)
+    except (KeyError, TypeError) as exc:
+        logger.warning("invalid pending marketplace image metadata: %s", exc)
 
 
 async def reorder_wishes(
@@ -172,6 +217,8 @@ async def update_wish(
         wish.url = payload.url
     if "priority" in update_data:
         wish.priority = payload.priority
+    if "original_product_url" in update_data:
+        wish.original_product_url = payload.original_product_url
     if "price" in update_data:
         wish.price = payload.price
         wish.currency = payload.currency
@@ -315,6 +362,8 @@ def _to_response(wish: Wish) -> WishResponse:
         price=wish.price,
         currency=wish.currency,
         status=wish.status,
+        original_product_url=wish.original_product_url,
+        source_marketplace=wish.source_marketplace,
         images=[
             WishImageResponse(
                 id=image.id,

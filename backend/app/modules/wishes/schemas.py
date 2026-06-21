@@ -17,6 +17,9 @@ class WishCreateRequest(BaseModel):
     priority: int = Field(default=3, ge=1, le=5)
     price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
+    original_product_url: str | None = Field(default=None, max_length=2_048)
+    source_marketplace: str | None = Field(default=None, max_length=32)
+    pending_marketplace_image_id: UUID | None = Field(default=None)
 
     @field_validator("title")
     @classmethod
@@ -24,7 +27,7 @@ class WishCreateRequest(BaseModel):
         """normalize title"""
         return value.strip()
 
-    @field_validator("description", "url")
+    @field_validator("description", "url", "original_product_url")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         """normalize optional text"""
@@ -33,7 +36,7 @@ class WishCreateRequest(BaseModel):
         normalized = value.strip()
         return normalized or None
 
-    @field_validator("url")
+    @field_validator("url", "original_product_url")
     @classmethod
     def validate_url_scheme(cls, value: str | None) -> str | None:
         """only allow http and https URLs — blocks javascript:, data:, file:// etc."""
@@ -65,6 +68,7 @@ class WishUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = Field(default=None, max_length=2_000)
     url: str | None = Field(default=None, max_length=2_048)
+    original_product_url: str | None = Field(default=None, max_length=2_048)
     priority: int | None = Field(default=None, ge=1, le=5)
     price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
@@ -75,7 +79,7 @@ class WishUpdateRequest(BaseModel):
         """normalize title"""
         return value.strip() if value is not None else None
 
-    @field_validator("description", "url")
+    @field_validator("description", "url", "original_product_url")
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         """normalize optional text"""
@@ -84,7 +88,7 @@ class WishUpdateRequest(BaseModel):
         normalized = value.strip()
         return normalized or None
 
-    @field_validator("url")
+    @field_validator("url", "original_product_url")
     @classmethod
     def validate_url_scheme(cls, value: str | None) -> str | None:
         """only allow http and https URLs — blocks javascript:, data:, file:// etc."""
@@ -150,6 +154,8 @@ class WishResponse(BaseModel):
     price: Decimal | None
     currency: str | None
     status: str
+    original_product_url: str | None = None
+    source_marketplace: str | None = None
     images: list[WishImageResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime

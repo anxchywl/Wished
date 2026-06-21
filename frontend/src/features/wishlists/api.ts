@@ -101,3 +101,13 @@ export function deleteWishlistCover(accessToken: string, wishlistId: string) {
     accessToken,
   });
 }
+
+/**
+ * send formatted share message via bot to the owner's telegram chat
+ */
+export function shareWishlist(accessToken: string, wishlistId: string) {
+  return apiClient<{ ok: boolean }>(`/wishlists/${wishlistId}/share`, {
+    method: "POST",
+    accessToken,
+  });
+}

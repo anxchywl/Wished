@@ -47,6 +47,7 @@ import {
   parseWishlistDescription,
   formatWishlistDescription,
 } from "./utils";
+import { encodeWishlistStartParam } from "@/lib/telegram/start-param";
 import {
   useCreateWishMutation,
   useCopyWishMutation,
@@ -64,7 +65,6 @@ import { useModalFocusMode } from "./use-modal-focus-mode";
 import { ImageCropperModal } from "@/components/ui/image-cropper";
 import { useProfileQuery } from "@/features/profile/hooks";
 import { logStartup } from "@/lib/debug/startup-log";
-import { encodeWishlistStartParam } from "@/lib/telegram/start-param";
 import {
   useCreateReservationMutation,
   useCancelReservationMutation,
@@ -287,13 +287,13 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     });
   }
 
-  // share wishlist to telegram
+  // share wishlist — bot sends a formatted message with the wishlist name as a hyperlink
   function handleShare() {
     const username = profileQuery.data?.username;
     const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
     if (!username || !botUsername) return;
     const startParam = encodeWishlistStartParam(username, wishlistId);
-    const miniAppUrl = `https://t.me/${botUsername}?startapp=${encodeURIComponent(startParam)}`;
+    const miniAppUrl = `https://t.me/${botUsername}/wished?startapp=${encodeURIComponent(startParam)}`;
     const shareText = t("shareWishlistText").replace("{wishlist}", wishlist?.title ?? "");
     const tgShareUrl =
       `https://t.me/share/url?url=${encodeURIComponent(miniAppUrl)}` +
@@ -307,7 +307,16 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   }
 
   // create wish
-  function handleCreateWish(title: string, description: string, price: string, currency: string, imageFile?: PreviewFile) {
+  function handleCreateWish(
+    title: string,
+    description: string,
+    price: string,
+    currency: string,
+    imageFile?: PreviewFile,
+    originalProductUrl?: string | null,
+    sourceMarketplace?: string | null,
+    pendingMarketplaceImageId?: string | null,
+  ) {
     setWishModalOpen(false);
     const normalizedPrice = price.trim();
     const normalizedCurrency = currency.trim();
@@ -317,6 +326,9 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         description: description || null,
         price: normalizedPrice && normalizedCurrency ? normalizedPrice : null,
         currency: normalizedPrice && normalizedCurrency ? normalizedCurrency : null,
+        original_product_url: originalProductUrl ?? null,
+        source_marketplace: sourceMarketplace ?? null,
+        pending_marketplace_image_id: pendingMarketplaceImageId ?? null,
       },
       {
         onSuccess: (wish) => {
@@ -483,7 +495,9 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
       <CreateWishModal
         open={wishModalOpen}
         onClose={() => setWishModalOpen(false)}
-        onCreate={handleCreateWish}
+        onCreate={(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId) =>
+          handleCreateWish(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId)
+        }
         isPending={createWishMutation.isPending}
       />
 
@@ -895,6 +909,17 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               </button>
             </div>
           )}
+
+          {wish.original_product_url ? (
+            <a
+              href={wish.original_product_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary underline underline-offset-2"
+            >
+              {t("openProductPage") ?? "Open wish's page"}
+            </a>
+          ) : null}
 
           {wish.description ? (
             <div className="w-full rounded-2xl border border-border bg-muted/10 px-4 py-3">
@@ -1316,10 +1341,20 @@ function EditWishlistModal({
   );
 }
 
+
 type CreateWishModalProps = {
   open: boolean;
   onClose: () => void;
-  onCreate: (title: string, description: string, price: string, currency: string, imageFile?: PreviewFile) => void;
+  onCreate: (
+    title: string,
+    description: string,
+    price: string,
+    currency: string,
+    imageFile?: PreviewFile,
+    originalProductUrl?: string | null,
+    sourceMarketplace?: string | null,
+    pendingMarketplaceImageId?: string | null,
+  ) => void;
   isPending: boolean;
 };
 
@@ -1330,6 +1365,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
   const [step, setStep] = useState<1 | 2>(1);
+  const [productUrl, setProductUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -1345,6 +1381,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
     if (open) {
       setActive(true);
       setStep(1);
+      setProductUrl("");
       setTitle("");
       setDescription("");
       setPrice("");
@@ -1384,7 +1421,17 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
     }
 
     setDescription(cleanDescription);
-    onCreate(cleanTitle, cleanDescription, cleanPrice, cleanCurrency, coverFile);
+    const cleanUrl = productUrl.trim() || null;
+    onCreate(
+      cleanTitle,
+      cleanDescription,
+      cleanPrice,
+      cleanCurrency,
+      coverFile,
+      cleanUrl,
+      null,
+      null,
+    );
   }
 
   function handleCancel() {
@@ -1531,6 +1578,19 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                   </div>
                 </div>
 
+                <div className={`flex flex-col gap-1 ${focusMode.sectionClass("productUrl")}`}>
+                  <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("productUrlLabel") ?? "Product URL"}</label>
+                  <input
+                    type="url"
+                    className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder="https://..."
+                    value={productUrl}
+                    onChange={(e) => setProductUrl(e.currentTarget.value)}
+                    {...focusMode.fieldFocusProps("productUrl")}
+                    onBlur={focusMode.onFieldBlur}
+                  />
+                </div>
+
                 <div className={`flex flex-col gap-1 ${focusMode.sectionClass("description")}`}>
                   <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("descriptionLabel") ?? "Description"}</label>
                   <textarea
@@ -1596,7 +1656,7 @@ type EditWishModalProps = {
   open: boolean;
   onClose: () => void;
   wish: Wish | null;
-  onUpdate: (input: { title?: string; description?: string | null; price?: string | null; currency?: string | null }) => void;
+  onUpdate: (input: { title?: string; description?: string | null; original_product_url?: string | null; price?: string | null; currency?: string | null }) => void;
   onDelete: () => void;
   onUploadImage: (file: PreviewFile) => void;
   onDeleteImage: (imageId: string) => void;
@@ -1618,6 +1678,7 @@ function EditWishModal({
 }: EditWishModalProps) {
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
+  const [productUrl, setProductUrl] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -1635,6 +1696,7 @@ function EditWishModal({
     if (open && wish) {
       setActive(true);
       if (lastInitializedId.current !== wish.id) {
+        setProductUrl(wish.original_product_url ?? "");
         setTitle(wish.title ?? "");
         setDescription(wish.description ?? "");
         setPrice(wish.price ?? "");
@@ -1676,6 +1738,7 @@ function EditWishModal({
       onUpdate({
         title: cleanTitle,
         description: cleanDescription || null,
+        original_product_url: productUrl.trim() || null,
         price: cleanPrice && cleanCurrency ? cleanPrice : null,
         currency: cleanPrice && cleanCurrency ? cleanCurrency : null,
       });
@@ -1813,6 +1876,19 @@ function EditWishModal({
                     onBlur={focusMode.onFieldBlur}
                   />
                 </div>
+              </div>
+
+              <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("productUrl")}`}>
+                <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("productUrlLabel") ?? "Product URL"}</label>
+                <input
+                  type="url"
+                  className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  placeholder="https://..."
+                  value={productUrl}
+                  onChange={(e) => setProductUrl(e.currentTarget.value)}
+                  {...focusMode.fieldFocusProps("productUrl")}
+                  onBlur={focusMode.onFieldBlur}
+                />
               </div>
 
               <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("description")}`}>

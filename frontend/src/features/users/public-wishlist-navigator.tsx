@@ -610,6 +610,19 @@ function PublicWishView({ wishlistId, wishId }: PublicWishViewProps) {
         </button>
       </section> : null}
 
+      {wish.original_product_url ? (
+        <section className="flex flex-col px-4 mt-2">
+          <a
+            href={wish.original_product_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-primary underline underline-offset-2"
+          >
+            {t("openProductPage") ?? "Open wish's page"}
+          </a>
+        </section>
+      ) : null}
+
       {wish.description ? (
         <section className="flex flex-col px-4 mt-2">
           <div className="w-full rounded-2xl border border-border bg-muted/10 px-4 py-3">

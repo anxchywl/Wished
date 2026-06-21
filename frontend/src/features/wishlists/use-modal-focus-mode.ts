@@ -43,17 +43,17 @@ export function useModalFocusMode() {
       blurTimer.current = null;
     }
 
-    // delay collapsing other fields to let native focus start first
+    // delay collapsing other fields until keyboard is mostly open
     setTimeout(() => {
       setFocusedSection(section);
-      
-      // delay scroll to center after viewport begins resizing
+
+      // scroll after layout settles
       setTimeout(() => {
         if (target.isConnected) {
           target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
         }
       }, 100);
-    }, 60);
+    }, 180);
   }, [mobileKeyboardTarget]);
 
   const handleBlur = useCallback(() => {

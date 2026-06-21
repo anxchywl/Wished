@@ -37,7 +37,7 @@ def test_create_wish_accepts_price_currency_and_priority(monkeypatch) -> None:
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    async def fake_create_wish(db, current_user, requested_wishlist_id, payload):
+    async def fake_create_wish(db, current_user, requested_wishlist_id, payload, settings=None, redis=None):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         assert payload.title == "Keyboard"
@@ -233,6 +233,8 @@ def _wish(
         "price": price,
         "currency": currency,
         "status": status,
+        "original_product_url": None,
+        "source_marketplace": None,
         "images": [],
         "created_at": timestamp,
         "updated_at": timestamp,

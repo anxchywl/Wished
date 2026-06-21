@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api";
 import type {
+  ProductImportPayload,
+  ProductImportResult,
   Wish,
   WishCreateInput,
   WishImage,
@@ -7,6 +9,17 @@ import type {
   WishReorderInput,
   WishUpdateInput,
 } from "@/features/wishes/types";
+
+/**
+ * import product data from a marketplace URL (client-assisted: caller extracts metadata)
+ */
+export function importProductUrl(accessToken: string, payload: ProductImportPayload) {
+  return apiClient<ProductImportResult>("/marketplace/import", {
+    method: "POST",
+    accessToken,
+    body: payload,
+  });
+}
 
 /**
  * list wishes

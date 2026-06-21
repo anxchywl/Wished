@@ -1,7 +1,12 @@
+import base64
+import json
+import logging
+import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, UploadFile, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +32,8 @@ from app.modules.wishlists.schemas import (
     WishlistResponse,
     WishlistUpdateRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/wishlists", tags=["wishlists"])
 
@@ -120,3 +127,57 @@ async def remove_wishlist_cover(
 ) -> WishlistResponse:
     """remove wishlist cover image"""
     return await delete_wishlist_cover(db, current_user, wishlist_id)
+
+
+@router.post("/{wishlist_id}/share", status_code=status.HTTP_200_OK)
+async def share_wishlist(
+    wishlist_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict:
+    """send a formatted share message to the owner's telegram chat via bot"""
+    if not settings.telegram_bot_token or not current_user.username:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="share unavailable")
+
+    wishlist = await get_wishlist(db, current_user, wishlist_id)
+
+    start_param = _encode_wishlist_start_param(current_user.username, str(wishlist_id))
+    bot_username = settings.telegram_bot_username or ""
+    mini_app_url = f"https://t.me/{bot_username}/wished?startapp={start_param}"
+
+    title_escaped = _escape_md(wishlist.title)
+    url_escaped = _escape_md_url(mini_app_url)
+    text = f"Here, see my wishlist in Wished: [{title_escaped}]({url_escaped})"
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+            json={
+                "chat_id": current_user.telegram_id,
+                "text": text,
+                "parse_mode": "MarkdownV2",
+            },
+        )
+
+    if not resp.is_success:
+        logger.error("telegram sendMessage failed: %s", resp.text)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="telegram error")
+
+    return {"ok": True}
+
+
+def _encode_wishlist_start_param(username: str, wishlist_id: str) -> str:
+    payload = json.dumps({"username": username, "wishlistId": wishlist_id}, separators=(",", ":"))
+    b64 = base64.urlsafe_b64encode(payload.encode()).rstrip(b"=").decode()
+    return f"wl_{b64}"
+
+
+def _escape_md(text: str) -> str:
+    """escape special chars for Telegram MarkdownV2 text/labels"""
+    return re.sub(r"([_*\[\]()~`>#+=|{}.!\-])", r"\\\1", text)
+
+
+def _escape_md_url(url: str) -> str:
+    """escape only ) and \\ inside MarkdownV2 link URLs"""
+    return url.replace("\\", "\\\\").replace(")", "\\)")

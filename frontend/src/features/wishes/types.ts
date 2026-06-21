@@ -22,6 +22,8 @@ export type Wish = {
   price: string | null;
   currency: string | null;
   status: string;
+  original_product_url: string | null;
+  source_marketplace: string | null;
   images: WishImage[];
   created_at: string;
   updated_at: string;
@@ -38,6 +40,30 @@ export type WishCreateInput = {
   priority?: number;
   price?: string | null;
   currency?: string | null;
+  original_product_url?: string | null;
+  source_marketplace?: string | null;
+  pending_marketplace_image_id?: string | null;
+};
+
+export type ProductImportPayload = {
+  original_url: string;
+  title?: string | null;
+  description?: string | null;
+  price?: string | null;
+  currency?: string | null;
+  image_url?: string | null;
+  marketplace?: string | null;
+};
+
+export type ProductImportResult = {
+  title: string | null;
+  description: string | null;
+  price: string | null;
+  currency: string | null;
+  marketplace: string | null;
+  original_url: string;
+  pending_image_id: string | null;
+  pending_image_thumbnail_url: string | null;
 };
 
 export type WishUpdateInput = {
@@ -45,6 +71,7 @@ export type WishUpdateInput = {
   title?: string;
   description?: string | null;
   url?: string | null;
+  original_product_url?: string | null;
   priority?: number;
   price?: string | null;
   currency?: string | null;

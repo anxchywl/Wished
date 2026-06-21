@@ -7,6 +7,7 @@ import {
   copyWish,
   deleteWish,
   deleteWishImage,
+  importProductUrl,
   listWishes,
   reorderWishes,
   uncompleteWish,
@@ -15,6 +16,8 @@ import {
 } from "@/features/wishes/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
 import type {
+  ProductImportPayload,
+  ProductImportResult,
   Wish,
   WishCreateInput,
   WishListResponse,
@@ -27,6 +30,17 @@ import {
   reservationQueryKeys,
 } from "@/features/reservations/hooks";
 import { useAuthStore } from "@/stores/auth-store";
+
+/**
+ * import product data from a marketplace URL
+ */
+export function useImportProductUrlMutation() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation<ProductImportResult, Error, ProductImportPayload>({
+    mutationFn: (payload: ProductImportPayload) => importProductUrl(accessToken ?? "", payload),
+  });
+}
 
 /**
  * load wishes
@@ -105,6 +119,8 @@ export function useCreateWishMutation(wishlistId: string) {
         price: input.price ?? null,
         currency: input.currency ?? null,
         status: "active",
+        original_product_url: input.original_product_url ?? null,
+        source_marketplace: input.source_marketplace ?? null,
         images: [],
         created_at: timestamp,
         updated_at: timestamp,

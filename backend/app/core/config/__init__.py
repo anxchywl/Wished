@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     upload_rate_per_minute: int = 20
     upload_rate_per_hour: int = 100
 
+    marketplace_import_rate_per_minute: int = 5
+    marketplace_import_rate_per_hour: int = 30
+
     allowed_origins: list[str] = Field(default_factory=list)
 
     admin_telegram_ids: list[int] = Field(default_factory=list)
