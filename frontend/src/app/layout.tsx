@@ -39,11 +39,39 @@ const captureTelegramInitDataScript = `
     if (raw) {
       sessionStorage.setItem("wished/tgInitDataRaw", raw);
     }
-    if (startParam || startParamFromWebApp) {
-      sessionStorage.setItem("wished/tgStartParam", startParam || startParamFromWebApp);
+    var effectiveStartParam = startParam || startParamFromWebApp;
+    if (effectiveStartParam) {
+      sessionStorage.setItem("wished/tgStartParam", effectiveStartParam);
     }
     if (webApp) {
       if (typeof webApp.expand === "function") webApp.expand();
+    }
+
+    // eagerly navigate to the wishlist popup URL before React hydrates so that
+    // useSearchParams() already has the correct values on first render
+    if (effectiveStartParam && effectiveStartParam.indexOf("wl_") === 0) {
+      try {
+        var b64 = effectiveStartParam.slice(3).replace(/-/g, "+").replace(/_/g, "/");
+        var padLen = (4 - (b64.length % 4)) % 4;
+        for (var i = 0; i < padLen; i++) b64 += "=";
+        var json = decodeURIComponent(escape(atob(b64)));
+        var parsed = JSON.parse(json);
+        if (parsed && typeof parsed.username === "string" && typeof parsed.wishlistId === "string") {
+          var targetSearch = "?profile=" + encodeURIComponent(parsed.username) +
+            "&wishlist=" + encodeURIComponent(parsed.wishlistId);
+          if (parsed.shareToken && typeof parsed.shareToken === "string") {
+            targetSearch += "&share_token=" + encodeURIComponent(parsed.shareToken);
+          }
+          var currentSearch = new URLSearchParams(window.location.search);
+          var alreadyThere =
+            currentSearch.get("profile") &&
+            currentSearch.get("profile").toLowerCase() === parsed.username.toLowerCase() &&
+            currentSearch.get("wishlist") === parsed.wishlistId;
+          if (!alreadyThere) {
+            window.history.replaceState(null, "", "/users" + targetSearch);
+          }
+        }
+      } catch (e2) {}
     }
   } catch (e) {}
 })();
