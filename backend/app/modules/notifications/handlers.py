@@ -118,7 +118,7 @@ async def handle_followed(
 
     t = _text(followed.language_code)
     actor = _actor_name(follower)
-    text = f"{t['followed_title']}\n{t['followed_body'].format(actor=actor)}"
+    text = t['followed_body'].format(actor=actor)
     url = profile_url(mini_app_url, follower.username or str(follower_id))
     try:
         await _send(bot, followed.telegram_id, text, t["open_profile"], url)
@@ -158,7 +158,7 @@ async def handle_wishlist_created(
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
         t = _text(language_code)
-        text = f"{t['wishlist_created_title']}\n{t['wishlist_created_body'].format(actor=actor, title=wishlist.title)}"
+        text = t['wishlist_created_body'].format(actor=actor, title=wishlist.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wishlist"], url)
             logger.info("sent WISHLIST_CREATED notification to telegram_id=%s", follower_tg_id)
@@ -203,7 +203,7 @@ async def handle_wish_created(
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
         t = _text(language_code)
-        text = f"{t['wish_created_title']}\n{t['wish_created_body'].format(actor=actor, title=wish.title)}"
+        text = t['wish_created_body'].format(actor=actor, title=wish.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wish"], url)
             logger.info("sent WISH_CREATED notification to telegram_id=%s", follower_tg_id)
@@ -248,7 +248,7 @@ async def handle_wish_fulfilled(
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
         t = _text(language_code)
-        text = f"{t['wish_fulfilled_title']}\n{t['wish_fulfilled_body'].format(actor=actor, title=wish.title)}"
+        text = t['wish_fulfilled_body'].format(actor=actor, title=wish.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wishlist"], url)
             logger.info("sent WISH_FULFILLED notification to telegram_id=%s", follower_tg_id)
