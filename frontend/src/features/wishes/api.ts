@@ -24,8 +24,9 @@ export function importProductUrl(accessToken: string, payload: ProductImportPayl
 /**
  * list wishes
  */
-export function listWishes(accessToken: string, wishlistId: string) {
-  return apiClient<WishListResponse>(`/wishlists/${wishlistId}/wishes`, { accessToken });
+export function listWishes(accessToken: string, wishlistId: string, shareToken?: string | null) {
+  const query = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
+  return apiClient<WishListResponse>(`/wishlists/${wishlistId}/wishes${query}`, { accessToken });
 }
 
 /**

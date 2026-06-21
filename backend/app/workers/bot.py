@@ -32,14 +32,18 @@ FIND_FRIENDS_REQUEST_ID = 1
 FIND_FRIENDS_RATE_LIMIT = 10
 FIND_FRIENDS_RATE_WINDOW_SECONDS = 60
 CONFETTI_MESSAGE_EFFECT_ID = "5046509860389126442"
+LANG_PREF_KEY = "bot:lang_pref:{telegram_id}"
+LANG_PREF_TTL = 30 * 24 * 3600
+
 BOT_TEXT = {
     "en": {
         "find_friends": "Find friends",
         "open_wished": "Open Wished",
         "welcome": (
-            "Welcome to Wished!\n\n"
-            "Create, share, and track your wishlists.\n\n"
-            "Choose an option below to continue."
+            "Welcome to Wished. "
+            "Create wishlists, discover wishes, and coordinate gifts with friends. "
+            "Choose an option below to continue. "
+            "Press Open Wished to get started and Find friends to connect with people you know."
         ),
         "open_profile": "Open {name}",
         "registered": "{name} is registered in Wished.",
@@ -48,14 +52,17 @@ BOT_TEXT = {
         "invite": "Invite to Wished",
         "rate_limited": "Too many requests. Please try again in a minute.",
         "unknown_user": "This user",
+        "language_changed": "Language set to English.",
+        "language_select": "Please choose your language.",
     },
     "ru": {
         "find_friends": "Найти друзей",
         "open_wished": "Открыть Wished",
         "welcome": (
-            "Добро пожаловать в Wished!\n\n"
-            "Создавайте, делитесь и отслеживайте списки желаний.\n\n"
-            "Выберите действие ниже, чтобы продолжить."
+            "Добро пожаловать в Wished. "
+            "Создавайте вишлисты, находите желания друзей и удобно координируйте подарки. "
+            "Выберите действие ниже, чтобы продолжить. "
+            "Нажмите «Открыть Wished», чтобы начать, и «Найти друзей», чтобы связаться с людьми, которых вы знаете."
         ),
         "open_profile": "Открыть {name}",
         "registered": "{name} зарегистрирован в Wished.",
@@ -64,14 +71,17 @@ BOT_TEXT = {
         "invite": "Пригласить в Wished",
         "rate_limited": "Слишком много запросов. Повторите через минуту.",
         "unknown_user": "Этот пользователь",
+        "language_changed": "Язык изменён на русский.",
+        "language_select": "Пожалуйста, выберите язык.",
     },
     "kz": {
         "find_friends": "Достарды табу",
         "open_wished": "Wished ашу",
         "welcome": (
-            "Wished қолданбасына қош келдіңіз!\n\n"
-            "Тілектер тізімін жасап, бөлісіп, бақылаңыз.\n\n"
-            "Жалғастыру үшін төмендегі әрекетті таңдаңыз."
+            "Wished қолданбасына қош келдіңіз. "
+            "Тілектер тізімін жасап, достарыңыздың тілектерін қарап, сыйлықтарды бірге жоспарлаңыз. "
+            "Жалғастыру үшін төмендегі әрекетті таңдаңыз. "
+            "Бастау үшін «Wished ашу» және таныстарыңызбен байланысу үшін «Достарды табу» батырмасын басыңыз."
         ),
         "open_profile": "{name} профилін ашу",
         "registered": "{name} Wished жүйесінде тіркелген.",
@@ -80,28 +90,143 @@ BOT_TEXT = {
         "invite": "Wished жүйесіне шақыру",
         "rate_limited": "Сұраулар тым көп. Бір минуттан кейін қайталап көріңіз.",
         "unknown_user": "Бұл пайдаланушы",
+        "language_changed": "Тіл қазақша деп орнатылды.",
+        "language_select": "Тіліңізді таңдаңыз.",
     },
 }
+
+LANGUAGE_SELECT_MSG = (
+    "English — Please choose your language.\n"
+    "Қазақша — Тіліңізді таңдаңыз.\n"
+    "Русский — Пожалуйста, выберите язык."
+)
+
+LANG_BUTTON_LABELS: dict[str, str] = {
+    "English": "en",
+    "Қазақша": "kz",
+    "Русский": "ru",
+}
+
 INVITE_TEXT = (
     "Join me on Wished. "
     "Create wishlists, reserve gifts, and share ideas with friends."
 )
 
 
+def _language_keyboard() -> ReplyKeyboardMarkup:
+    """reply keyboard for language selection"""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="English")],
+            [KeyboardButton(text="Қазақша")],
+            [KeyboardButton(text="Русский")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+async def _get_user_lang(telegram_id: int) -> str:
+    """get language preference from redis cache then db; default en"""
+    try:
+        redis = get_redis_client()
+        cached = await redis.get(LANG_PREF_KEY.format(telegram_id=telegram_id))
+        if cached and cached in BOT_TEXT:
+            return cached
+    except Exception:
+        logger.debug("redis lang lookup failed for telegram_id=%s", telegram_id)
+
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(select(User).where(User.telegram_id == telegram_id))
+            user = result.scalar_one_or_none()
+            if user and user.language_code:
+                lang = "kz" if user.language_code in {"kk", "kz"} else user.language_code
+                if lang in BOT_TEXT:
+                    return lang
+    except Exception:
+        logger.debug("db lang lookup failed for telegram_id=%s", telegram_id)
+
+    return "en"
+
+
+async def _has_language_preference(telegram_id: int) -> bool:
+    """return True only if user explicitly chose a language via the bot"""
+    try:
+        redis = get_redis_client()
+        cached = await redis.get(LANG_PREF_KEY.format(telegram_id=telegram_id))
+        if cached and cached in BOT_TEXT:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+async def _save_language_preference(telegram_id: int, lang: str) -> None:
+    """persist language choice to redis and db"""
+    try:
+        redis = get_redis_client()
+        await redis.set(LANG_PREF_KEY.format(telegram_id=telegram_id), lang, ex=LANG_PREF_TTL)
+    except Exception:
+        logger.exception("failed to cache language preference for telegram_id=%s", telegram_id)
+
+    try:
+        async with async_session_factory() as db:
+            result = await db.execute(select(User).where(User.telegram_id == telegram_id))
+            user = result.scalar_one_or_none()
+            if user:
+                user.language_code = lang
+                await db.commit()
+    except Exception:
+        logger.exception("failed to save language preference to db for telegram_id=%s", telegram_id)
+
+
+async def _bot_text(message: types.Message) -> dict[str, str]:
+    """get localized bot text from stored preference"""
+    if not message.from_user:
+        return BOT_TEXT["en"]
+    lang = await _get_user_lang(message.from_user.id)
+    return BOT_TEXT[lang]
+
+
 async def start_handler(message: types.Message) -> None:
-    """handle start command"""
+    """handle start command — always show language selector first"""
+    if not message.from_user:
+        return
+    await message.answer(
+        "Please choose your language. Тіліңізді таңдаңыз. Пожалуйста, выберите язык.",
+        reply_markup=_language_keyboard(),
+    )
+
+
+async def language_text_handler(message: types.Message) -> None:
+    """handle language button tap from reply keyboard"""
+    if not message.from_user or not message.text:
+        return
+
+    lang = LANG_BUTTON_LABELS.get(message.text, "en")
+    await _save_language_preference(message.from_user.id, lang)
+
     settings = get_settings()
-    text = _bot_text(message)
+    text = BOT_TEXT[lang]
     await message.answer(
         text["welcome"],
         reply_markup=_friend_discovery_keyboard(text, settings.telegram_mini_app_url),
     )
 
 
+async def language_command_handler(message: types.Message) -> None:
+    """handle /language command — show language selector"""
+    await message.answer(
+        "Please choose your language. Тіліңізді таңдаңыз. Пожалуйста, выберите язык.",
+        reply_markup=_language_keyboard(),
+    )
+
+
 async def find_handler(message: types.Message) -> None:
     """show native user picker"""
     settings = get_settings()
-    text = _bot_text(message)
+    text = await _bot_text(message)
     await message.answer(
         text["find_friends"],
         reply_markup=_friend_discovery_keyboard(text, settings.telegram_mini_app_url),
@@ -110,15 +235,8 @@ async def find_handler(message: types.Message) -> None:
 
 def _friend_discovery_keyboard(text: dict[str, str], web_app_url: str | None) -> ReplyKeyboardMarkup:
     """build discovery keyboard"""
-    app_url = web_app_url or "http://localhost:3000"
     return ReplyKeyboardMarkup(
         keyboard=[
-            [
-                KeyboardButton(
-                    text=text["open_wished"],
-                    web_app=WebAppInfo(url=app_url),
-                )
-            ],
             [
                 KeyboardButton(
                     text=text["find_friends"],
@@ -147,7 +265,7 @@ async def users_shared_handler(message: types.Message) -> None:
     if not message.from_user:
         return
 
-    text = _bot_text(message)
+    text = await _bot_text(message)
     if not await _allow_find_request(message.from_user.id):
         await message.answer(text["rate_limited"])
         return
@@ -254,13 +372,6 @@ async def _delete_shared_users_message(message: types.Message) -> None:
         logger.debug("shared users message could not be deleted")
 
 
-def _bot_text(message: types.Message) -> dict[str, str]:
-    """get localized bot text"""
-    language_code = message.from_user.language_code if message.from_user else "en"
-    language = "kz" if language_code in {"kk", "kz"} else language_code
-    return BOT_TEXT.get(language, BOT_TEXT["en"])
-
-
 async def _allow_find_request(telegram_id: int) -> bool:
     """rate limit friend discovery"""
     try:
@@ -292,8 +403,10 @@ async def main() -> None:
     bot = Bot(token=settings.telegram_bot_token)
     dp = Dispatcher()
     dp.message.register(start_handler, CommandStart())
+    dp.message.register(language_command_handler, Command("language"))
     dp.message.register(find_handler, Command("find"))
     dp.message.register(users_shared_handler, F.users_shared)
+    dp.message.register(language_text_handler, F.text.in_(LANG_BUTTON_LABELS.keys()))
 
     web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
     await bot.set_chat_menu_button(

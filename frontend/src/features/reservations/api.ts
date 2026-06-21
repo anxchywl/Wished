@@ -45,8 +45,9 @@ export type BookedWishListResponse = {
 /**
  * create reservation for a wish
  */
-export function createReservation(accessToken: string, wishId: string) {
-  return apiClient<ReservationResponse>(`/wishes/${wishId}/reserve`, {
+export function createReservation(accessToken: string, wishId: string, shareToken?: string | null) {
+  const query = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
+  return apiClient<ReservationResponse>(`/wishes/${wishId}/reserve${query}`, {
     method: "POST",
     accessToken,
   });
@@ -65,9 +66,10 @@ export function cancelReservation(accessToken: string, reservationId: string) {
 /**
  * get viewer-safe reservation status for a wish
  */
-export function getReservationStatus(accessToken: string, wishId: string) {
+export function getReservationStatus(accessToken: string, wishId: string, shareToken?: string | null) {
+  const query = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
   return apiClient<WishReservationStatusResponse>(
-    `/wishes/${wishId}/reservation-status`,
+    `/wishes/${wishId}/reservation-status${query}`,
     { accessToken },
   );
 }

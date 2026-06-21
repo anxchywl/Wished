@@ -42,8 +42,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_URL: redis://redis:6379/${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/${REDIS_DB:-0}
       MINIO_ENDPOINT: minio:9000
       MINIO_PUBLIC_ENDPOINT: https://${CADDY_DOMAIN:?CADDY_DOMAIN must be set}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
@@ -52,6 +52,7 @@ services:
       MINIO_MEDIA_BUCKET: ${MINIO_MEDIA_BUCKET:-wished-media}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-[]}
       ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
+      TRUST_PROXY_HEADERS: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -106,10 +107,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: wished-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -157,8 +159,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_URL: redis://redis:6379/${REDIS_DB:-0}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/${REDIS_DB:-0}
     depends_on:
       postgres:
         condition: service_healthy

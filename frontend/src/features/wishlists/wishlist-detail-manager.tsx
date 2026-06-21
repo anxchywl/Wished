@@ -48,6 +48,7 @@ import {
   formatWishlistDescription,
 } from "./utils";
 import { encodeWishlistStartParam } from "@/lib/telegram/start-param";
+import { createWishlistShareToken } from "@/features/wishlists/api";
 import {
   useCreateWishMutation,
   useCopyWishMutation,
@@ -287,12 +288,22 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     });
   }
 
-  // share wishlist — bot sends a formatted message with the wishlist name as a hyperlink
-  function handleShare() {
+  // share wishlist — for private wishlists, embed a share token so recipients can view it
+  async function handleShare() {
     const username = profileQuery.data?.username;
     const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
     if (!username || !botUsername) return;
-    const startParam = encodeWishlistStartParam(username, wishlistId);
+    const accessToken = useAuthStore.getState().accessToken;
+    let shareToken: string | undefined;
+    if (wishlist?.visibility === "private" && accessToken) {
+      try {
+        const result = await createWishlistShareToken(accessToken, wishlistId);
+        shareToken = result.token;
+      } catch {
+        // proceed without token — recipient will see 404 for private wishlist
+      }
+    }
+    const startParam = encodeWishlistStartParam(username, wishlistId, shareToken);
     const miniAppUrl = `https://t.me/${botUsername}/wished?startapp=${encodeURIComponent(startParam)}`;
     const shareText = t("shareWishlistText").replace("{wishlist}", wishlist?.title ?? "");
     const tgShareUrl =
@@ -1587,7 +1598,10 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                     value={productUrl}
                     onChange={(e) => setProductUrl(e.currentTarget.value)}
                     {...focusMode.fieldFocusProps("productUrl")}
-                    onBlur={focusMode.onFieldBlur}
+                    onBlur={() => {
+                      setProductUrl((current) => current.trim());
+                      focusMode.onFieldBlur();
+                    }}
                   />
                 </div>
 
@@ -1887,7 +1901,10 @@ function EditWishModal({
                   value={productUrl}
                   onChange={(e) => setProductUrl(e.currentTarget.value)}
                   {...focusMode.fieldFocusProps("productUrl")}
-                  onBlur={focusMode.onFieldBlur}
+                  onBlur={() => {
+                    setProductUrl((current) => current.trim());
+                    focusMode.onFieldBlur();
+                  }}
                 />
               </div>
 

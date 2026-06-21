@@ -22,13 +22,16 @@ export const bookedWishesQueryKey = ["reservations", "booked"] as const;
 /**
  * load reservation status for a wish
  */
-export function useReservationStatusQuery(wishId: string) {
+export function useReservationStatusQuery(wishId: string, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
+  const queryKey = shareToken
+    ? ([...reservationQueryKeys.status(wishId), shareToken] as const)
+    : reservationQueryKeys.status(wishId);
 
   return useQuery({
-    queryKey: reservationQueryKeys.status(wishId),
-    queryFn: () => getReservationStatus(accessToken ?? "", wishId),
+    queryKey,
+    queryFn: () => getReservationStatus(accessToken ?? "", wishId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
     staleTime: 0,
     refetchInterval: 1_000,
@@ -82,15 +85,18 @@ export function useBookedWishesQuery() {
 /**
  * create reservation mutation
  */
-export function useCreateReservationMutation(wishlistId: string) {
+export function useCreateReservationMutation(wishlistId: string, shareToken?: string | null) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
 
   return useMutation({
-    mutationFn: (wishId: string) => createReservation(accessToken ?? "", wishId),
+    mutationFn: (wishId: string) => createReservation(accessToken ?? "", wishId, shareToken),
     onSuccess: (reservation, wishId) => {
+      const statusKey = shareToken
+        ? ([...reservationQueryKeys.status(wishId), shareToken] as const)
+        : reservationQueryKeys.status(wishId);
       queryClient.setQueryData<WishReservationStatusResponse>(
-        reservationQueryKeys.status(wishId),
+        statusKey,
         {
           wish_id: wishId,
           is_reserved: true,

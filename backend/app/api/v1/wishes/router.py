@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,9 +37,11 @@ async def list_wishes(
     wishlist_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    share_token: Annotated[str | None, Query()] = None,
 ) -> WishListResponse:
     """list wishlist wishes"""
-    return await list_wishlist_wishes(db, current_user, wishlist_id)
+    return await list_wishlist_wishes(db, current_user, wishlist_id, share_token=share_token, redis=redis)
 
 
 @router.post(

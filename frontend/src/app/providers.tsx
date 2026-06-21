@@ -317,10 +317,13 @@ function TelegramDeepLinkHandler() {
           current.get("profile")?.toLowerCase() === wishlistTarget.username.toLowerCase() &&
           current.get("wishlist") === wishlistTarget.wishlistId;
         if (isCurrentTarget) return;
-        router.replace(
+        let url =
           `/users?profile=${encodeURIComponent(wishlistTarget.username)}` +
-            `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`,
-        );
+          `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`;
+        if (wishlistTarget.shareToken) {
+          url += `&share_token=${encodeURIComponent(wishlistTarget.shareToken)}`;
+        }
+        router.replace(url);
         return;
       }
 

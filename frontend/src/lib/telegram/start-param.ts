@@ -3,6 +3,7 @@ const WISHLIST_PREFIX = "wl_";
 type WishlistStartParam = {
   username: string;
   wishlistId: string;
+  shareToken?: string;
 };
 
 function toBase64Url(value: string) {
@@ -22,8 +23,10 @@ function fromBase64Url(value: string) {
   return new TextDecoder().decode(bytes);
 }
 
-export function encodeWishlistStartParam(username: string, wishlistId: string) {
-  return `${WISHLIST_PREFIX}${toBase64Url(JSON.stringify({ username, wishlistId }))}`;
+export function encodeWishlistStartParam(username: string, wishlistId: string, shareToken?: string) {
+  const payload: WishlistStartParam = { username, wishlistId };
+  if (shareToken) payload.shareToken = shareToken;
+  return `${WISHLIST_PREFIX}${toBase64Url(JSON.stringify(payload))}`;
 }
 
 export function decodeWishlistStartParam(value: string): WishlistStartParam | null {
@@ -42,6 +45,7 @@ export function decodeWishlistStartParam(value: string): WishlistStartParam | nu
     return {
       username: parsed.username,
       wishlistId: parsed.wishlistId,
+      shareToken: typeof parsed.shareToken === "string" ? parsed.shareToken : undefined,
     };
   } catch {
     return null;

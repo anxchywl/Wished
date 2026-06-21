@@ -40,20 +40,22 @@ export function useWishlistsQuery() {
 /**
  * find single wishlist in cached list
  */
-export function useWishlistQuery(wishlistId: string) {
+export function useWishlistQuery(wishlistId: string, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const tgUserId = useSyncTgUserId();
   const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: [...wishlistQueryKeys.detail(wishlistId), accessToken] as const,
-    queryFn: () => getWishlist(accessToken ?? "", wishlistId),
+    queryKey: [...wishlistQueryKeys.detail(wishlistId), accessToken, shareToken] as const,
+    queryFn: () => getWishlist(accessToken ?? "", wishlistId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishlistId),
     initialData: () =>
-      queryClient
-        .getQueryData<WishlistListResponse>(wishlistQueryKeys.all(tgUserId))
-        ?.items.find((wishlist) => wishlist.id === wishlistId),
+      shareToken
+        ? undefined
+        : queryClient
+            .getQueryData<WishlistListResponse>(wishlistQueryKeys.all(tgUserId))
+            ?.items.find((wishlist) => wishlist.id === wishlistId),
     staleTime: 2 * 60 * 1000,
   });
 }

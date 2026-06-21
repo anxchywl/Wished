@@ -30,6 +30,7 @@ type PublicWishlistNavigatorProps = {
   initialUser?: UserProfileResponse | null;
   initialWishlistId?: string | null;
   initialWishId?: string | null;
+  shareToken?: string | null;
   onClose: () => void;
 };
 
@@ -54,6 +55,7 @@ export function PublicWishlistNavigator({
   initialUser,
   initialWishlistId,
   initialWishId,
+  shareToken,
   onClose,
 }: PublicWishlistNavigatorProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -153,11 +155,11 @@ export function PublicWishlistNavigator({
     }
 
     if (frame.view === "wishlist" && frame.wishlistId) {
-      return <PublicWishlistView wishlistId={frame.wishlistId} onOpenWish={handleWishOpen} />;
+      return <PublicWishlistView wishlistId={frame.wishlistId} shareToken={shareToken} onOpenWish={handleWishOpen} />;
     }
 
     if (frame.view === "wish" && frame.wishlistId && frame.wishId) {
-      return <PublicWishView wishlistId={frame.wishlistId} wishId={frame.wishId} />;
+      return <PublicWishView wishlistId={frame.wishlistId} wishId={frame.wishId} shareToken={shareToken} />;
     }
 
     if (frame.view === "copy" && frame.wishlistId && frame.wishId) {
@@ -425,17 +427,18 @@ function PublicWishlistRow({ wishlist, onOpen, onPrefetch }: PublicWishlistRowPr
 
 type PublicWishlistViewProps = {
   wishlistId: string;
+  shareToken?: string | null;
   onOpenWish: (wishlistId: string, wishId: string, title?: string) => void;
 };
 
 /**
  * show public wishlist
  */
-function PublicWishlistView({ wishlistId, onOpenWish }: PublicWishlistViewProps) {
+function PublicWishlistView({ wishlistId, shareToken, onOpenWish }: PublicWishlistViewProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
-  const wishlistQuery = useWishlistQuery(wishlistId);
-  const wishesQuery = useWishesQuery(wishlistId);
+  const wishlistQuery = useWishlistQuery(wishlistId, shareToken);
+  const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
   const wishlist = wishlistQuery.data;
   const wishes = wishesQuery.data?.items ?? [];
   const parsed = parseWishlistDescription(wishlist?.description);
@@ -449,8 +452,8 @@ function PublicWishlistView({ wishlistId, onOpenWish }: PublicWishlistViewProps)
   function handleWishHover() {
     if (!accessToken) return;
     queryClient.prefetchQuery({
-      queryKey: wishQueryKeys.list(wishlistId),
-      queryFn: () => listWishes(accessToken, wishlistId),
+      queryKey: [...wishQueryKeys.list(wishlistId), shareToken] as const,
+      queryFn: () => listWishes(accessToken, wishlistId, shareToken),
     });
   }
 
@@ -474,6 +477,7 @@ function PublicWishlistView({ wishlistId, onOpenWish }: PublicWishlistViewProps)
           <PublicWishRow
             key={wish.id}
             wish={wish}
+            shareToken={shareToken}
             onOpen={() => onOpenWish(wishlistId, wish.id, wish.title)}
             onPrefetch={handleWishHover}
           />
@@ -485,6 +489,7 @@ function PublicWishlistView({ wishlistId, onOpenWish }: PublicWishlistViewProps)
 
 type PublicWishRowProps = {
   wish: Wish;
+  shareToken?: string | null;
   onOpen: () => void;
   onPrefetch: () => void;
 };
@@ -492,9 +497,9 @@ type PublicWishRowProps = {
 /**
  * public wish row
  */
-function PublicWishRow({ wish, onOpen, onPrefetch }: PublicWishRowProps) {
+function PublicWishRow({ wish, shareToken, onOpen, onPrefetch }: PublicWishRowProps) {
   const isCompleted = wish.status === "completed";
-  const reservationStatus = useReservationStatusQuery(wish.id);
+  const reservationStatus = useReservationStatusQuery(wish.id, shareToken);
   const isBooked = reservationStatus.data?.is_reserved ?? false;
   return (
     <button
@@ -537,20 +542,21 @@ function PublicWishRow({ wish, onOpen, onPrefetch }: PublicWishRowProps) {
 type PublicWishViewProps = {
   wishlistId: string;
   wishId: string;
+  shareToken?: string | null;
 };
 
 /**
  * show public wish
  */
-function PublicWishView({ wishlistId, wishId }: PublicWishViewProps) {
-  const wishesQuery = useWishesQuery(wishlistId);
+function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps) {
+  const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
   const wish = useMemo(
     () => wishesQuery.data?.items.find((item) => item.id === wishId) ?? null,
     [wishId, wishesQuery.data?.items],
   );
   const { t } = useTranslation();
-  const reservationStatus = useReservationStatusQuery(wishId);
-  const createReservation = useCreateReservationMutation(wishlistId);
+  const reservationStatus = useReservationStatusQuery(wishId, shareToken);
+  const createReservation = useCreateReservationMutation(wishlistId, shareToken);
   const status = reservationStatus.data;
   const isReserved = status?.is_reserved ?? false;
   const isBusy = createReservation.isPending;

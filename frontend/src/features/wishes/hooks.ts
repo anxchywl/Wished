@@ -45,16 +45,19 @@ export function useImportProductUrlMutation() {
 /**
  * load wishes
  */
-export function useWishesQuery(wishlistId: string, enabled = true) {
+export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
+  const queryKey = shareToken
+    ? ([...wishQueryKeys.list(wishlistId), shareToken] as const)
+    : wishQueryKeys.list(wishlistId);
 
   return useQuery({
-    queryKey: wishQueryKeys.list(wishlistId),
+    queryKey,
     queryFn: async () => {
-      const response = await listWishes(accessToken ?? "", wishlistId);
-      const cached = queryClient.getQueryData<WishListResponse>(wishQueryKeys.list(wishlistId));
+      const response = await listWishes(accessToken ?? "", wishlistId, shareToken);
+      const cached = queryClient.getQueryData<WishListResponse>(queryKey);
       return preserveWishImageUrls(response, cached);
     },
     enabled: Boolean(enabled && authStatus === "authenticated" && accessToken && wishlistId),

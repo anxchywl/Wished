@@ -6,7 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.modules.wishlists import (
     update_wishlist,
     upload_wishlist_cover,
 )
+from app.modules.wishlists.service import get_accessible_wishlist
 from app.modules.wishlists.schemas import (
     WishlistCreateRequest,
     WishlistListResponse,
@@ -32,6 +33,7 @@ from app.modules.wishlists.schemas import (
     WishlistResponse,
     WishlistUpdateRequest,
 )
+from app.modules.wishlists.share_token import create_wishlist_share_token
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +54,11 @@ async def get_wishlist_detail(
     wishlist_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    share_token: Annotated[str | None, Query()] = None,
 ) -> WishlistResponse:
     """get wishlist"""
-    return await get_wishlist(db, current_user, wishlist_id)
+    return await get_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
 
 
 @router.post("", response_model=WishlistResponse, status_code=status.HTTP_201_CREATED)
@@ -128,6 +132,21 @@ async def remove_wishlist_cover(
 ) -> WishlistResponse:
     """remove wishlist cover image"""
     return await delete_wishlist_cover(db, current_user, wishlist_id)
+
+
+@router.post("/{wishlist_id}/share-token", status_code=status.HTTP_200_OK)
+async def post_share_token(
+    wishlist_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> dict:
+    """generate a share token for a private wishlist (owner only)"""
+    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id)
+    if wishlist.owner_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the wishlist owner")
+    token = await create_wishlist_share_token(redis, wishlist_id)
+    return {"token": token}
 
 
 @router.post("/{wishlist_id}/share", status_code=status.HTTP_200_OK)

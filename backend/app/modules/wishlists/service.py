@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.db.models import User, Wish, WishImage, Wishlist
+from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.events import publish_event
 from app.integrations.minio import delete_object, get_presigned_url, upload_object
 from app.modules.media.processing import process_image
@@ -70,9 +71,11 @@ async def get_wishlist(
     db: AsyncSession,
     current_user: User,
     wishlist_id: UUID,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> WishlistResponse:
     """get visible wishlist"""
-    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id)
+    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
     return _to_response(wishlist)
 
 
@@ -320,13 +323,18 @@ async def get_accessible_wishlist(
     db: AsyncSession,
     current_user: User,
     wishlist_id: UUID,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> Wishlist:
-    """find visible wishlist"""
+    """find visible wishlist; share_token grants access to private wishlists"""
     result = await db.execute(select(Wishlist).where(Wishlist.id == wishlist_id))
     wishlist = result.scalar_one_or_none()
     if wishlist is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist not found")
     if wishlist.owner_user_id != current_user.id and wishlist.visibility != "public":
+        if share_token and redis:
+            if await validate_wishlist_share_token(redis, share_token, wishlist_id):
+                return wishlist
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wishlist not found")
     return wishlist
 

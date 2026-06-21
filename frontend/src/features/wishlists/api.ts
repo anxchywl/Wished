@@ -17,8 +17,19 @@ export function listWishlists(accessToken: string) {
 /**
  * get wishlist
  */
-export function getWishlist(accessToken: string, wishlistId: string) {
-  return apiClient<Wishlist>(`/wishlists/${wishlistId}`, { accessToken });
+export function getWishlist(accessToken: string, wishlistId: string, shareToken?: string | null) {
+  const query = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : "";
+  return apiClient<Wishlist>(`/wishlists/${wishlistId}${query}`, { accessToken });
+}
+
+/**
+ * generate share token for a private wishlist (owner only)
+ */
+export function createWishlistShareToken(accessToken: string, wishlistId: string) {
+  return apiClient<{ token: string }>(`/wishlists/${wishlistId}/share-token`, {
+    method: "POST",
+    accessToken,
+  });
 }
 
 /**

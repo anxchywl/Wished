@@ -596,6 +596,83 @@ class TestMediaAccessAuthorization:
 # validation error handler does not leak request body (M1)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# S2 — rate limit X-Forwarded-For bypass prevention
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_rate_limit_uses_direct_ip_by_default() -> None:
+    """rate limiter keys by real TCP IP when trust_proxy_headers is False"""
+    from app.modules.auth.rate_limit import check_auth_rate_limit
+    from fastapi import Request
+    from unittest.mock import MagicMock
+
+    request = MagicMock(spec=Request)
+    # attacker sets a spoofed header pointing to a different IP
+    request.headers = {"X-Forwarded-For": "1.2.3.4"}
+    request.client = MagicMock()
+    request.client.host = "5.6.7.8"
+
+    captured_keys: list[str] = []
+    pipe = AsyncMock()
+    pipe.__aenter__ = AsyncMock(return_value=pipe)
+    pipe.__aexit__ = AsyncMock(return_value=False)
+    pipe.incr = MagicMock(return_value=pipe)
+    pipe.expire = MagicMock(return_value=pipe)
+    # return counts that are within limit
+    pipe.execute = AsyncMock(return_value=[1, True, 1, True])
+
+    redis = AsyncMock()
+    redis.pipeline = MagicMock(return_value=pipe)
+
+    # intercept the keys passed to incr
+    def _capture_incr(key):
+        captured_keys.append(key)
+        return pipe
+
+    pipe.incr = _capture_incr
+
+    await check_auth_rate_limit(redis, request, trust_proxy_headers=False)
+
+    # keys must be derived from the real TCP address, not the forged XFF header
+    assert all("5.6.7.8" in k for k in captured_keys)
+    assert not any("1.2.3.4" in k for k in captured_keys)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_uses_xff_when_proxy_trusted() -> None:
+    """when trust_proxy_headers is True, XFF is used for rate limit keying"""
+    from app.modules.auth.rate_limit import check_auth_rate_limit
+    from fastapi import Request
+    from unittest.mock import MagicMock
+
+    request = MagicMock(spec=Request)
+    request.headers = {"X-Forwarded-For": "9.9.9.9"}
+    request.client = MagicMock()
+    request.client.host = "172.20.0.5"  # internal proxy IP
+
+    captured_keys: list[str] = []
+
+    pipe = AsyncMock()
+    pipe.__aenter__ = AsyncMock(return_value=pipe)
+    pipe.__aexit__ = AsyncMock(return_value=False)
+    pipe.expire = MagicMock(return_value=pipe)
+    pipe.execute = AsyncMock(return_value=[1, True, 1, True])
+
+    def _capture_incr(key):
+        captured_keys.append(key)
+        return pipe
+
+    pipe.incr = _capture_incr
+
+    redis = AsyncMock()
+    redis.pipeline = MagicMock(return_value=pipe)
+
+    await check_auth_rate_limit(redis, request, trust_proxy_headers=True)
+
+    assert all("9.9.9.9" in k for k in captured_keys)
+
+
 class TestValidationErrorHandler:
     def test_validation_error_response_excludes_input_value(self) -> None:
         """422 response must not echo back the raw request value"""

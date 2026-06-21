@@ -97,8 +97,11 @@ def _update_user_from_telegram(user: User, telegram_user: TelegramUserData) -> N
     user.username = telegram_user.username
     user.first_name = telegram_user.first_name
     user.last_name = telegram_user.last_name
-    user.photo_url = telegram_user.photo_url
-    user.language_code = telegram_user.language_code
+    if telegram_user.photo_url is not None:
+        user.photo_url = telegram_user.photo_url
+    # preserve explicit language choice; only seed on first login
+    if user.language_code is None:
+        user.language_code = telegram_user.language_code
     user.is_premium = telegram_user.is_premium
 
 

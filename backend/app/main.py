@@ -32,6 +32,8 @@ def create_app() -> FastAPI:
             raise RuntimeError(
                 "TELEGRAM_INIT_DATA_MAX_AGE_SECONDS must not exceed 300 in production"
             )
+        if not settings.redis_password:
+            raise RuntimeError("REDIS_PASSWORD must be set to a secure value in production")
         if not settings.admin_telegram_ids:
             logger.warning("ADMIN_TELEGRAM_IDS is empty — admin panel will be inaccessible")
 

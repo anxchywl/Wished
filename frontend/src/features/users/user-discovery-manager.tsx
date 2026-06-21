@@ -130,6 +130,7 @@ export function UserDiscoveryManager() {
   const profileToken = searchParams.get("profile_token");
   const selectedWishlistId = searchParams.get("wishlist");
   const selectedWishId = searchParams.get("wish");
+  const shareToken = searchParams.get("share_token");
   const followingQuery = useFollowingQuery();
   const followedUsers = followingQuery.data?.items ?? [];
   const bookedWishesQuery = useBookedWishesQuery();
@@ -216,6 +217,7 @@ export function UserDiscoveryManager() {
         profileToken={profileToken}
         initialWishlistId={selectedWishlistId}
         initialWishId={selectedWishId}
+        shareToken={shareToken}
         onClose={() => router.replace("/users")}
       />
 

@@ -1590,6 +1590,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "fastapi" },
     { name = "greenlet" },
+    { name = "httpx" },
     { name = "minio" },
     { name = "pillow" },
     { name = "pydantic-settings" },
@@ -1602,7 +1603,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -1615,7 +1615,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.29.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "greenlet", specifier = ">=3.1.1" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.2" },
+    { name = "httpx", specifier = ">=0.27.2" },
     { name = "minio", specifier = ">=7.2.10" },
     { name = "pillow", specifier = ">=10.0.0" },
     { name = "pydantic-settings", specifier = ">=2.5.2" },

@@ -62,6 +62,10 @@ class Settings(BaseSettings):
 
     allowed_origins: list[str] = Field(default_factory=list)
 
+    # set to True only when the backend is behind a trusted reverse proxy that sets X-Forwarded-For;
+    # False by default — use the direct TCP connection IP for rate limiting
+    trust_proxy_headers: bool = False
+
     admin_telegram_ids: list[int] = Field(default_factory=list)
 
     @field_validator("admin_telegram_ids", mode="before")

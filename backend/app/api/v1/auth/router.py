@@ -58,7 +58,7 @@ async def telegram_auth(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> TokenResponse:
     """authenticate telegram user"""
-    await check_auth_rate_limit(redis, request)
+    await check_auth_rate_limit(redis, request, settings.trust_proxy_headers)
     try:
         telegram_user = validate_telegram_init_data(
             init_data=payload.init_data,
@@ -86,7 +86,7 @@ async def refresh_auth_token(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> RefreshResponse:
     """refresh auth tokens using the httpOnly cookie"""
-    await check_auth_rate_limit(redis, request)
+    await check_auth_rate_limit(redis, request, settings.trust_proxy_headers)
     refresh_token_value = request.cookies.get(REFRESH_TOKEN_COOKIE)
     if not refresh_token_value:
         raise HTTPException(

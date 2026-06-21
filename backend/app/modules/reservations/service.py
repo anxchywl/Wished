@@ -2,12 +2,14 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Reservation, User, Wish, Wishlist
+from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
     BookedWishItem,
     BookedWishListResponse,
@@ -20,9 +22,11 @@ async def create_reservation(
     db: AsyncSession,
     current_user: User,
     wish_id: UUID,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> ReservationResponse:
     """create reservation for a wish — owner may reserve their own wish"""
-    wish = await _get_accessible_wish(db, current_user, wish_id)
+    wish = await _get_accessible_wish(db, current_user, wish_id, share_token=share_token, redis=redis)
 
     # check for existing active reservation inside a transaction
     result = await db.execute(
@@ -131,9 +135,11 @@ async def get_wish_reservation_status(
     db: AsyncSession,
     current_user: User,
     wish_id: UUID,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> WishReservationStatusResponse:
     """return viewer-safe reservation status, respecting the wish owner's booking_visibility setting"""
-    wish = await _get_accessible_wish(db, current_user, wish_id, require_active=False)
+    wish = await _get_accessible_wish(db, current_user, wish_id, require_active=False, share_token=share_token, redis=redis)
     is_owner = wish.wishlist.owner_user_id == current_user.id
 
     result = await db.execute(
@@ -265,8 +271,10 @@ async def _get_accessible_wish(
     current_user: User,
     wish_id: UUID,
     require_active: bool = True,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> Wish:
-    """find wish accessible to the user"""
+    """find wish accessible to the user; share_token grants access to private wishlists"""
     result = await db.execute(
         select(Wish)
         .options(selectinload(Wish.wishlist))
@@ -276,6 +284,14 @@ async def _get_accessible_wish(
     if not wish:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
     if wish.wishlist.owner_user_id != current_user.id and wish.wishlist.visibility != "public":
+        if share_token and redis:
+            if await validate_wishlist_share_token(redis, share_token, wish.wishlist_id):
+                if require_active and wish.status != "active":
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Wish is not available for reservation",
+                    )
+                return wish
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
     if require_active and wish.status != "active":
         raise HTTPException(

@@ -29,9 +29,11 @@ async def list_wishlist_wishes(
     db: AsyncSession,
     current_user: User,
     wishlist_id: UUID,
+    share_token: str | None = None,
+    redis: Redis | None = None,
 ) -> WishListResponse:
     """list wishlist wishes"""
-    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id)
+    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
     query = (
         select(Wish)
         .options(selectinload(Wish.images))
