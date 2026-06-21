@@ -303,9 +303,18 @@ async def main() -> None:
         )
     )
 
+    # blpop blocks for up to BLPOP_TIMEOUT seconds — the client must not have
+    # a socket timeout shorter than that, so we use a dedicated connection here
+    from redis.asyncio import Redis as AsyncRedis
+    blocking_redis = AsyncRedis.from_url(
+        settings.redis_connection_url,
+        encoding="utf-8",
+        decode_responses=True,
+        socket_timeout=None,
+    )
     redis = get_redis_client()
     notification_task = asyncio.create_task(
-        run_notification_worker(redis, bot, async_session_factory, web_app_url)
+        run_notification_worker(blocking_redis, bot, async_session_factory, web_app_url)
     )
 
     logger.info("starting telegram bot polling")
@@ -317,6 +326,7 @@ async def main() -> None:
             await notification_task
         except asyncio.CancelledError:
             pass
+        await blocking_redis.aclose()
         await dispose_db()
         await close_redis()
 

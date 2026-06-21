@@ -88,7 +88,7 @@ async def _send(bot: Bot, telegram_id: int, text: str, button_text: str, url: st
             [InlineKeyboardButton(text=button_text, web_app=WebAppInfo(url=url))]
         ]
     )
-    await bot.send_message(chat_id=telegram_id, text=text, reply_markup=keyboard)
+    await bot.send_message(chat_id=telegram_id, text=text, reply_markup=keyboard, parse_mode="HTML")
 
 
 async def handle_followed(
@@ -151,7 +151,8 @@ async def handle_wishlist_created(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    url = wishlist_url(mini_app_url, wishlist_id)
+    username = owner.username or str(owner_id)
+    url = wishlist_url(mini_app_url, username, wishlist_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
@@ -195,7 +196,8 @@ async def handle_wish_created(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    url = wish_url(mini_app_url, wishlist_id, wish_id)
+    username = owner.username or str(owner_id)
+    url = wish_url(mini_app_url, username, wishlist_id, wish_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
@@ -239,7 +241,8 @@ async def handle_wish_fulfilled(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    url = wishlist_url(mini_app_url, wishlist_id)
+    username = owner.username or str(owner_id)
+    url = wishlist_url(mini_app_url, username, wishlist_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):

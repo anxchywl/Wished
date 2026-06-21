@@ -31,13 +31,13 @@ def test_profile_url() -> None:
 
 def test_wishlist_url() -> None:
     wid = uuid4()
-    assert wishlist_url("https://app.example.com", wid) == f"https://app.example.com/wishlists/{wid}"
+    assert wishlist_url("https://app.example.com", "alice", wid) == f"https://app.example.com/users?profile=alice&wishlist={wid}"
 
 
 def test_wish_url() -> None:
     wid = uuid4()
     wish = uuid4()
-    assert wish_url("https://app.example.com", wid, wish) == f"https://app.example.com/wishlists/{wid}?wish={wish}"
+    assert wish_url("https://app.example.com", "alice", wid, wish) == f"https://app.example.com/users?profile=alice&wishlist={wid}&wish={wish}"
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +300,9 @@ async def test_handle_wish_created_notifies_followers() -> None:
     assert call.kwargs["chat_id"] == follower_tg_id
     assert "New wish" in call.kwargs["text"]
     assert "New Sneakers" in call.kwargs["text"]
-    assert str(wish_id) in call.kwargs["reply_markup"].inline_keyboard[0][0].web_app.url
+    url = call.kwargs["reply_markup"].inline_keyboard[0][0].web_app.url
+    assert str(wish_id) in url
+    assert "carol" in url
 
 
 # ---------------------------------------------------------------------------
