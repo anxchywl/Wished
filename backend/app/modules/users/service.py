@@ -124,7 +124,7 @@ def build_user_profile_response(
         first_name=user.first_name,
         last_name=user.last_name,
         photo_url=user.photo_url,
-        birthday=user.birthday if is_owner or user.birthday_visibility == "public" else None,
+        birthday=user.birthday if is_owner or user.birthday_visibility == "public" or (is_following and user.birthday_visibility == "friends") else None,
         is_self=is_owner,
         is_following=False if is_owner else is_following,
     )
