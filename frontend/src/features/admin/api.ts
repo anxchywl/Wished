@@ -27,6 +27,18 @@ export type AdminUserItem = {
   last_login_at: string | null;
   wishlist_count: number;
   wish_count: number;
+  is_blocked: boolean;
+  blocked_at: string | null;
+  blocked_reason: string | null;
+};
+
+export type ModerationLogItem = {
+  id: string;
+  user_id: string;
+  action: string;
+  reason: string | null;
+  performed_by: string;
+  created_at: string;
 };
 
 export type AdminWishlistItem = {
@@ -109,4 +121,23 @@ export async function fetchAdminMedia(): Promise<AdminMediaItem[]> {
 
 export async function fetchAuditLogs(): Promise<AuditLogItem[]> {
   return apiClient<AuditLogItem[]>("/admin/audit-logs?limit=100", { accessToken: getToken() });
+}
+
+export async function blockUser(userId: string, reason: string): Promise<void> {
+  return apiClient<void>(`/admin/users/${userId}/block`, {
+    method: "POST",
+    body: { reason },
+    accessToken: getToken(),
+  });
+}
+
+export async function unblockUser(userId: string): Promise<void> {
+  return apiClient<void>(`/admin/users/${userId}/unblock`, {
+    method: "POST",
+    accessToken: getToken(),
+  });
+}
+
+export async function fetchModerationLogs(userId: string): Promise<ModerationLogItem[]> {
+  return apiClient<ModerationLogItem[]>(`/admin/users/${userId}/moderation-logs`, { accessToken: getToken() });
 }

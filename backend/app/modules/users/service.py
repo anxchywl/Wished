@@ -19,11 +19,11 @@ async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
 
 
 async def get_user_by_username(db: AsyncSession, username: str) -> User:
-    """find user by username"""
+    """find user by username; blocked users are treated as not found"""
     normalized_username = _normalize_username(username)
     result = await db.execute(select(User).where(User.username.ilike(normalized_username)))
     user = result.scalar_one_or_none()
-    if user is None:
+    if user is None or user.is_blocked:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 

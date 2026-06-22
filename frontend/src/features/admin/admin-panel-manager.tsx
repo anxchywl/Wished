@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
   useAdminStats,
@@ -8,6 +8,8 @@ import {
   useAdminWishlists,
   useAdminWishes,
   useAuditLogs,
+  useBlockUser,
+  useUnblockUser,
 } from "./hooks";
 import type { AdminUserItem, AdminWishlistItem, AdminWishItem, AuditLogItem } from "./api";
 
@@ -130,14 +132,147 @@ function UsersTab({ search, setSearch }: { search: string; setSearch: (v: string
       </label>
       {isLoading && <p className="admin-state">{t("adminLoading")}</p>}
       {users && users.length === 0 && <p className="admin-state">{t("adminNoUsers")}</p>}
-      {users && users.map((u) => <UserRow key={u.id} user={u} />)}
+      {users && users.map((u) => <UserRow key={u.id} user={u} searchQuery={search || undefined} />)}
     </div>
   );
 }
 
-function UserRow({ user }: { user: AdminUserItem }) {
+type ModerationDialogState =
+  | { type: "block"; userId: string }
+  | { type: "unblock"; userId: string }
+  | null;
+
+function ModerationDialog({
+  dialog,
+  onClose,
+  searchQuery,
+}: {
+  dialog: ModerationDialogState;
+  onClose: () => void;
+  searchQuery?: string;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState(false);
+  const blockMutation = useBlockUser(searchQuery);
+  const unblockMutation = useUnblockUser(searchQuery);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (dialog) {
+      setReason("");
+      setReasonError(false);
+      window.setTimeout(() => inputRef.current?.focus(), 60);
+    }
+  }, [dialog]);
+
+  if (!dialog) return null;
+
+  const isBlock = dialog.type === "block";
+  const isPending = blockMutation.isPending || unblockMutation.isPending;
+
+  async function handleConfirm() {
+    if (!dialog) return;
+    if (isBlock && !reason.trim()) {
+      setReasonError(true);
+      return;
+    }
+    try {
+      if (isBlock) {
+        await blockMutation.mutateAsync({ userId: dialog.userId, reason: reason.trim() });
+      } else {
+        await unblockMutation.mutateAsync({ userId: dialog.userId });
+      }
+      onClose();
+    } catch {
+      // error visible via mutation state; dialog stays open
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed", inset: 0, zIndex: 9000,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        background: "rgba(0,0,0,0.55)", padding: 20,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: "var(--tg-theme-bg-color, #fff)",
+        borderRadius: 16, padding: 24, width: "100%", maxWidth: 340,
+        display: "flex", flexDirection: "column", gap: 16,
+      }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--tg-theme-text-color)" }}>
+          {isBlock ? t("adminBlockConfirmTitle") : t("adminUnblockConfirmTitle")}
+        </h2>
+        <p style={{ margin: 0, fontSize: 14, color: "var(--tg-theme-hint-color)", lineHeight: 1.5 }}>
+          {isBlock ? t("adminBlockConfirmBody") : t("adminUnblockConfirmBody")}
+        </p>
+        {isBlock && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tg-theme-text-color)" }}>
+              {t("adminBlockReasonLabel")}
+            </label>
+            <textarea
+              ref={inputRef}
+              value={reason}
+              onChange={(e) => { setReason(e.target.value); setReasonError(false); }}
+              placeholder={t("adminBlockReasonPlaceholder")}
+              rows={3}
+              maxLength={500}
+              style={{
+                resize: "none", borderRadius: 8, padding: "8px 10px",
+                fontSize: 14, border: `1px solid ${reasonError ? "var(--tg-theme-destructive-text-color, red)" : "var(--tg-theme-hint-color, #ccc)"}`,
+                background: "var(--tg-theme-secondary-bg-color, #f5f5f5)",
+                color: "var(--tg-theme-text-color)",
+              }}
+            />
+            {reasonError && (
+              <span style={{ fontSize: 12, color: "var(--tg-theme-destructive-text-color, red)" }}>
+                {t("adminBlockReasonRequired")}
+              </span>
+            )}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onClose}
+            style={{
+              flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
+              background: "var(--tg-theme-secondary-bg-color, #f0f0f0)",
+              color: "var(--tg-theme-text-color)", border: "none", cursor: "pointer",
+            }}
+          >
+            {t("adminCancel")}
+          </button>
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleConfirm}
+            style={{
+              flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
+              background: isBlock ? "var(--tg-theme-destructive-text-color, #e53935)" : "var(--tg-theme-button-color, #6B7EE8)",
+              color: "#fff", border: "none", cursor: isPending ? "not-allowed" : "pointer",
+              opacity: isPending ? 0.6 : 1,
+            }}
+          >
+            {t("adminConfirm")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UserRow({ user, searchQuery }: { user: AdminUserItem; searchQuery?: string }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [dialog, setDialog] = useState<ModerationDialogState>(null);
   const name = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || `tg:${user.telegram_id}`;
 
   async function copyUsername() {
@@ -162,28 +297,81 @@ function UserRow({ user }: { user: AdminUserItem }) {
   const initials = (user.first_name?.[0] ?? user.username?.[0] ?? "?").toUpperCase();
 
   return (
-    <article className="admin-list-card" style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-      <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: "50%", overflow: "hidden", background: "var(--tg-theme-button-color, #6B7EE8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>
-        {user.photo_url
-          ? <img src={user.photo_url} alt={initials} width={36} height={36} style={{ objectFit: "cover" }} referrerPolicy="no-referrer" />
-          : initials}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-      <div className="admin-list-title">{name}</div>
-      {user.username && (
-        <button type="button" className="admin-username" onClick={copyUsername} title={copied ? t("adminUsernameCopied") : t("adminCopyUsername")}>
-          @{user.username}
-        </button>
-      )}
-      <div className="admin-list-meta">
-        ID: {user.telegram_id} · {user.wishlist_count} {t("adminWishlistsCount")} · {user.wish_count} {t("adminWishesCount")}
-      </div>
-      <div className="admin-list-meta">
-        {t("adminJoined")}: {new Date(user.created_at).toLocaleDateString()}
-        {user.last_login_at && ` · ${t("adminLastLogin")}: ${new Date(user.last_login_at).toLocaleDateString()}`}
-      </div>
-      </div>
-    </article>
+    <>
+      <ModerationDialog dialog={dialog} onClose={() => setDialog(null)} searchQuery={searchQuery} />
+      <article
+        className="admin-list-card"
+        style={{
+          display: "flex", gap: "10px", alignItems: "flex-start",
+          opacity: user.is_blocked ? 0.75 : 1,
+          borderLeft: user.is_blocked ? "3px solid var(--tg-theme-destructive-text-color, #e53935)" : undefined,
+        }}
+      >
+        <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: "50%", overflow: "hidden", background: "var(--tg-theme-button-color, #6B7EE8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>
+          {user.photo_url
+            ? <img src={user.photo_url} alt={initials} width={36} height={36} style={{ objectFit: "cover" }} referrerPolicy="no-referrer" />
+            : initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span className="admin-list-title" style={{ margin: 0 }}>{name}</span>
+            {user.is_blocked && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                background: "var(--tg-theme-destructive-text-color, #e53935)", color: "#fff",
+                textTransform: "uppercase", letterSpacing: "0.04em",
+              }}>
+                {t("adminBlockedBadge")}
+              </span>
+            )}
+          </div>
+          {user.username && (
+            <button type="button" className="admin-username" onClick={copyUsername} title={copied ? t("adminUsernameCopied") : t("adminCopyUsername")}>
+              @{user.username}
+            </button>
+          )}
+          <div className="admin-list-meta">
+            ID: {user.telegram_id} · {user.wishlist_count} {t("adminWishlistsCount")} · {user.wish_count} {t("adminWishesCount")}
+          </div>
+          <div className="admin-list-meta">
+            {t("adminJoined")}: {new Date(user.created_at).toLocaleDateString()}
+            {user.last_login_at && ` · ${t("adminLastLogin")}: ${new Date(user.last_login_at).toLocaleDateString()}`}
+          </div>
+          {user.is_blocked && user.blocked_reason && (
+            <div className="admin-list-meta" style={{ color: "var(--tg-theme-destructive-text-color, #e53935)" }}>
+              {user.blocked_reason}
+            </div>
+          )}
+        </div>
+        <div style={{ flexShrink: 0 }}>
+          {user.is_blocked ? (
+            <button
+              type="button"
+              onClick={() => setDialog({ type: "unblock", userId: user.id })}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: "var(--tg-theme-button-color, #6B7EE8)", color: "#fff",
+                border: "none", cursor: "pointer",
+              }}
+            >
+              {t("adminUnblockUser")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setDialog({ type: "block", userId: user.id })}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: "var(--tg-theme-destructive-text-color, #e53935)", color: "#fff",
+                border: "none", cursor: "pointer",
+              }}
+            >
+              {t("adminBlockUser")}
+            </button>
+          )}
+        </div>
+      </article>
+    </>
   );
 }
 
@@ -290,6 +478,8 @@ function LogRow({ log }: { log: AuditLogItem }) {
     viewed_wishlists: t("adminActionViewedWishlists"),
     viewed_wishes: t("adminActionViewedWishes"),
     viewed_media: t("adminActionViewedMedia"),
+    blocked_user: t("adminActionBlocked"),
+    unblocked_user: t("adminActionUnblocked"),
   };
   const label = actionMap[log.action] ?? log.action;
   const actor = log.actor_telegram_id ? `tg:${log.actor_telegram_id}` : t("adminSystem");

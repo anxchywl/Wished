@@ -40,6 +40,21 @@ type AppProvidersProps = {
   children: ReactNode;
 };
 
+function BlockedScreen() {
+  const { t } = useTranslation();
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-[9999] px-8 text-center gap-4">
+      <div style={{ fontSize: 48 }}>🚫</div>
+      <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--tg-theme-text-color)" }}>
+        {t("accountRestrictedTitle")}
+      </h1>
+      <p style={{ fontSize: 15, color: "var(--tg-theme-hint-color)", lineHeight: 1.5 }}>
+        {t("accountRestrictedBody")}
+      </p>
+    </div>
+  );
+}
+
 /**
  * persistent layout wrapper
  */
@@ -200,6 +215,10 @@ function PersistentLayout({ children }: { children: ReactNode }) {
         <span className="auth-loading-spinner" />
       </div>
     );
+  }
+
+  if (authStatus === "blocked") {
+    return <BlockedScreen />;
   }
 
   const isMainRoute =

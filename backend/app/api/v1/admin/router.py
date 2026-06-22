@@ -10,9 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import require_admin
 from app.api.deps.database import get_db_session
+from fastapi import HTTPException, status as http_status
 from app.db.models.audit_log import AuditLog
 from app.db.models.follows import Follow
+from app.db.models.refresh_tokens import RefreshToken
 from app.db.models.reservations import Reservation
+from app.db.models.user_moderation_log import UserModerationLog
 from app.db.models.users import User
 from app.db.models.wish_images import WishImage
 from app.db.models.wishes import Wish
@@ -25,6 +28,8 @@ from app.api.v1.admin.schemas import (
     AdminWishItem,
     AdminWishlistItem,
     AuditLogItem,
+    BlockUserRequest,
+    ModerationLogItem,
 )
 
 logger = logging.getLogger("app.api.v1.admin")
@@ -141,6 +146,9 @@ async def list_users(
             last_login_at=u.last_login_at.isoformat() if u.last_login_at else None,
             wishlist_count=wishlist_count,
             wish_count=wish_count,
+            is_blocked=u.is_blocked,
+            blocked_at=u.blocked_at.isoformat() if u.blocked_at else None,
+            blocked_reason=u.blocked_reason,
         ))
 
     await _write_audit_log(db, admin, "viewed_users", metadata={"q": q, "limit": limit, "offset": offset})
@@ -286,6 +294,112 @@ async def list_audit_logs(
             target_type=log.target_type,
             target_id=log.target_id,
             metadata_json=log.metadata_json,
+            created_at=log.created_at.isoformat(),
+        )
+        for log in logs
+    ]
+
+
+@router.post("/users/{user_id}/block", status_code=204)
+async def block_user(
+    user_id: str,
+    body: BlockUserRequest,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> None:
+    """block a user account and invalidate all their sessions"""
+    from uuid import UUID as _UUID
+    target_id = _UUID(user_id)
+
+    if target_id == admin.id:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail="Admins cannot block themselves")
+
+    target = (await db.execute(select(User).where(User.id == target_id))).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="User not found")
+    if target.is_blocked:
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail="User is already blocked")
+
+    target.is_blocked = True
+    target.blocked_at = datetime.now(UTC)
+    target.blocked_reason = body.reason.strip()
+    target.blocked_by = admin.id
+
+    # revoke all active refresh tokens immediately
+    await db.execute(
+        RefreshToken.__table__.update()
+        .where(RefreshToken.user_id == target_id)
+        .where(RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+
+    db.add(UserModerationLog(
+        user_id=target_id,
+        action="blocked",
+        reason=body.reason.strip(),
+        performed_by=admin.id,
+    ))
+    await _write_audit_log(db, admin, "blocked_user", target_type="user", target_id=user_id, metadata={"reason": body.reason.strip()})
+    await db.commit()
+    logger.warning("admin %s blocked user %s reason=%r", admin.telegram_id, target.telegram_id, body.reason)
+
+
+@router.post("/users/{user_id}/unblock", status_code=204)
+async def unblock_user(
+    user_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> None:
+    """restore access for a blocked user"""
+    from uuid import UUID as _UUID
+    target_id = _UUID(user_id)
+
+    target = (await db.execute(select(User).where(User.id == target_id))).scalar_one_or_none()
+    if target is None:
+        raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not target.is_blocked:
+        raise HTTPException(status_code=http_status.HTTP_409_CONFLICT, detail="User is not blocked")
+
+    target.is_blocked = False
+    target.blocked_at = None
+    target.blocked_reason = None
+    target.blocked_by = None
+
+    db.add(UserModerationLog(
+        user_id=target_id,
+        action="unblocked",
+        reason=None,
+        performed_by=admin.id,
+    ))
+    await _write_audit_log(db, admin, "unblocked_user", target_type="user", target_id=user_id)
+    await db.commit()
+    logger.info("admin %s unblocked user %s", admin.telegram_id, target.telegram_id)
+
+
+@router.get("/users/{user_id}/moderation-logs", response_model=list[ModerationLogItem])
+async def get_moderation_logs(
+    user_id: str,
+    admin: Annotated[User, Depends(require_admin)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[ModerationLogItem]:
+    """list moderation history for a user"""
+    from uuid import UUID as _UUID
+    target_id = _UUID(user_id)
+
+    stmt = (
+        select(UserModerationLog)
+        .where(UserModerationLog.user_id == target_id)
+        .order_by(UserModerationLog.created_at.desc())
+    )
+    logs = list((await db.execute(stmt)).scalars().all())
+
+    return [
+        ModerationLogItem(
+            id=log.id,
+            user_id=log.user_id,
+            action=log.action,
+            reason=log.reason,
+            performed_by=log.performed_by,
             created_at=log.created_at.isoformat(),
         )
         for log in logs

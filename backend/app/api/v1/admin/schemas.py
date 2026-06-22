@@ -30,6 +30,9 @@ class AdminUserItem(BaseModel):
     last_login_at: str | None
     wishlist_count: int
     wish_count: int
+    is_blocked: bool
+    blocked_at: str | None
+    blocked_reason: str | None
 
 
 class AdminWishlistItem(BaseModel):
@@ -74,6 +77,21 @@ class AuditLogItem(BaseModel):
     target_type: str | None
     target_id: str | None
     metadata_json: Any | None
+    created_at: str
+
+
+class BlockUserRequest(BaseModel):
+    """payload for block action"""
+    reason: str
+
+
+class ModerationLogItem(BaseModel):
+    """one entry in a user's moderation history"""
+    id: UUID
+    user_id: UUID
+    action: str
+    reason: str | None
+    performed_by: UUID
     created_at: str
 
 

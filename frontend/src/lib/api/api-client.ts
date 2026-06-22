@@ -76,6 +76,13 @@ export async function apiClient<TResponse>(
         useAuthStore.getState().setAccessToken(null);
       } else if (response.status === 401) {
         useAuthStore.getState().setAccessToken(null);
+      } else if (
+        response.status === 403 &&
+        typeof payload === "object" &&
+        payload !== null &&
+        (payload as { detail?: string }).detail === "account_blocked"
+      ) {
+        useAuthStore.getState().setAuthStatus("blocked");
       }
       throw new ApiError(response.statusText || "API request failed", response.status, payload);
     }

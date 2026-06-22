@@ -12,6 +12,7 @@ export type AuthStatus =
   | "authenticating"
   | "authenticated"
   | "unauthenticated"
+  | "blocked"
   | "error";
 
 type AuthState = {

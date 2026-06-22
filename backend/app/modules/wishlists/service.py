@@ -46,7 +46,7 @@ async def list_user_wishlists(
     """list visible user wishlists"""
     user_result = await db.execute(select(User).where(User.username.ilike(username.strip().removeprefix("@"))))
     owner = user_result.scalar_one_or_none()
-    if owner is None:
+    if owner is None or (owner.is_blocked and owner.id != current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if (
         owner.id != current_user.id
