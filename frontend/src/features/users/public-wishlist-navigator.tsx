@@ -328,6 +328,11 @@ function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, o
                   @{profile.username}
                 </a>
               ) : null}
+              {profile.birthday ? (
+                <p className="text-xs text-hint mt-0.5">
+                  🎂 {new Date(profile.birthday).toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
