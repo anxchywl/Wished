@@ -24,7 +24,8 @@ cleanup() {
 trap cleanup EXIT
 
 # Find latest backup
-LATEST=$(ls -1dt "${BACKUP_LOCAL_PATH}/????-??-??_??-??" 2>/dev/null | head -1 || true)
+LATEST=$(find "${BACKUP_LOCAL_PATH}" -maxdepth 1 -mindepth 1 -type d \
+    -name "????-??-??_??-??" 2>/dev/null | sort -r | head -1)
 if [ -z "${LATEST}" ]; then
     err "No backup found in ${BACKUP_LOCAL_PATH}"
     exit 1

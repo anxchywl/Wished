@@ -6,7 +6,8 @@ set -euo pipefail
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 err() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2; exit 1; }
 
-LATEST=$(ls -1dt /backups/????-??-??_??-?? 2>/dev/null | head -1)
+LATEST=$(find /backups -maxdepth 1 -mindepth 1 -type d \
+    -name "????-??-??_??-??" 2>/dev/null | sort -r | head -1)
 [ -n "${LATEST}" ] || err "No backups found in /backups"
 
 log "Verifying backup: ${LATEST}"
