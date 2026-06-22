@@ -198,6 +198,7 @@ export function WishManager({ wishlistId }: WishManagerProps) {
               onUpdate={(input) => updateMutation.mutate({ id: wish.id, input })}
               selectableWishlists={wishlistsQuery.data?.items ?? []}
               wish={wish}
+              isMutating={updateMutation.isPending || deleteMutation.isPending}
             />
           ))}
         </div>
@@ -219,6 +220,7 @@ export type WishItemProps = {
   onDelete: () => void;
   onUploadImage: (file: File) => void;
   onDeleteImage: (imageId: string) => void;
+  isMutating?: boolean;
 };
 
 /**
@@ -231,6 +233,7 @@ export function WishItem({
   onDelete,
   onUploadImage,
   onDeleteImage,
+  isMutating = false,
 }: WishItemProps) {
   const [title, setTitle] = useState(wish.title ?? "");
   const [wishlistId, setWishlistId] = useState(wish.wishlist_id ?? "");
@@ -288,6 +291,7 @@ export function WishItem({
         <div className="flex gap-2">
           <Button
             className="rounded-xl"
+            disabled={isMutating}
             onClick={() => {
               const cleanTitle = finalizeTextInput(title, 160);
               const cleanPrice = finalizePriceInput(price);
@@ -306,7 +310,11 @@ export function WishItem({
           >
             {t("saveButton")}
           </Button>
-          <Button className="rounded-xl bg-destructive hover:bg-destructive/90" onClick={onDelete}>
+          <Button
+            className="rounded-xl bg-destructive hover:bg-destructive/90"
+            disabled={isMutating}
+            onClick={onDelete}
+          >
             {t("deleteButton")}
           </Button>
         </div>

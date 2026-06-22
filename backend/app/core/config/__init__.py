@@ -56,9 +56,37 @@ class Settings(BaseSettings):
     max_images_per_wish: int = 5
     upload_rate_per_minute: int = 20
     upload_rate_per_hour: int = 100
+    upload_rate_per_day: int = 200
 
     marketplace_import_rate_per_minute: int = 5
-    marketplace_import_rate_per_hour: int = 30
+    marketplace_import_rate_per_hour: int = 20
+
+    # wishlist mutation rate limits
+    wishlist_create_per_hour: int = 20
+    wishlist_create_per_day: int = 100
+    wishlist_edit_per_hour: int = 100
+    wishlist_delete_per_hour: int = 20
+
+    # wish mutation rate limits
+    wish_create_per_hour: int = 100
+    wish_create_per_day: int = 500
+    wish_edit_per_hour: int = 300
+    wish_delete_per_hour: int = 100
+
+    # follow/unfollow rate limits
+    follow_per_hour: int = 100
+    unfollow_per_hour: int = 100
+
+    # reservation rate limits
+    reservation_create_per_hour: int = 60
+    reservation_cancel_per_hour: int = 60
+
+    # notification batching: suppress duplicate category notifications within this window
+    notification_batch_window_seconds: int = 60
+
+    # request body size limits
+    max_request_body_bytes: int = 2 * 1024 * 1024  # 2 MB
+    max_upload_body_bytes: int = 10 * 1024 * 1024  # 10 MB
 
     allowed_origins: list[str] = Field(default_factory=list)
 

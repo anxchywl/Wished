@@ -163,7 +163,11 @@ def _wb_image_url(article_id: int) -> str:
     return f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/images/big/1.webp"
 
 
-async def _fetch_wb_card_api(url: str) -> dict | None:
+def _wb_api_cache_key(article_id: int) -> str:
+    return f"marketplace:wb_card:{article_id}"
+
+
+async def _fetch_wb_card_api(url: str, redis: Redis | None = None) -> dict | None:
     """fetch product data from Wildberries public JSON card API
 
     This API is accessible from datacenter IPs without bot-blocking,
@@ -173,6 +177,15 @@ async def _fetch_wb_card_api(url: str) -> dict | None:
     if not match:
         return None
     article_id = int(match.group(1))
+
+    if redis is not None:
+        cache_key = _wb_api_cache_key(article_id)
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
 
     try:
         api_url = (
@@ -208,12 +221,18 @@ async def _fetch_wb_card_api(url: str) -> dict | None:
             except (InvalidOperation, TypeError):
                 pass
 
-        return {
+        result = {
             "title": title,
             "price": price,
             "currency": "RUB" if price else None,
             "image_url": _wb_image_url(article_id),
         }
+        if redis is not None:
+            try:
+                await redis.setex(_wb_api_cache_key(article_id), _CACHE_TTL, json.dumps(result))
+            except Exception:
+                pass
+        return result
     except Exception as exc:
         logger.warning("WB card API failed for %s: %s", url, exc)
         return None
@@ -302,7 +321,7 @@ async def import_product(
         if match and not image_url:
             image_url = _wb_image_url(int(match.group(1)))
         if not title:
-            wb_data = await _fetch_wb_card_api(url)
+            wb_data = await _fetch_wb_card_api(url, redis=redis)
             if wb_data:
                 title = title or wb_data.get("title")
                 price_str = price_str or wb_data.get("price")

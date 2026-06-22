@@ -18,7 +18,9 @@ from app.modules.users import (
     unfollow_user,
 )
 from app.modules.users.discovery import validate_discovery_token
+from app.modules.users.rate_limit import check_follow_limit, check_unfollow_limit
 from app.modules.users.schemas import FollowedUserListResponse, UserProfileResponse
+from app.core.config import Settings, get_settings
 from app.modules.wishlists import list_user_wishlists
 from app.modules.wishlists.schemas import WishlistListResponse
 
@@ -73,9 +75,11 @@ async def post_user_follow(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
     profile_token: str | None = None,
 ) -> UserProfileResponse:
     """follow user"""
+    await check_follow_limit(redis, current_user.id, settings.follow_per_hour)
     target = await get_user_by_username(db, username.removeprefix("@"))
     has_discovery_access = await validate_discovery_token(
         redis, profile_token, current_user.telegram_id, target.telegram_id, db=db,
@@ -88,8 +92,11 @@ async def delete_user_follow(
     username: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """unfollow user"""
+    await check_unfollow_limit(redis, current_user.id, settings.unfollow_per_hour)
     await unfollow_user(db, current_user, username)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

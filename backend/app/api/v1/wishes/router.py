@@ -20,6 +20,11 @@ from app.modules.wishes import (
     uncomplete_wish,
     update_wish,
 )
+from app.modules.wishes.rate_limit import (
+    check_wish_create_limit,
+    check_wish_delete_limit,
+    check_wish_edit_limit,
+)
 from app.modules.wishes.schemas import (
     WishCopyRequest,
     WishCreateRequest,
@@ -58,6 +63,11 @@ async def post_wish(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WishResponse:
     """create wish"""
+    await check_wish_create_limit(
+        redis, current_user.id,
+        settings.wish_create_per_hour,
+        settings.wish_create_per_day,
+    )
     return await create_wish(db, current_user, wishlist_id, payload, settings, redis)
 
 
@@ -78,8 +88,11 @@ async def patch_wish(
     payload: WishUpdateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> WishResponse:
     """update wish"""
+    await check_wish_edit_limit(redis, current_user.id, settings.wish_edit_per_hour)
     return await update_wish(db, current_user, wish_id, payload)
 
 
@@ -99,8 +112,11 @@ async def remove_wish(
     wish_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """delete wish"""
+    await check_wish_delete_limit(redis, current_user.id, settings.wish_delete_per_hour)
     await delete_wish(db, current_user, wish_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

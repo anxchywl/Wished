@@ -532,7 +532,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         onClose={() => setEditModalOpen(false)}
         onSave={handleSaveSettings}
         onDelete={handleDeleteWishlist}
-        isPending={updateWishlistMutation.isPending}
+        isPending={updateWishlistMutation.isPending || deleteWishlistMutation.isPending}
         initialTitle={editTitle}
         initialDescription={editDesc}
         initialCover={selectedCover}
@@ -566,7 +566,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
             deleteImageMutation.mutate({ wishId: selectedWish.id, imageId });
           }
         }}
-        isPending={updateWishMutation.isPending}
+        isPending={updateWishMutation.isPending || deleteWishMutation.isPending}
       />
     </div>
   );

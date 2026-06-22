@@ -11,7 +11,7 @@ from app.api.deps.redis import get_redis
 from app.core.config import Settings, get_settings
 from app.integrations.telegram import TelegramInitDataError, validate_telegram_init_data
 from app.modules.auth import AuthError, authenticate_telegram_user, logout, refresh_tokens
-from app.modules.auth.rate_limit import check_auth_rate_limit
+from app.modules.auth.rate_limit import check_auth_rate_limit, check_auth_rate_limit_by_telegram_id
 from app.modules.auth.schemas import (
     RefreshResponse,
     TelegramAuthRequest,
@@ -72,6 +72,7 @@ async def telegram_auth(
             detail="Invalid Telegram authentication data",
         ) from exc
 
+    await check_auth_rate_limit_by_telegram_id(redis, telegram_user.telegram_id)
     token_response, refresh_token = await authenticate_telegram_user(db, telegram_user, settings)
     _set_refresh_cookie(response, refresh_token, token_response.refresh_token_expires_at, settings)
     return token_response

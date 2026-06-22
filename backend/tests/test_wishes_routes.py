@@ -1,13 +1,27 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
 from app.main import create_app
+
+
+def _rate_limit_redis() -> AsyncMock:
+    redis = AsyncMock()
+    pipe = AsyncMock()
+    pipe.__aenter__ = AsyncMock(return_value=pipe)
+    pipe.__aexit__ = AsyncMock(return_value=False)
+    pipe.incr = MagicMock(return_value=pipe)
+    pipe.expire = MagicMock(return_value=pipe)
+    pipe.execute = AsyncMock(return_value=[1, True, 1, True])
+    redis.pipeline = MagicMock(return_value=pipe)
+    return redis
 
 
 def test_list_wishes_returns_wishlist_wishes(monkeypatch) -> None:
@@ -16,8 +30,9 @@ def test_list_wishes_returns_wishlist_wishes(monkeypatch) -> None:
     wishlist_id = uuid4()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _rate_limit_redis
 
-    async def fake_list_wishlist_wishes(db, current_user, requested_wishlist_id):
+    async def fake_list_wishlist_wishes(db, current_user, requested_wishlist_id, **kwargs):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         return {"items": [_wish(wishlist_id=wishlist_id)]}
@@ -36,6 +51,7 @@ def test_create_wish_accepts_price_currency_and_priority(monkeypatch) -> None:
     wishlist_id = uuid4()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _rate_limit_redis
 
     async def fake_create_wish(db, current_user, requested_wishlist_id, payload, settings=None, redis=None):
         assert current_user is user
@@ -78,6 +94,7 @@ def test_patch_wish_can_move_between_wishlists(monkeypatch) -> None:
     target_wishlist_id = uuid4()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _rate_limit_redis
 
     async def fake_update_wish(db, current_user, requested_wish_id, payload):
         assert current_user is user
@@ -143,6 +160,7 @@ def test_delete_wish_returns_no_content(monkeypatch) -> None:
     wish_id = uuid4()
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _rate_limit_redis
 
     async def fake_delete_wish(db, current_user, requested_wish_id):
         assert current_user is user

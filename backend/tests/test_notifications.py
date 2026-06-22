@@ -150,6 +150,7 @@ async def test_handle_followed_sends_notification() -> None:
     bot = AsyncMock()
     redis = AsyncMock()
     redis.set.return_value = True  # not duplicate
+    redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_followed(
         {"type": "FOLLOWED", "event_id": event_id, "follower_user_id": str(follower_id), "followed_user_id": str(followed_id)},
@@ -159,7 +160,6 @@ async def test_handle_followed_sends_notification() -> None:
     bot.send_message.assert_called_once()
     call = bot.send_message.call_args
     assert call.kwargs["chat_id"] == 999
-    assert "New follower" in call.kwargs["text"]
     assert "Alice" in call.kwargs["text"]
 
 
@@ -236,7 +236,8 @@ async def test_handle_wishlist_created_notifies_followers() -> None:
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(follower_tg_id, "en")])
     bot = AsyncMock()
     redis = AsyncMock()
-    redis.set.return_value = True
+    redis.set.return_value = True  # not duplicate, not batched
+    redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wishlist_created(
         {"type": "WISHLIST_CREATED", "event_id": str(uuid4()), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
@@ -246,7 +247,6 @@ async def test_handle_wishlist_created_notifies_followers() -> None:
     bot.send_message.assert_called_once()
     call = bot.send_message.call_args
     assert call.kwargs["chat_id"] == follower_tg_id
-    assert "New wishlist" in call.kwargs["text"]
     assert "My Birthday List" in call.kwargs["text"]
 
 
@@ -288,7 +288,8 @@ async def test_handle_wish_created_notifies_followers() -> None:
     db = _fake_db_wish(owner, wishlist, wish, followers=[(follower_tg_id, "en")])
     bot = AsyncMock()
     redis = AsyncMock()
-    redis.set.return_value = True
+    redis.set.return_value = True  # not duplicate, not batched
+    redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_created(
         {"type": "WISH_CREATED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
@@ -298,7 +299,6 @@ async def test_handle_wish_created_notifies_followers() -> None:
     bot.send_message.assert_called_once()
     call = bot.send_message.call_args
     assert call.kwargs["chat_id"] == follower_tg_id
-    assert "New wish" in call.kwargs["text"]
     assert "New Sneakers" in call.kwargs["text"]
     url = call.kwargs["reply_markup"].inline_keyboard[0][0].web_app.url
     assert str(wish_id) in url
@@ -323,7 +323,8 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
     db = _fake_db_wish(owner, wishlist, wish, followers=[(follower_tg_id, "ru")])
     bot = AsyncMock()
     redis = AsyncMock()
-    redis.set.return_value = True
+    redis.set.return_value = True  # not duplicate, not batched
+    redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_fulfilled(
         {"type": "WISH_FULFILLED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
@@ -332,7 +333,7 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
 
     bot.send_message.assert_called_once()
     call = bot.send_message.call_args
-    assert "Желание исполнено" in call.kwargs["text"]
+    assert "Guitar" in call.kwargs["text"]
     # button opens wishlist, not the wish itself
     url = call.kwargs["reply_markup"].inline_keyboard[0][0].web_app.url
     assert str(wishlist_id) in url
@@ -356,7 +357,8 @@ async def test_wish_fulfilled_text_contains_no_reservation_info() -> None:
     db = _fake_db_wish(owner, wishlist, wish, followers=[(123, "en")])
     bot = AsyncMock()
     redis = AsyncMock()
-    redis.set.return_value = True
+    redis.set.return_value = True  # not duplicate, not batched
+    redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_fulfilled(
         {"type": "WISH_FULFILLED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},

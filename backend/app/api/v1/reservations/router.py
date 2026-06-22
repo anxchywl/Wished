@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps.auth import get_current_user
 from app.api.deps.database import get_db_session
 from app.api.deps.redis import get_redis
+from app.core.config import Settings, get_settings
 from app.db.models import User
+from app.modules.reservations.rate_limit import (
+    check_reservation_cancel_limit,
+    check_reservation_create_limit,
+)
 from app.modules.reservations import (
     cancel_reservation,
     cancel_wish_reservation_as_owner,
@@ -36,9 +41,11 @@ async def post_reservation(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
     share_token: Annotated[str | None, Query()] = None,
 ) -> ReservationResponse:
     """create reservation for a wish"""
+    await check_reservation_create_limit(redis, current_user.id, settings.reservation_create_per_hour)
     return await create_reservation(db, current_user, wish_id, share_token=share_token, redis=redis)
 
 
@@ -47,8 +54,11 @@ async def delete_reservation(
     reservation_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """cancel own reservation"""
+    await check_reservation_cancel_limit(redis, current_user.id, settings.reservation_cancel_per_hour)
     await cancel_reservation(db, current_user, reservation_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

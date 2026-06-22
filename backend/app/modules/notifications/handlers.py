@@ -13,6 +13,9 @@ from app.modules.notifications.deep_links import profile_url, wish_url, wishlist
 logger = logging.getLogger(__name__)
 
 DEDUP_TTL_SECONDS = 172800  # 48 hours
+BATCH_WINDOW_SECONDS = 60  # suppress rapid same-category notifications per actor→recipient pair
+OUTBOUND_RATE_KEY = "notif:outbound:rate"
+OUTBOUND_RATE_LIMIT = 25  # max outbound messages per second to stay under Telegram flood limits
 
 _TEXT: dict[str, dict[str, str]] = {
     "en": {
@@ -79,6 +82,24 @@ async def _is_duplicate(redis: Redis, event_id: str, telegram_id: int) -> bool:
     result = await redis.set(key, "1", nx=True, ex=DEDUP_TTL_SECONDS)
     # result is None if key already existed
     return result is None
+
+
+async def _is_batched(redis: Redis, category: str, actor_id: str, recipient_tg_id: int, window: int) -> bool:
+    """return True if a notification for this category+actor was already sent to this recipient recently
+
+    sets the key on first call so subsequent calls within `window` seconds return True.
+    """
+    key = f"notif:batch:{category}:{actor_id}:{recipient_tg_id}"
+    result = await redis.set(key, "1", nx=True, ex=window)
+    return result is None
+
+
+async def _check_outbound_rate(redis: Redis) -> bool:
+    """return False if the outbound Telegram rate limit is exceeded (Telegram flood protection)"""
+    count = await redis.incr(OUTBOUND_RATE_KEY)
+    if count == 1:
+        await redis.expire(OUTBOUND_RATE_KEY, 1)
+    return count <= OUTBOUND_RATE_LIMIT
 
 
 async def _send(bot: Bot, telegram_id: int, text: str, button_text: str, url: str) -> None:
@@ -157,6 +178,12 @@ async def handle_wishlist_created(
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
+        if await _is_batched(redis, "wishlist_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+            logger.debug("batched WISHLIST_CREATED notification for telegram_id=%s", follower_tg_id)
+            continue
+        if not await _check_outbound_rate(redis):
+            logger.warning("outbound Telegram rate limit hit — dropping WISHLIST_CREATED for telegram_id=%s", follower_tg_id)
+            continue
         t = _text(language_code)
         text = t['wishlist_created_body'].format(actor=actor, title=wishlist.title)
         try:
@@ -202,6 +229,12 @@ async def handle_wish_created(
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
+        if await _is_batched(redis, "wish_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+            logger.debug("batched WISH_CREATED notification for telegram_id=%s", follower_tg_id)
+            continue
+        if not await _check_outbound_rate(redis):
+            logger.warning("outbound Telegram rate limit hit — dropping WISH_CREATED for telegram_id=%s", follower_tg_id)
+            continue
         t = _text(language_code)
         text = t['wish_created_body'].format(actor=actor, title=wish.title)
         try:
@@ -246,6 +279,12 @@ async def handle_wish_fulfilled(
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
+            continue
+        if await _is_batched(redis, "wish_fulfilled", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+            logger.debug("batched WISH_FULFILLED notification for telegram_id=%s", follower_tg_id)
+            continue
+        if not await _check_outbound_rate(redis):
+            logger.warning("outbound Telegram rate limit hit — dropping WISH_FULFILLED for telegram_id=%s", follower_tg_id)
             continue
         t = _text(language_code)
         text = t['wish_fulfilled_body'].format(actor=actor, title=wish.title)

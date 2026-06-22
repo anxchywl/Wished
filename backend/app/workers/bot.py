@@ -50,6 +50,7 @@ BOT_TEXT = {
         "not_available": "{name} is not available in Wished.",
         "not_registered": "{name} has not joined Wished yet.",
         "invite": "Invite to Wished",
+        "invite_text": "Join me on Wished. Create wishlists, reserve gifts, and share ideas with friends.",
         "rate_limited": "Too many requests. Please try again in a minute.",
         "unknown_user": "This user",
         "language_changed": "Language set to English.",
@@ -69,6 +70,7 @@ BOT_TEXT = {
         "not_available": "{name} недоступен в Wished.",
         "not_registered": "{name} ещё не присоединился к Wished.",
         "invite": "Пригласить в Wished",
+        "invite_text": "Присоединяйся ко мне в Wished. Создавай вишлисты, резервируй подарки и делись идеями с друзьями.",
         "rate_limited": "Слишком много запросов. Повторите через минуту.",
         "unknown_user": "Этот пользователь",
         "language_changed": "Язык изменён на русский.",
@@ -88,6 +90,7 @@ BOT_TEXT = {
         "not_available": "{name} Wished жүйесінде қолжетімсіз.",
         "not_registered": "{name} Wished жүйесіне әлі қосылмаған.",
         "invite": "Wished жүйесіне шақыру",
+        "invite_text": "Маған Wished жүйесінде қосыл. Тілектер тізімін жасап, сыйлықтарды брондап, достарыңмен идеялар бөліс.",
         "rate_limited": "Сұраулар тым көп. Бір минуттан кейін қайталап көріңіз.",
         "unknown_user": "Бұл пайдаланушы",
         "language_changed": "Тіл қазақша деп орнатылды.",
@@ -106,11 +109,6 @@ LANG_BUTTON_LABELS: dict[str, str] = {
     "Қазақша": "kz",
     "Русский": "ru",
 }
-
-INVITE_TEXT = (
-    "Join me on Wished. "
-    "Create wishlists, reserve gifts, and share ideas with friends."
-)
 
 
 def _language_keyboard() -> ReplyKeyboardMarkup:
@@ -332,8 +330,7 @@ async def users_shared_handler(message: types.Message) -> None:
                 continue
 
             bot_url = f"https://t.me/{settings.telegram_bot_username}"
-            invite_message = f"{INVITE_TEXT}"
-            invite_url = f"https://t.me/share/url?url={_urlencode(bot_url)}&text={_urlencode(invite_message)}"
+            invite_url = f"https://t.me/share/url?url={_urlencode(bot_url)}&text={_urlencode(text['invite_text'])}"
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [

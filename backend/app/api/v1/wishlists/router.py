@@ -34,6 +34,11 @@ from app.modules.wishlists.schemas import (
     WishlistUpdateRequest,
 )
 from app.modules.wishlists.share_token import create_wishlist_share_token
+from app.modules.wishlists.rate_limit import (
+    check_wishlist_create_limit,
+    check_wishlist_delete_limit,
+    check_wishlist_edit_limit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +72,14 @@ async def post_wishlist(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> WishlistResponse:
     """create wishlist"""
+    await check_wishlist_create_limit(
+        redis, current_user.id,
+        settings.wishlist_create_per_hour,
+        settings.wishlist_create_per_day,
+    )
     return await create_wishlist(db, current_user, payload, redis=redis)
 
 
@@ -88,8 +99,11 @@ async def patch_wishlist(
     payload: WishlistUpdateRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> WishlistResponse:
     """update wishlist"""
+    await check_wishlist_edit_limit(redis, current_user.id, settings.wishlist_edit_per_hour)
     return await update_wishlist(db, current_user, wishlist_id, payload)
 
 
@@ -98,8 +112,11 @@ async def remove_wishlist(
     wishlist_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """delete wishlist"""
+    await check_wishlist_delete_limit(redis, current_user.id, settings.wishlist_delete_per_hour)
     await delete_wishlist(db, current_user, wishlist_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

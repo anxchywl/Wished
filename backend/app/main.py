@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,6 +12,8 @@ from app.db.session import dispose_db
 from app.integrations.redis import close_redis
 
 logger = logging.getLogger(__name__)
+
+_UPLOAD_PATH_PARTS = ("/images", "/cover", "/import")
 
 
 def create_app() -> FastAPI:
@@ -50,6 +52,25 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+
+    _max_normal = settings.max_request_body_bytes
+    _max_upload = settings.max_upload_body_bytes
+
+    @app.middleware("http")
+    async def enforce_body_size(request: Request, call_next) -> Response:
+        """reject oversized request bodies before they reach route handlers"""
+        content_length = request.headers.get("content-length")
+        if content_length:
+            size = int(content_length)
+            is_upload = any(part in request.url.path for part in _UPLOAD_PATH_PARTS)
+            limit = _max_upload if is_upload else _max_normal
+            if size > limit:
+                mb = limit // (1024 * 1024)
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"request body exceeds {mb} MB limit"},
+                )
+        return await call_next(request)
 
     app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
