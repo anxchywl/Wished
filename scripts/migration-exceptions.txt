@@ -1,0 +1,6 @@
+# Destructive migrations reviewed and approved.
+# Each line is the filename of a migration whose upgrade() contains a destructive op
+# that has been deliberately reviewed before reaching production.
+# Add new entries only after human review — never add without understanding the impact.
+
+202606200003_drop_user_photo_url.py
