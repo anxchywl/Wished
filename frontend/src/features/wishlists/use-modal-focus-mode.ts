@@ -43,17 +43,15 @@ export function useModalFocusMode() {
       blurTimer.current = null;
     }
 
-    // delay collapsing other fields until keyboard is mostly open
-    setTimeout(() => {
-      setFocusedSection(section);
+    // collapse other sections immediately so layout settles before keyboard opens
+    setFocusedSection(section);
 
-      // scroll after layout settles
-      setTimeout(() => {
-        if (target.isConnected) {
-          target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-        }
-      }, 100);
-    }, 180);
+    // scroll after keyboard is open and layout has settled
+    setTimeout(() => {
+      if (target.isConnected) {
+        target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+    }, 320);
   }, [mobileKeyboardTarget]);
 
   const handleBlur = useCallback(() => {
