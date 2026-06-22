@@ -320,31 +320,27 @@ function getTelegramStartParam() {
 // handle startapp deep links to open profile popups
 function TelegramDeepLinkHandler() {
   const router = useRouter();
+  const authStatus = useAuthStore((state) => state.authStatus);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
+  // capture the deep link destination as early as possible (before auth completes)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    function handleDeepLink() {
+    function captureDeepLink() {
       const startParam = getTelegramStartParam();
       if (!startParam) return;
 
       const wishlistTarget = decodeWishlistStartParam(startParam);
       if (wishlistTarget) {
         window.sessionStorage.removeItem("wished/tgStartParam");
-        const current = new URLSearchParams(window.location.search);
-        const isCurrentTarget =
-          current.get("profile")?.toLowerCase() === wishlistTarget.username.toLowerCase() &&
-          current.get("wishlist") === wishlistTarget.wishlistId;
-        if (isCurrentTarget) return;
         let url =
           `/users?profile=${encodeURIComponent(wishlistTarget.username)}` +
           `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`;
         if (wishlistTarget.shareToken) {
           url += `&share_token=${encodeURIComponent(wishlistTarget.shareToken)}`;
         }
-        setTimeout(() => {
-          router.replace(url);
-        }, 100);
+        setPendingUrl(url);
         return;
       }
 
@@ -353,22 +349,35 @@ function TelegramDeepLinkHandler() {
       const username = startParam.slice(PROFILE_TOKEN_LENGTH);
       if (!username) return;
       window.sessionStorage.removeItem("wished/tgStartParam");
-      const current = new URLSearchParams(window.location.search);
-      if (current.get("profile")?.toLowerCase() === username.toLowerCase()) return;
-      setTimeout(() => {
-        router.replace(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
-      }, 100);
+      setPendingUrl(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
     }
 
-    // SDK is loaded beforeInteractive so start_param is available immediately
-    handleDeepLink();
+    captureDeepLink();
 
     const webApp = (window as DeepLinkWindow).Telegram?.WebApp;
-    webApp?.onEvent?.("activated", handleDeepLink);
+    webApp?.onEvent?.("activated", captureDeepLink);
     return () => {
-      webApp?.offEvent?.("activated", handleDeepLink);
+      webApp?.offEvent?.("activated", captureDeepLink);
     };
-  }, [router]);
+  }, []);
+
+  // navigate only after auth is settled so Next.js does not abort the transition
+  useEffect(() => {
+    if (!pendingUrl || authStatus !== "authenticated") return;
+
+    const current = new URLSearchParams(window.location.search);
+    const pendingParams = new URLSearchParams(pendingUrl.split("?")[1] ?? "");
+    const alreadyThere =
+      current.get("profile")?.toLowerCase() === pendingParams.get("profile")?.toLowerCase() &&
+      current.get("wishlist") === pendingParams.get("wishlist");
+    if (alreadyThere) {
+      setPendingUrl(null);
+      return;
+    }
+
+    router.replace(pendingUrl);
+    setPendingUrl(null);
+  }, [pendingUrl, authStatus, router]);
 
   return null;
 }

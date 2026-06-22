@@ -140,7 +140,16 @@ async def handle_followed(
     t = _text(followed.language_code)
     actor = _actor_name(follower)
     text = t['followed_body'].format(actor=actor)
-    url = profile_url(mini_app_url, follower.username or str(follower_id))
+    # followers without a Telegram username cannot be navigated to by username;
+    # send a plain text notification rather than a broken "Open Profile" button
+    if not follower.username:
+        try:
+            await bot.send_message(chat_id=followed.telegram_id, text=text)
+            logger.info("sent FOLLOWED notification (no username) to telegram_id=%s", followed.telegram_id)
+        except Exception:
+            logger.exception("failed to send FOLLOWED notification to telegram_id=%s", followed.telegram_id)
+        return
+    url = profile_url(mini_app_url, follower.username)
     try:
         await _send(bot, followed.telegram_id, text, t["open_profile"], url)
         logger.info("sent FOLLOWED notification to telegram_id=%s", followed.telegram_id)
