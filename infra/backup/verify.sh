@@ -39,10 +39,8 @@ pg_restore --list "${LATEST}/postgres.dump" \
 MAX_AGE="${BACKUP_MAX_AGE_SECONDS:-79200}"  # 22h default: covers 6h interval + buffer
 
 if [ -f /backups/.last-success ]; then
-    LAST_SUCCESS_STR=$(head -1 /backups/.last-success)
-    LAST_SUCCESS_EPOCH=$(date -u -d "${LAST_SUCCESS_STR}" +%s 2>/dev/null \
-        || date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "${LAST_SUCCESS_STR}" +%s 2>/dev/null \
-        || echo 0)
+    LAST_SUCCESS_EPOCH=$(head -1 /backups/.last-success)
+    LAST_SUCCESS_STR=$(sed -n '2p' /backups/.last-success)
     NOW=$(date +%s)
     AGE_SECONDS=$(( NOW - LAST_SUCCESS_EPOCH ))
 

@@ -75,9 +75,8 @@ find /backups -maxdepth 1 -mindepth 1 -type d \
 
 log "Backup complete: ${BACKUP_DIR}"
 
-# Write a success timestamp so verify-backup and external monitors can check freshness
-date -u +%Y-%m-%dT%H:%M:%SZ > /backups/.last-success
-echo "${BACKUP_DIR}" >> /backups/.last-success
+# Write epoch on line 1, human-readable on line 2 — epoch avoids date parsing issues on busybox
+printf '%s\n%s\n' "$(date +%s)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > /backups/.last-success
 
 # Heartbeat ping — signals to external monitoring that backup succeeded.
 # Set BACKUP_HEARTBEAT_URL to a healthchecks.io, BetterUptime, or UptimeRobot ping URL.
