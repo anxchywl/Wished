@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
@@ -87,7 +86,6 @@ class TestCreateReservation:
         wish_id = uuid4()
         rsv_id = uuid4()
         wish = _wish(owner_id=uuid4())  # user is not owner
-        rsv = _reservation(wish_id, user.id, rsv_id)
 
         db = AsyncMock()
         # execute calls: (1) _get_accessible_wish, (2) FOR UPDATE check

@@ -1130,7 +1130,7 @@ function EditWishlistModal({
       onClick={onClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""} ${focusMode.isSwitching ? "keyboard-switching-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />
@@ -1460,7 +1460,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
       onClick={onClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""} ${focusMode.isSwitching ? "keyboard-switching-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />
@@ -1792,7 +1792,7 @@ function EditWishModal({
       onClick={onClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""} ${focusMode.isSwitching ? "keyboard-switching-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />

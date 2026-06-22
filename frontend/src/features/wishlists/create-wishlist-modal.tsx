@@ -91,7 +91,7 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
       onClick={onClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""} ${focusMode.isSwitching ? "keyboard-switching-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />

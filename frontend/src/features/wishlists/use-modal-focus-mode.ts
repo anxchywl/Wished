@@ -19,6 +19,8 @@ export function useModalFocusMode() {
   const [focusedSection, setFocusedSection] = useState<string | null>(null);
   const [mobileKeyboardTarget, setMobileKeyboardTarget] = useState(false);
   const blurTimer = useRef<number | null>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const switchTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const updateKeyboardTarget = () => setMobileKeyboardTarget(isMobileKeyboardTarget());
@@ -43,22 +45,35 @@ export function useModalFocusMode() {
       blurTimer.current = null;
     }
 
+    const isEnteringFocusMode = focusedSection === null;
+
+    if (!isEnteringFocusMode && focusedSection !== section) {
+      setIsSwitching(true);
+      if (switchTimer.current) window.clearTimeout(switchTimer.current);
+      // turn off switching class after layout has settled instantly
+      switchTimer.current = window.setTimeout(() => setIsSwitching(false), 50);
+    }
+
     // collapse other sections immediately so layout settles before keyboard opens
     setFocusedSection(section);
 
-    // scroll after keyboard is open and layout has settled
-    setTimeout(() => {
-      if (target.isConnected) {
-        target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-      }
-    }, 320);
-  }, [mobileKeyboardTarget]);
+    // only trigger manual scroll when first opening the keyboard
+    // when switching between fields, let the browser handle it naturally to avoid jumping/flickering
+    if (isEnteringFocusMode) {
+      setTimeout(() => {
+        if (target.isConnected) {
+          target.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        }
+      }, 150);
+    }
+  }, [mobileKeyboardTarget, focusedSection]);
 
   const handleBlur = useCallback(() => {
     blurTimer.current = window.setTimeout(() => {
       const active = document.activeElement;
       if (!mobileKeyboardTarget || !active || !active.closest(".modal-sheet")) {
         setFocusedSection(null);
+        setIsSwitching(false);
       }
     }, 120);
   }, [mobileKeyboardTarget]);
@@ -76,6 +91,7 @@ export function useModalFocusMode() {
     // delay focus clear to let mobile keyboard start hiding smoothly
     setTimeout(() => {
       setFocusedSection(null);
+      setIsSwitching(false);
     }, 200);
   }, []);
 
@@ -88,6 +104,7 @@ export function useModalFocusMode() {
     onFieldBlur: handleBlur,
     clearFocus,
     isFocusMode: mobileKeyboardTarget && Boolean(focusedSection),
+    isSwitching,
     sectionClass: (section: string) =>
       mobileKeyboardTarget && focusedSection && focusedSection !== section ? "modal-focus-collapsed" : "modal-focus-section",
   };
