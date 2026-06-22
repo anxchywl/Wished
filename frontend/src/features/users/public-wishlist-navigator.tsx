@@ -329,7 +329,7 @@ function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, o
                 </a>
               ) : null}
               {profile.birthday ? (
-                <p className="text-xs text-hint mt-0.5">
+                <p className="text-xs text-muted mt-0.5">
                   🎂 {new Date(profile.birthday).toLocaleDateString(undefined, { month: "long", day: "numeric" })}
                 </p>
               ) : null}
