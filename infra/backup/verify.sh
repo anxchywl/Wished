@@ -28,7 +28,7 @@ TABLE_COUNT=$(pg_restore --list "${LATEST}/postgres.dump" | grep -c "TABLE DATA"
 log "Tables in backup: ${TABLE_COUNT}"
 pg_restore --list "${LATEST}/postgres.dump" \
     | grep "TABLE DATA" \
-    | awk '{print "  -", $NF}' \
+    | awk '{print "  -", $(NF-1)}' \
     | sort
 
 # Manifest check
