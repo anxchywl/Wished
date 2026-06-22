@@ -342,7 +342,9 @@ function TelegramDeepLinkHandler() {
         if (wishlistTarget.shareToken) {
           url += `&share_token=${encodeURIComponent(wishlistTarget.shareToken)}`;
         }
-        router.replace(url);
+        setTimeout(() => {
+          router.replace(url);
+        }, 100);
         return;
       }
 
@@ -353,7 +355,9 @@ function TelegramDeepLinkHandler() {
       window.sessionStorage.removeItem("wished/tgStartParam");
       const current = new URLSearchParams(window.location.search);
       if (current.get("profile")?.toLowerCase() === username.toLowerCase()) return;
-      router.replace(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
+      setTimeout(() => {
+        router.replace(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
+      }, 100);
     }
 
     // SDK is loaded beforeInteractive so start_param is available immediately
