@@ -337,7 +337,7 @@ export const dict = {
     reserving: "Бронирование...",
     cancellingReservation: "Отмена...",
     birthday: "День рождения",
-    addBirthday: "Добавить день рождения",
+    addBirthday: "День рождения",
     removeBirthday: "Удалить день рождения",
     months: "Янв,Фев,Мар,Апр,Май,Июн,Июл,Авг,Сен,Окт,Ноя,Дек",
     done: "Готово",

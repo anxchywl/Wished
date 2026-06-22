@@ -29,3 +29,11 @@ async def check_wish_delete_limit(redis: Redis, user_id: UUID, per_hour: int) ->
         redis, "rate:wish:delete:hr", uid, 3600, per_hour,
         detail="wish delete rate limit exceeded — try again later",
     )
+
+
+async def check_wish_complete_limit(redis: Redis, user_id: UUID) -> None:
+    uid = str(user_id)
+    await check_rate_limit(
+        redis, "rate:wish:complete:hr", uid, 3600, 60,
+        detail="wish complete rate limit exceeded — try again later",
+    )

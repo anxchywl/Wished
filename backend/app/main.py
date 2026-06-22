@@ -38,6 +38,8 @@ def create_app() -> FastAPI:
             raise RuntimeError("REDIS_PASSWORD must be set to a secure value in production")
         if not settings.admin_telegram_ids:
             logger.warning("ADMIN_TELEGRAM_IDS is empty — admin panel will be inaccessible")
+        if not settings.allowed_origins:
+            raise RuntimeError("ALLOWED_ORIGINS must be set in production — refusing to start with open CORS")
 
     app = FastAPI(
         title=settings.app_name,

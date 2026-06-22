@@ -21,6 +21,7 @@ from app.modules.wishes import (
     update_wish,
 )
 from app.modules.wishes.rate_limit import (
+    check_wish_complete_limit,
     check_wish_create_limit,
     check_wish_delete_limit,
     check_wish_edit_limit,
@@ -129,6 +130,7 @@ async def post_wish_complete(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishResponse:
     """mark wish as fulfilled"""
+    await check_wish_complete_limit(redis, current_user.id)
     return await complete_wish(db, current_user, wish_id, redis=redis)
 
 
@@ -137,6 +139,8 @@ async def delete_wish_complete(
     wish_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishResponse:
     """restore fulfilled wish to active"""
+    await check_wish_complete_limit(redis, current_user.id)
     return await uncomplete_wish(db, current_user, wish_id)

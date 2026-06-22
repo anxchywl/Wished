@@ -126,15 +126,28 @@ async def list_users(
             )
         )
     users = list((await db.execute(stmt)).scalars().all())
+    user_ids = [u.id for u in users]
+
+    wishlist_counts: dict = {}
+    wish_counts: dict = {}
+    if user_ids:
+        wl_rows = (await db.execute(
+            select(Wishlist.owner_user_id, func.count().label("cnt"))
+            .where(Wishlist.owner_user_id.in_(user_ids))
+            .group_by(Wishlist.owner_user_id)
+        )).all()
+        wishlist_counts = {row.owner_user_id: row.cnt for row in wl_rows}
+
+        w_rows = (await db.execute(
+            select(Wishlist.owner_user_id, func.count().label("cnt"))
+            .join(Wish, Wish.wishlist_id == Wishlist.id)
+            .where(Wishlist.owner_user_id.in_(user_ids))
+            .group_by(Wishlist.owner_user_id)
+        )).all()
+        wish_counts = {row.owner_user_id: row.cnt for row in w_rows}
 
     result = []
     for u in users:
-        wishlist_count = (await db.execute(
-            select(func.count()).select_from(Wishlist).where(Wishlist.owner_user_id == u.id)
-        )).scalar() or 0
-        wish_count = (await db.execute(
-            select(func.count()).select_from(Wish).join(Wishlist).where(Wishlist.owner_user_id == u.id)
-        )).scalar() or 0
         result.append(AdminUserItem(
             id=u.id,
             telegram_id=u.telegram_id,
@@ -144,8 +157,8 @@ async def list_users(
             photo_url=u.photo_url,
             created_at=u.created_at.isoformat(),
             last_login_at=u.last_login_at.isoformat() if u.last_login_at else None,
-            wishlist_count=wishlist_count,
-            wish_count=wish_count,
+            wishlist_count=wishlist_counts.get(u.id, 0),
+            wish_count=wish_counts.get(u.id, 0),
             is_blocked=u.is_blocked,
             blocked_at=u.blocked_at.isoformat() if u.blocked_at else None,
             blocked_reason=u.blocked_reason,
@@ -170,18 +183,25 @@ async def list_wishlists(
         stmt = stmt.where(Wishlist.visibility == visibility)
     rows = list((await db.execute(stmt)).all())
 
+    wishlist_ids = [wl.id for wl, _ in rows]
+    wish_counts_map: dict = {}
+    if wishlist_ids:
+        wc_rows = (await db.execute(
+            select(Wish.wishlist_id, func.count().label("cnt"))
+            .where(Wish.wishlist_id.in_(wishlist_ids))
+            .group_by(Wish.wishlist_id)
+        )).all()
+        wish_counts_map = {row.wishlist_id: row.cnt for row in wc_rows}
+
     result = []
     for wishlist, owner in rows:
-        wish_count = (await db.execute(
-            select(func.count()).select_from(Wish).where(Wish.wishlist_id == wishlist.id)
-        )).scalar() or 0
         result.append(AdminWishlistItem(
             id=wishlist.id,
             owner_telegram_id=owner.telegram_id,
             owner_username=owner.username,
             title=wishlist.title,
             visibility=wishlist.visibility,
-            wish_count=wish_count,
+            wish_count=wish_counts_map.get(wishlist.id, 0),
             created_at=wishlist.created_at.isoformat(),
         ))
 
@@ -211,17 +231,26 @@ async def list_wishes(
         stmt = stmt.where(Wish.status == wish_status)
     rows = list((await db.execute(stmt)).all())
 
+    wish_ids = [w.id for w, _ in rows]
+    reservation_map: dict = {}
+    image_map: dict = {}
+    if wish_ids:
+        res_rows = (await db.execute(
+            select(Reservation.wish_id, func.count().label("cnt"))
+            .where(Reservation.wish_id.in_(wish_ids), Reservation.status == "active")
+            .group_by(Reservation.wish_id)
+        )).all()
+        reservation_map = {row.wish_id: row.cnt for row in res_rows}
+
+        img_rows = (await db.execute(
+            select(WishImage.wish_id, func.count().label("cnt"))
+            .where(WishImage.wish_id.in_(wish_ids))
+            .group_by(WishImage.wish_id)
+        )).all()
+        image_map = {row.wish_id: row.cnt for row in img_rows}
+
     result = []
     for wish, owner in rows:
-        has_reservation = bool((await db.execute(
-            select(func.count()).select_from(Reservation).where(
-                Reservation.wish_id == wish.id,
-                Reservation.status == "active",
-            )
-        )).scalar())
-        image_count = (await db.execute(
-            select(func.count()).select_from(WishImage).where(WishImage.wish_id == wish.id)
-        )).scalar() or 0
         result.append(AdminWishItem(
             id=wish.id,
             wishlist_id=wish.wishlist_id,
@@ -229,8 +258,8 @@ async def list_wishes(
             title=wish.title,
             status=wish.status,
             created_at=wish.created_at.isoformat(),
-            has_reservation=has_reservation,
-            image_count=image_count,
+            has_reservation=bool(reservation_map.get(wish.id, 0)),
+            image_count=image_map.get(wish.id, 0),
         ))
 
     await _write_audit_log(db, admin, "viewed_wishes", metadata={"limit": limit, "offset": offset})

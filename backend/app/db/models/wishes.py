@@ -30,7 +30,7 @@ class Wish(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
     original_product_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     source_marketplace: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
