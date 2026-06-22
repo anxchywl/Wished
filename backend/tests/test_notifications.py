@@ -416,7 +416,6 @@ async def test_worker_dispatches_followed_event() -> None:
 
 @pytest.mark.asyncio
 async def test_worker_skips_unknown_event_type() -> None:
-    from app.modules.notifications import worker as worker_module
 
     event = {"type": "UNKNOWN_TYPE", "event_id": str(uuid4())}
     dispatched = []

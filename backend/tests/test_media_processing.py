@@ -1,9 +1,8 @@
 """image processing pipeline tests"""
 import io
-import struct
 
 import pytest
-from PIL import Image, ExifTags
+from PIL import Image
 
 
 def _make_rgb_image(width: int = 400, height: int = 300, color=(100, 149, 237)) -> bytes:
@@ -102,7 +101,7 @@ def test_process_image_does_not_upscale_small_images() -> None:
 
 
 def test_process_image_preserves_aspect_ratio() -> None:
-    from app.modules.media.processing import THUMBNAIL_MAX_DIM, process_image
+    from app.modules.media.processing import process_image
 
     content = _make_rgb_image(1200, 400)  # 3:1 ratio
     thumb, _, _ = process_image(content)

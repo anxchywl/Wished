@@ -12,10 +12,9 @@ import asyncio
 import base64
 import logging
 import re
-import sys
 from uuid import uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from sqlalchemy.ext.asyncio import create_async_engine
 

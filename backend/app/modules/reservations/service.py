@@ -26,7 +26,7 @@ async def create_reservation(
     redis: Redis | None = None,
 ) -> ReservationResponse:
     """create reservation for a wish — owner may reserve their own wish"""
-    wish = await _get_accessible_wish(db, current_user, wish_id, share_token=share_token, redis=redis)
+    await _get_accessible_wish(db, current_user, wish_id, share_token=share_token, redis=redis)
 
     # check for existing active reservation inside a transaction
     result = await db.execute(

@@ -1,7 +1,5 @@
-import asyncio
 from uuid import uuid4
 from pydantic import BaseModel, Field, ConfigDict, field_validator
-from typing import List
 from uuid import UUID
 
 class WishlistReorderRequest(BaseModel):

@@ -7,9 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-logger = logging.getLogger(__name__)
-
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
 from app.db.models import Reservation, User, Wish, WishImage, Wishlist
 from app.modules.events import publish_event
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
@@ -24,6 +22,8 @@ from app.modules.wishes.schemas import (
 )
 from app.modules.wishlists import get_accessible_wishlist
 
+logger = logging.getLogger(__name__)
+
 
 async def list_wishlist_wishes(
     db: AsyncSession,
@@ -33,7 +33,7 @@ async def list_wishlist_wishes(
     redis: Redis | None = None,
 ) -> WishListResponse:
     """list wishlist wishes"""
-    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
     query = (
         select(Wish)
         .options(selectinload(Wish.images))

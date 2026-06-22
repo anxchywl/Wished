@@ -111,7 +111,6 @@ class TestMigrationSafetyChecker:
 
     def test_exceptions_file_is_respected(self, tmp_path):
         # a migration listed in exceptions must not trigger a failure
-        exceptions = ROOT / "scripts" / "migration-exceptions.txt"
         bad_migration = tmp_path / "202606200003_drop_user_photo_url.py"
         bad_migration.write_text(
             'def upgrade():\n    op.drop_column("users", "photo_url")\n'

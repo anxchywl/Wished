@@ -422,7 +422,6 @@ async def main() -> None:
         decode_responses=True,
         socket_timeout=None,
     )
-    redis = get_redis_client()
     notification_task = asyncio.create_task(
         run_notification_worker(blocking_redis, bot, async_session_factory, web_app_url)
     )

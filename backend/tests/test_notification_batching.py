@@ -1,7 +1,7 @@
 """tests for notification batching and outbound rate limiting"""
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 
 # ---------------------------------------------------------------------------

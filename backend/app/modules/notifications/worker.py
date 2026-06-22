@@ -4,7 +4,6 @@ import logging
 
 from aiogram import Bot
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.handlers import (
     handle_followed,

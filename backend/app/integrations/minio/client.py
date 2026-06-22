@@ -1,4 +1,3 @@
-import json
 from datetime import timedelta
 from io import BytesIO
 from urllib.parse import urlparse

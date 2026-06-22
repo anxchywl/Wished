@@ -1,6 +1,5 @@
 """shared Redis fixed-window rate limiter used across all modules"""
 
-from uuid import UUID
 
 from fastapi import HTTPException, status
 from redis.asyncio import Redis

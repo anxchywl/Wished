@@ -1,4 +1,3 @@
-import sys
 
 content = open('app/main.py').read()
 replacement = """
