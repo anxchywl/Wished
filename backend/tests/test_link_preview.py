@@ -288,7 +288,6 @@ def test_choose_extractor_generic_for_unknown_host() -> None:
 @pytest.mark.asyncio
 async def test_generic_extractor_extracts_opengraph() -> None:
     from app.modules.link_preview.extractors.generic import GenericExtractor
-    import httpx
 
     html = """
     <html><head>
@@ -354,7 +353,7 @@ async def test_generic_extractor_returns_empty_on_fetch_failure() -> None:
 
 @pytest.mark.asyncio
 async def test_wildberries_extractor_uses_card_api() -> None:
-    from app.modules.link_preview.extractors.wildberries import WildberriesExtractor, _fetch_wb_card_api
+    from app.modules.link_preview.extractors.wildberries import WildberriesExtractor
 
     api_response = {
         "data": {
