@@ -406,6 +406,7 @@ async def test_users_shared_handler_matches_selected_users(monkeypatch) -> None:
         )
     )
     registered_user = SimpleNamespace(
+        id="00000000-0000-0000-0000-000000000001",
         telegram_id=123,
         username="alice",
         profile_visibility="public",
@@ -448,7 +449,7 @@ async def test_users_shared_handler_matches_selected_users(monkeypatch) -> None:
     assert message.answers[0]["message_effect_id"] == "5046509860389126442"
     assert message.deleted is False
     button = message.answers[0]["reply_markup"].inline_keyboard[0][0]
-    assert button.web_app.url == "https://example.com/users?profile=alice&profile_token=test-token"
+    assert button.web_app.url == "https://example.com/users?profile_id=00000000-0000-0000-0000-000000000001&profile_token=test-token"
 
 
 @pytest.mark.asyncio
