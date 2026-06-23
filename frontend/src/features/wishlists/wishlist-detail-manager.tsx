@@ -54,6 +54,7 @@ import {
   useCopyWishMutation,
   useDeleteWishMutation,
   useDeleteWishImageMutation,
+  useLinkPreviewMutation,
   useReorderWishesMutation,
   useUpdateWishMutation,
   useUploadWishImageMutation,
@@ -1387,6 +1388,9 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
   const [coverFile, setCoverFile] = useState<PreviewFile | undefined>();
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [linkPreviewStatus, setLinkPreviewStatus] = useState<"idle" | "loading" | "found" | "failed">("idle");
+  const linkPreviewMutation = useLinkPreviewMutation();
+  const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -1400,10 +1404,45 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
       setCoverPreview("");
       setCoverFile(undefined);
       setPendingCropFile(null);
+      setLinkPreviewStatus("idle");
     } else {
       setActive(false);
     }
   }, [open]);
+
+  function handleProductUrlChange(url: string) {
+    setProductUrl(url);
+
+    if (linkPreviewDebounceRef.current) {
+      clearTimeout(linkPreviewDebounceRef.current);
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed || !trimmed.startsWith("http")) {
+      setLinkPreviewStatus("idle");
+      return;
+    }
+
+    setLinkPreviewStatus("loading");
+    linkPreviewDebounceRef.current = setTimeout(async () => {
+      try {
+        const result = await linkPreviewMutation.mutateAsync({ url: trimmed });
+        // auto-fill only if field is currently empty (never overwrite manually edited values)
+        if (result.title && !title.trim()) {
+          setTitle(normalizeTextInput(result.title, 160));
+        }
+        if (result.description && !description.trim()) {
+          setDescription(normalizeTextInput(result.description, 2000));
+        }
+        if (result.price && !price.trim()) {
+          setPrice(normalizePriceInput(result.price));
+        }
+        setLinkPreviewStatus(result.title || result.description ? "found" : "failed");
+      } catch {
+        setLinkPreviewStatus("failed");
+      }
+    }, 600);
+  }
 
   if (!open) return null;
 
@@ -1475,6 +1514,31 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                 key="wish-info-step"
                 className="public-nav-frame public-nav-enter-back flex flex-col gap-3"
               >
+                <div className={`flex flex-col gap-1 ${focusMode.sectionClass("productUrl")}`}>
+                  <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("productUrlLabel") ?? "Product URL"}</label>
+                  <input
+                    type="url"
+                    className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    placeholder={t("productUrlPlaceholder") ?? "https://kaspi.kz/..."}
+                    value={productUrl}
+                    onChange={(e) => handleProductUrlChange(e.currentTarget.value)}
+                    {...focusMode.fieldFocusProps("productUrl")}
+                    onBlur={() => {
+                      setProductUrl((current) => current.trim());
+                      focusMode.onFieldBlur();
+                    }}
+                  />
+                  {linkPreviewStatus === "loading" && (
+                    <p className="text-[11px] text-muted">{t("linkPreviewLoading") ?? "Fetching product information..."}</p>
+                  )}
+                  {linkPreviewStatus === "found" && (
+                    <p className="text-[11px] text-primary">{t("linkPreviewFound") ?? "Product information found"}</p>
+                  )}
+                  {linkPreviewStatus === "failed" && (
+                    <p className="text-[11px] text-muted">{t("linkPreviewFailed") ?? "Could not automatically extract product information"}</p>
+                  )}
+                </div>
+
                 <div className={`flex flex-col gap-1 ${focusMode.sectionClass("title")}`}>
                   <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("wishTitleLabel") ?? "Wish Title"}</label>
                   <input

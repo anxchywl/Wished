@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     marketplace_import_rate_per_minute: int = 5
     marketplace_import_rate_per_hour: int = 20
 
+    link_preview_rate_per_hour: int = 20
+
     # wishlist mutation rate limits
     wishlist_create_per_hour: int = 20
     wishlist_create_per_day: int = 100

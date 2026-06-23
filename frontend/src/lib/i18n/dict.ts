@@ -221,6 +221,9 @@ export const dict = {
     productUnsupportedMarketplace: "This marketplace is not supported yet.",
     accountRestrictedTitle: "Account Restricted",
     accountRestrictedBody: "Your account has been restricted. If you believe this is a mistake, contact support.",
+    linkPreviewLoading: "Fetching product information...",
+    linkPreviewFound: "Product information found",
+    linkPreviewFailed: "Could not automatically extract product information",
   },
   ru: {
     wished: "Wished",
@@ -443,6 +446,9 @@ export const dict = {
     productUnsupportedMarketplace: "Этот магазин пока не поддерживается.",
     accountRestrictedTitle: "Аккаунт заблокирован",
     accountRestrictedBody: "Ваш аккаунт был ограничен. Если вы считаете это ошибкой, обратитесь в поддержку.",
+    linkPreviewLoading: "Загрузка информации о товаре...",
+    linkPreviewFound: "Информация о товаре найдена",
+    linkPreviewFailed: "Не удалось автоматически загрузить информацию о товаре",
   },
   kz: {
     wished: "Wished",
@@ -665,6 +671,9 @@ export const dict = {
     productUnsupportedMarketplace: "Бұл дүкен әлі қолданылмайды.",
     accountRestrictedTitle: "Аккаунт бұғатталды",
     accountRestrictedBody: "Аккаунтыңыз шектелді. Бұл қате деп санасаңыз, қолдау қызметіне хабарласыңыз.",
+    linkPreviewLoading: "Тауар ақпараты жүктелуде...",
+    linkPreviewFound: "Тауар ақпараты табылды",
+    linkPreviewFailed: "Тауар ақпаратын автоматты түрде жүктеу мүмкін болмады",
   }
 };
 

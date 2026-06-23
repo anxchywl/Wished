@@ -80,3 +80,15 @@ export type WishUpdateInput = {
 export type WishReorderInput = {
   wish_ids: string[];
 };
+
+export type LinkPreviewRequest = {
+  url: string;
+};
+
+export type LinkPreviewResult = {
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  price: string | null;
+  source: string | null;
+};

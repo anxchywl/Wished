@@ -1,5 +1,7 @@
 import { apiClient } from "@/lib/api";
 import type {
+  LinkPreviewRequest,
+  LinkPreviewResult,
   ProductImportPayload,
   ProductImportResult,
   Wish,
@@ -15,6 +17,17 @@ import type {
  */
 export function importProductUrl(accessToken: string, payload: ProductImportPayload) {
   return apiClient<ProductImportResult>("/marketplace/import", {
+    method: "POST",
+    accessToken,
+    body: payload,
+  });
+}
+
+/**
+ * fetch product metadata from a URL via server-side extraction
+ */
+export function fetchLinkPreview(accessToken: string, payload: LinkPreviewRequest) {
+  return apiClient<LinkPreviewResult>("/link-preview", {
     method: "POST",
     accessToken,
     body: payload,

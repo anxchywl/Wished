@@ -3,7 +3,7 @@ PYTHON := backend/.venv/bin/python
 .PHONY: test lint check deploy
 
 test:
-	$(PYTHON) -m pytest backend/tests/ -v --ignore=backend/tests/test_marketplace.py
+	$(PYTHON) -m pytest backend/tests/ -v
 
 lint:
 	$(PYTHON) -m ruff check backend/

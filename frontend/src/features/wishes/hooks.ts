@@ -7,6 +7,7 @@ import {
   copyWish,
   deleteWish,
   deleteWishImage,
+  fetchLinkPreview,
   importProductUrl,
   listWishes,
   reorderWishes,
@@ -16,6 +17,8 @@ import {
 } from "@/features/wishes/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
 import type {
+  LinkPreviewRequest,
+  LinkPreviewResult,
   ProductImportPayload,
   ProductImportResult,
   Wish,
@@ -39,6 +42,17 @@ export function useImportProductUrlMutation() {
 
   return useMutation<ProductImportResult, Error, ProductImportPayload>({
     mutationFn: (payload: ProductImportPayload) => importProductUrl(accessToken ?? "", payload),
+  });
+}
+
+/**
+ * fetch product metadata from a URL via server-side extraction
+ */
+export function useLinkPreviewMutation() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation<LinkPreviewResult, Error, LinkPreviewRequest>({
+    mutationFn: (payload: LinkPreviewRequest) => fetchLinkPreview(accessToken ?? "", payload),
   });
 }
 
