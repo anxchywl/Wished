@@ -263,26 +263,24 @@ async def _download_and_process_image(
         return None
 
     try:
-        thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+        thumbnail_bytes, medium_bytes = process_image(content)
     except ValueError as exc:
         logger.warning("marketplace image processing failed: %s", exc)
         return None
 
     image_uuid = uuid4()
     bucket = settings.minio_media_bucket
-    full_key = f"marketplace-temp/{user_id}/{image_uuid}"
-    thumb_key = f"marketplace-temp/{user_id}/{image_uuid}-t"
     medium_key = f"marketplace-temp/{user_id}/{image_uuid}-m"
+    thumb_key = f"marketplace-temp/{user_id}/{image_uuid}-t"
 
     try:
-        upload_object(bucket, full_key, full_bytes, "image/webp")
-        upload_object(bucket, thumb_key, thumbnail_bytes, "image/webp")
         upload_object(bucket, medium_key, medium_bytes, "image/webp")
+        upload_object(bucket, thumb_key, thumbnail_bytes, "image/webp")
     except Exception as exc:
         logger.warning("marketplace image upload failed: %s", exc)
         return None
 
-    return image_uuid, full_key, thumb_key, medium_key, len(full_bytes)
+    return image_uuid, medium_key, thumb_key, medium_key, len(medium_bytes)
 
 
 def _image_meta_cache_key(user_id: UUID, image_uuid: UUID) -> str:

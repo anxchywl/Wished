@@ -319,26 +319,8 @@ export function WishItem({
           </Button>
         </div>
         
-        <div className="border-t border-border mt-2 pt-3">
-          <label className="text-sm font-semibold block mb-2" htmlFor={`image-${wish.id}`}>
-            {t("imagesLabel")}
-          </label>
-          <input
-            accept="image/jpeg,image/png,image/webp"
-            className="text-sm block w-full text-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-            id={`image-${wish.id}`}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) {
-                onUploadImage(file);
-                event.target.value = "";
-              }
-            }}
-            type="file"
-          />
-        </div>
-        {wish.images.filter((img) => img.status === "ready").length ? (
-          <div className="grid grid-cols-2 gap-2 mt-2">
+        {wish.images.filter((img) => img.status === "ready").length > 0 ? (
+          <div className="border-t border-border mt-2 pt-3 flex flex-col gap-2">
             {wish.images
               .filter((img) => img.status === "ready")
               .map((image) => (
@@ -346,7 +328,7 @@ export function WishItem({
                   <img
                     alt={image.file_name}
                     className="aspect-square w-full object-cover"
-                    src={image.thumbnail_url ?? image.url}
+                    src={image.thumbnail_url ?? image.medium_url ?? undefined}
                   />
                   <button
                     className="w-full px-2 py-2 text-sm text-destructive hover:bg-destructive/10 font-semibold transition-colors"
@@ -358,7 +340,26 @@ export function WishItem({
                 </div>
               ))}
           </div>
-        ) : null}
+        ) : (
+          <div className="border-t border-border mt-2 pt-3">
+            <label className="text-sm font-semibold block mb-2" htmlFor={`image-${wish.id}`}>
+              {t("imagesLabel")}
+            </label>
+            <input
+              accept="image/jpeg,image/png,image/webp"
+              className="text-sm block w-full text-muted file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+              id={`image-${wish.id}`}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) {
+                  onUploadImage(file);
+                  event.target.value = "";
+                }
+              }}
+              type="file"
+            />
+          </div>
+        )}
       </div>
     </article>
   );

@@ -87,7 +87,7 @@ async def upload_wish_image(
 
     # server-side processing: strip EXIF, convert to WebP, generate variants
     try:
-        thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+        thumbnail_bytes, medium_bytes = process_image(content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -97,24 +97,22 @@ async def upload_wish_image(
     # UUID-only object names — never expose original filename or extension
     image_id = uuid4()
     bucket = settings.minio_media_bucket
-    full_name = f"wishes/{wish_id}/{image_id}"
-    thumb_name = f"wishes/{wish_id}/{image_id}-t"
     medium_name = f"wishes/{wish_id}/{image_id}-m"
+    thumb_name = f"wishes/{wish_id}/{image_id}-t"
 
-    upload_object(bucket, full_name, full_bytes, "image/webp")
-    upload_object(bucket, thumb_name, thumbnail_bytes, "image/webp")
     upload_object(bucket, medium_name, medium_bytes, "image/webp")
+    upload_object(bucket, thumb_name, thumbnail_bytes, "image/webp")
 
     image = WishImage(
         id=image_id,
         wish_id=wish_id,
         bucket=bucket,
-        object_name=full_name,
+        object_name=medium_name,
         thumbnail_object_name=thumb_name,
         medium_object_name=medium_name,
         file_name=f"{image_id}.webp",
         content_type="image/webp",
-        size_bytes=len(full_bytes),
+        size_bytes=len(medium_bytes),
         status="ready",
     )
     db.add(image)

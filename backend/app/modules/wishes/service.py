@@ -72,24 +72,22 @@ async def copy_wish(
 
     for image in source.images:
         new_id = uuid4()
-        full_obj = f"wishes/{copied.id}/{new_id}"
-        thumb_obj = f"wishes/{copied.id}/{new_id}-t"
         medium_obj = f"wishes/{copied.id}/{new_id}-m"
+        thumb_obj = f"wishes/{copied.id}/{new_id}-t"
 
-        copy_object(image.bucket, image.object_name, image.bucket, full_obj)
+        src_medium = image.medium_object_name or image.object_name
+        copy_object(image.bucket, src_medium, image.bucket, medium_obj)
         if image.thumbnail_object_name:
             copy_object(image.bucket, image.thumbnail_object_name, image.bucket, thumb_obj)
-        if image.medium_object_name:
-            copy_object(image.bucket, image.medium_object_name, image.bucket, medium_obj)
 
         db.add(
             WishImage(
                 id=new_id,
                 wish_id=copied.id,
                 bucket=image.bucket,
-                object_name=full_obj,
+                object_name=medium_obj,
                 thumbnail_object_name=thumb_obj if image.thumbnail_object_name else None,
-                medium_object_name=medium_obj if image.medium_object_name else None,
+                medium_object_name=medium_obj,
                 file_name=f"{new_id}.webp",
                 content_type="image/webp",
                 size_bytes=image.size_bytes,

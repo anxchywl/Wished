@@ -628,7 +628,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
           <WishImageThumb
             id={wish.id}
             title={wish.title}
-            imageUrl={wish.images?.[0]?.url}
+            imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url}
             className="w-12 h-12 rounded-xl object-cover"
           />
           {isCompleted && (
@@ -851,7 +851,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             <WishImageThumb
               id={wish.id}
               title={wish.title}
-              imageUrl={wish.images?.[0]?.url}
+              imageUrl={wish.images?.[0]?.medium_url ?? wish.images?.[0]?.thumbnail_url}
               className="w-full h-full object-cover"
             />
           </div>
@@ -1715,7 +1715,7 @@ function EditWishModal({
         setDescription(wish.description ?? "");
         setPrice(wish.price ?? "");
         setCurrency(wish.currency ?? "");
-        setLocalCoverPreview(wish.images?.[0]?.url ?? null);
+        setLocalCoverPreview(wish.images?.[0]?.medium_url ?? wish.images?.[0]?.thumbnail_url ?? null);
         setPendingCropFile(null);
         setPendingCoverFile(null);
         setDeleteConfirming(false);

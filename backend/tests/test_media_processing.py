@@ -34,13 +34,13 @@ def _make_jpeg_with_exif(width: int = 400, height: int = 300) -> bytes:
 # output format
 # ---------------------------------------------------------------------------
 
-def test_process_image_returns_three_webp_variants() -> None:
+def test_process_image_returns_two_webp_variants() -> None:
     from app.modules.media.processing import process_image
 
     content = _make_rgb_image(800, 600)
-    thumb, medium, full = process_image(content)
+    thumb, medium = process_image(content)
 
-    for variant in (thumb, medium, full):
+    for variant in (thumb, medium):
         assert variant[:4] == b"RIFF"
         assert variant[8:12] == b"WEBP"
 
@@ -49,10 +49,10 @@ def test_process_image_accepts_png_with_alpha() -> None:
     from app.modules.media.processing import process_image
 
     content = _make_png_with_alpha()
-    thumb, medium, full = process_image(content)
+    thumb, medium = process_image(content)
 
     # alpha stripped — output is valid WebP
-    assert full[:4] == b"RIFF"
+    assert medium[:4] == b"RIFF"
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ def test_process_image_thumbnail_max_dim() -> None:
     from app.modules.media.processing import THUMBNAIL_MAX_DIM, process_image
 
     content = _make_rgb_image(1200, 900)
-    thumb, _, _ = process_image(content)
+    thumb, _ = process_image(content)
 
     img = Image.open(io.BytesIO(thumb))
     assert max(img.size) <= THUMBNAIL_MAX_DIM
@@ -73,20 +73,10 @@ def test_process_image_medium_max_dim() -> None:
     from app.modules.media.processing import MEDIUM_MAX_DIM, process_image
 
     content = _make_rgb_image(2400, 1800)
-    _, medium, _ = process_image(content)
+    _, medium = process_image(content)
 
     img = Image.open(io.BytesIO(medium))
     assert max(img.size) <= MEDIUM_MAX_DIM
-
-
-def test_process_image_full_max_dim() -> None:
-    from app.modules.media.processing import FULL_MAX_DIM, process_image
-
-    content = _make_rgb_image(3000, 2000)
-    _, _, full = process_image(content)
-
-    img = Image.open(io.BytesIO(full))
-    assert max(img.size) <= FULL_MAX_DIM
 
 
 def test_process_image_does_not_upscale_small_images() -> None:
@@ -94,7 +84,7 @@ def test_process_image_does_not_upscale_small_images() -> None:
 
     # 100×80 is smaller than thumbnail max (300)
     content = _make_rgb_image(100, 80)
-    thumb, _, _ = process_image(content)
+    thumb, _ = process_image(content)
 
     img = Image.open(io.BytesIO(thumb))
     assert img.size == (100, 80)
@@ -104,7 +94,7 @@ def test_process_image_preserves_aspect_ratio() -> None:
     from app.modules.media.processing import process_image
 
     content = _make_rgb_image(1200, 400)  # 3:1 ratio
-    thumb, _, _ = process_image(content)
+    thumb, _ = process_image(content)
 
     img = Image.open(io.BytesIO(thumb))
     w, h = img.size
@@ -119,9 +109,9 @@ def test_process_image_strips_exif_metadata() -> None:
     from app.modules.media.processing import process_image
 
     content = _make_jpeg_with_exif()
-    _, _, full = process_image(content)
+    _, medium = process_image(content)
 
-    out = Image.open(io.BytesIO(full))
+    out = Image.open(io.BytesIO(medium))
     exif = out.getexif()
     # after stripping, no EXIF tags should survive in the WebP output
     assert len(exif) == 0

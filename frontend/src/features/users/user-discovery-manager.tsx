@@ -292,7 +292,7 @@ function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
       onClick={onOpen}
     >
       <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
-        <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.url} className="w-full h-full object-cover" />
+        <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.thumbnail_url ?? item.images?.[0]?.medium_url} className="w-full h-full object-cover" />
       </div>
       <div className="flex-1 min-w-0">
         <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
@@ -339,7 +339,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
               <WishImageThumb
                 id={item.wish_id}
                 title={item.wish_title}
-                imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.url}
+                imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.thumbnail_url}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -350,7 +350,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
                     <WishImageThumb
                       id={item.wish_id}
                       title={item.wish_title}
-                      imageUrl={image.thumbnail_url ?? image.url}
+                      imageUrl={image.thumbnail_url ?? image.medium_url}
                       className="w-full h-full object-cover"
                     />
                   </div>

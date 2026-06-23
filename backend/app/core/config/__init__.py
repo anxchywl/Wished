@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     minio_media_bucket: str = "wished-media"
     minio_presigned_url_expires_seconds: int = 3600
 
-    max_images_per_wish: int = 5
+    max_images_per_wish: int = 1
     upload_rate_per_minute: int = 20
     upload_rate_per_hour: int = 100
     upload_rate_per_day: int = 200
