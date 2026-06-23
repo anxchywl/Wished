@@ -295,7 +295,7 @@ async def users_shared_handler(message: types.Message) -> None:
         for shared_user in shared_users:
             user = registered_users.get(shared_user.user_id)
             display_name = _shared_user_name(shared_user, text["unknown_user"])
-            if user and user.username:
+            if user:
                 discovery_token = await create_discovery_token(
                     get_redis_client(),
                     message.from_user.id,
@@ -305,7 +305,7 @@ async def users_shared_handler(message: types.Message) -> None:
                 web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
                 profile_url = (
                     f"{web_app_url}/users"
-                    f"?profile={user.username}"
+                    f"?profile_id={user.id}"
                     f"&profile_token={discovery_token}"
                 )
                 keyboard = InlineKeyboardMarkup(
@@ -323,10 +323,6 @@ async def users_shared_handler(message: types.Message) -> None:
                     reply_markup=keyboard,
                     message_effect_id=CONFETTI_MESSAGE_EFFECT_ID,
                 )
-                continue
-
-            if user:
-                await message.answer(text["not_available"].format(name=display_name))
                 continue
 
             bot_url = f"https://t.me/{settings.telegram_bot_username}"
