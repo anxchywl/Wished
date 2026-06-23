@@ -204,6 +204,25 @@ class WildberriesParser:
         return result
 
 
+def _ozon_image_from_state(html: str) -> str | None:
+    """extract first product image URL from Ozon's embedded JS state blob"""
+    # ir.ozon.com is Ozon's primary image CDN; URLs appear quoted inside JSON blobs
+    m = re.search(
+        r'"(https://ir\.ozon\.com/multimedia/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"',
+        html,
+        re.IGNORECASE,
+    )
+    if m:
+        return m.group(1)
+    # fallback: cdn*.ozon.ru / cdn*.ozon.kz
+    m = re.search(
+        r'"(https://cdn\d*\.ozon\.(?:ru|kz)/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"',
+        html,
+        re.IGNORECASE,
+    )
+    return m.group(1) if m else None
+
+
 class OzonParser:
     def parse(self, html: str, url: str, hostname: str) -> ProductData:
         result = ProductData(marketplace="ozon")
@@ -212,12 +231,17 @@ class OzonParser:
         if ld:
             _parse_json_ld_into(ld, result, "RUB")
             if result.title:
+                if not result.image_url:
+                    result.image_url = _ozon_image_from_state(html)
                 return result
 
         if _parse_og_into(html, result, "RUB"):
+            if not result.image_url:
+                result.image_url = _ozon_image_from_state(html)
             return result
 
         result.title = _h1_text(html)
+        result.image_url = _ozon_image_from_state(html)
         return result
 
 
