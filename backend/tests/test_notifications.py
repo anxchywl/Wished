@@ -302,7 +302,7 @@ async def test_handle_wish_created_notifies_followers() -> None:
     assert "New Sneakers" in call.kwargs["text"]
     url = call.kwargs["reply_markup"].inline_keyboard[0][0].web_app.url
     assert str(wish_id) in url
-    assert "carol" in url
+    assert str(owner_id) in url
 
 
 # ---------------------------------------------------------------------------

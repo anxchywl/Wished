@@ -67,6 +67,36 @@ async def list_user_wishlists(
     return WishlistListResponse(items=[_to_response(wishlist) for wishlist in result.scalars().all()])
 
 
+async def list_user_wishlists_by_id(
+    db: AsyncSession,
+    current_user: User,
+    target_user_id: UUID,
+    allow_profile_access: bool = False,
+) -> WishlistListResponse:
+    """list visible wishlists for a user looked up by internal UUID"""
+    result = await db.execute(select(User).where(User.id == target_user_id))
+    owner = result.scalar_one_or_none()
+    if owner is None or (owner.is_blocked and owner.id != current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if (
+        owner.id != current_user.id
+        and owner.profile_visibility != "public"
+        and not allow_profile_access
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    conditions = [Wishlist.owner_user_id == owner.id]
+    if owner.id != current_user.id:
+        conditions.append(Wishlist.visibility == "public")
+
+    result = await db.execute(
+        select(Wishlist)
+        .where(*conditions)
+        .order_by(Wishlist.position.asc())
+    )
+    return WishlistListResponse(items=[_to_response(wishlist) for wishlist in result.scalars().all()])
+
+
 async def get_wishlist(
     db: AsyncSession,
     current_user: User,

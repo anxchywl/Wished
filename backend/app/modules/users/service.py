@@ -12,10 +12,13 @@ from app.modules.events import publish_event
 from app.modules.users.schemas import FollowedUserListResponse, FollowedUserResponse, UserProfileResponse
 
 
-async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
-    """find user by id"""
+async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User:
+    """find user by id; blocked users are treated as not found"""
     result = await db.execute(select(User).where(User.id == user_id))
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user is None or user.is_blocked:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
 
 
 async def get_user_by_username(db: AsyncSession, username: str) -> User:
@@ -99,6 +102,53 @@ async def unfollow_user(db: AsyncSession, current_user: User, username: str) -> 
     return build_user_profile_response(target, current_user, is_following=False)
 
 
+async def follow_user_by_id(
+    db: AsyncSession,
+    current_user: User,
+    target_id: UUID,
+    has_discovery_access: bool = False,
+    redis: Redis | None = None,
+) -> UserProfileResponse:
+    """follow user by internal UUID"""
+    target = await get_user_by_id(db, target_id)
+    if target.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot follow yourself")
+    if target.profile_visibility != "public" and not has_discovery_access:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    already_following = False
+    db.add(Follow(follower_user_id=current_user.id, followed_user_id=target.id))
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        already_following = True
+
+    if not already_following and redis is not None:
+        await publish_event(redis, "FOLLOWED", {
+            "follower_user_id": current_user.id,
+            "followed_user_id": target.id,
+        })
+
+    return build_user_profile_response(target, current_user, is_following=True)
+
+
+async def unfollow_user_by_id(db: AsyncSession, current_user: User, target_id: UUID) -> UserProfileResponse:
+    """unfollow user by internal UUID"""
+    target = await get_user_by_id(db, target_id)
+    if target.id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unfollow yourself")
+
+    await db.execute(
+        delete(Follow).where(
+            Follow.follower_user_id == current_user.id,
+            Follow.followed_user_id == target.id,
+        )
+    )
+    await db.commit()
+    return build_user_profile_response(target, current_user, is_following=False)
+
+
 async def is_following_user(db: AsyncSession, current_user: User, user: User) -> bool:
     """check follow state"""
     if current_user.id == user.id:
@@ -120,6 +170,7 @@ def build_user_profile_response(
     """build user profile response"""
     is_owner = current_user is not None and current_user.id == user.id
     return UserProfileResponse(
+        user_id=str(user.id),
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,

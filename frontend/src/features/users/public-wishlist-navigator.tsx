@@ -7,9 +7,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
 import { UserAvatar } from "@/features/users/user-avatar";
-import { getUserProfile, type UserProfileResponse } from "@/features/users/api";
-import { userQueryKeys, useFollowMutation, useUserProfileQuery } from "@/features/users/hooks";
+import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
+import { userQueryKeys, useFollowMutation, useFollowByIdMutation, useUserProfileQuery, useUserProfileByIdQuery, useUserWishlistsByIdQuery } from "@/features/users/hooks";
 import { getWishlist, listUserWishlists } from "@/features/wishlists/api";
+import { getUserWishlistsById } from "@/features/users/api";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
 import type { Wishlist } from "@/features/wishlists/types";
 import { parseWishlistDescription } from "@/features/wishlists/utils";
@@ -26,6 +27,7 @@ import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store"
 type PublicWishlistNavigatorProps = {
   open: boolean;
   username: string | null;
+  userId?: string | null;
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
   initialWishlistId?: string | null;
@@ -51,6 +53,7 @@ type NavigationDirection = "forward" | "back";
 export function PublicWishlistNavigator({
   open,
   username,
+  userId,
   profileToken,
   initialUser,
   initialWishlistId,
@@ -87,11 +90,12 @@ export function PublicWishlistNavigator({
       setDirection("forward");
       setPreviousFrame(null);
     }
-  }, [initialWishlistId, initialWishId, open, username]);
+  }, [initialWishlistId, initialWishId, open, username, userId]);
 
-  if (!open || !username) return null;
+  if (!open || (!username && !userId)) return null;
 
-  const activeUsername = username.trim().replace(/^@/, "");
+  const activeUserId = userId ?? null;
+  const activeUsername = username ? username.trim().replace(/^@/, "") : null;
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
@@ -146,6 +150,7 @@ export function PublicWishlistNavigator({
       return (
         <PublicUserView
           username={activeUsername}
+          userId={activeUserId}
           profileToken={profileToken}
           initialUser={initialUser}
           onOpenWishlist={handleWishlistOpen}
@@ -243,7 +248,8 @@ export function PublicWishlistNavigator({
 }
 
 type PublicUserViewProps = {
-  username: string;
+  username: string | null;
+  userId?: string | null;
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
   onOpenWishlist: (wishlistId: string, title?: string) => void;
@@ -253,28 +259,46 @@ type PublicUserViewProps = {
 /**
  * show public profile
  */
-function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, onClose }: PublicUserViewProps) {
+function PublicUserView({ username, userId, profileToken, initialUser, onOpenWishlist, onClose }: PublicUserViewProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
-  const profileQuery = useUserProfileQuery(username, profileToken);
-  const wishlistsQuery = useUserWishlistsQuery(username, profileToken);
+  const profileByIdQuery = useUserProfileByIdQuery(userId ?? null, profileToken);
+  const profileByUsernameQuery = useUserProfileQuery(username ?? "", profileToken);
+  const wishlistsByIdQuery = useUserWishlistsByIdQuery(userId ?? null, profileToken);
+  const wishlistsByUsernameQuery = useUserWishlistsQuery(username ?? "", profileToken);
+  const profileQuery = userId ? profileByIdQuery : profileByUsernameQuery;
+  const wishlistsQuery = userId ? wishlistsByIdQuery : wishlistsByUsernameQuery;
   const profile = profileQuery.data ?? initialUser;
-  const followMutation = useFollowMutation(username, profileToken);
+  const followByIdMutation = useFollowByIdMutation(userId ?? "", profileToken);
+  const followByUsernameMutation = useFollowMutation(username ?? "", profileToken);
+  const followMutation = userId ? followByIdMutation : followByUsernameMutation;
   const wishlists = wishlistsQuery.data?.items ?? [];
   const { t } = useTranslation();
 
   useEffect(() => {
-    if (!accessToken || !username) return;
-    queryClient.prefetchQuery({
-      queryKey: [...userQueryKeys.profile(username), accessToken, profileToken] as const,
-      queryFn: () => getUserProfile(accessToken, username, profileToken),
-      staleTime: 30 * 1000,
-    });
-    queryClient.prefetchQuery({
-      queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
-      queryFn: () => listUserWishlists(accessToken, username, profileToken),
-    });
-  }, [accessToken, profileToken, queryClient, username]);
+    if (!accessToken) return;
+    if (userId) {
+      queryClient.prefetchQuery({
+        queryKey: [...userQueryKeys.profileById(userId), accessToken, profileToken] as const,
+        queryFn: () => getUserProfileById(accessToken, userId, profileToken),
+        staleTime: 30 * 1000,
+      });
+      queryClient.prefetchQuery({
+        queryKey: [...userQueryKeys.wishlistsById(userId), accessToken, profileToken] as const,
+        queryFn: () => getUserWishlistsById(accessToken, userId, profileToken),
+      });
+    } else if (username) {
+      queryClient.prefetchQuery({
+        queryKey: [...userQueryKeys.profile(username), accessToken, profileToken] as const,
+        queryFn: () => getUserProfile(accessToken, username, profileToken),
+        staleTime: 30 * 1000,
+      });
+      queryClient.prefetchQuery({
+        queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
+        queryFn: () => listUserWishlists(accessToken, username, profileToken),
+      });
+    }
+  }, [accessToken, profileToken, queryClient, username, userId]);
 
   function handleWishlistHover(wishlistId: string) {
     if (!accessToken) return;
@@ -343,7 +367,7 @@ function PublicUserView({ username, profileToken, initialUser, onOpenWishlist, o
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            {!profile.is_self && profile.username ? (
+            {!profile.is_self ? (
               <button
                 type="button"
                 className={`h-9 px-4 rounded-xl text-xs font-extrabold transition-all active:scale-[0.98] ${

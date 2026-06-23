@@ -127,6 +127,7 @@ export function UserDiscoveryManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedUsername = searchParams.get("profile");
+  const selectedUserId = searchParams.get("profile_id");
   const profileToken = searchParams.get("profile_token");
   const selectedWishlistId = searchParams.get("wishlist");
   const selectedWishId = searchParams.get("wish");
@@ -171,13 +172,12 @@ export function UserDiscoveryManager() {
             <div className="discover-following">
               {followedUsers.map((user) => (
                 <button
-                  key={user.username}
+                  key={user.user_id}
                   type="button"
                   className="discover-following-row pressable-action"
                   onClick={() => {
-                    if (user.username) router.replace(`/users?profile=${encodeURIComponent(user.username)}`);
+                    router.replace(`/users?profile_id=${encodeURIComponent(user.user_id)}`);
                   }}
-                  disabled={!user.username}
                 >
                   <UserAvatar user={user} />
                   <span>{user.first_name || user.username}</span>
@@ -212,8 +212,9 @@ export function UserDiscoveryManager() {
       </main>
 
       <PublicWishlistNavigator
-        open={Boolean(selectedUsername)}
+        open={Boolean(selectedUsername || selectedUserId)}
         username={selectedUsername}
+        userId={selectedUserId}
         profileToken={profileToken}
         initialWishlistId={selectedWishlistId}
         initialWishId={selectedWishId}

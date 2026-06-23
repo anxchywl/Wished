@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow, User, Wish, Wishlist
-from app.modules.notifications.deep_links import profile_url, wish_url, wishlist_url
+from app.modules.notifications.deep_links import profile_url_by_id, wish_url_by_id, wishlist_url_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -140,16 +140,7 @@ async def handle_followed(
     t = _text(followed.language_code)
     actor = _actor_name(follower)
     text = t['followed_body'].format(actor=actor)
-    # followers without a Telegram username cannot be navigated to by username;
-    # send a plain text notification rather than a broken "Open Profile" button
-    if not follower.username:
-        try:
-            await bot.send_message(chat_id=followed.telegram_id, text=text)
-            logger.info("sent FOLLOWED notification (no username) to telegram_id=%s", followed.telegram_id)
-        except Exception:
-            logger.exception("failed to send FOLLOWED notification to telegram_id=%s", followed.telegram_id)
-        return
-    url = profile_url(mini_app_url, follower.username)
+    url = profile_url_by_id(mini_app_url, follower_id)
     try:
         await _send(bot, followed.telegram_id, text, t["open_profile"], url)
         logger.info("sent FOLLOWED notification to telegram_id=%s", followed.telegram_id)
@@ -181,8 +172,7 @@ async def handle_wishlist_created(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    username = owner.username or str(owner_id)
-    url = wishlist_url(mini_app_url, username, wishlist_id)
+    url = wishlist_url_by_id(mini_app_url, owner_id, wishlist_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
@@ -232,8 +222,7 @@ async def handle_wish_created(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    username = owner.username or str(owner_id)
-    url = wish_url(mini_app_url, username, wishlist_id, wish_id)
+    url = wish_url_by_id(mini_app_url, owner_id, wishlist_id, wish_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
@@ -283,8 +272,7 @@ async def handle_wish_fulfilled(
 
     followers = await _get_followers(db, owner_id)
     actor = _actor_name(owner)
-    username = owner.username or str(owner_id)
-    url = wishlist_url(mini_app_url, username, wishlist_id)
+    url = wishlist_url_by_id(mini_app_url, owner_id, wishlist_id)
 
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):

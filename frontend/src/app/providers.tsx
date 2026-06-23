@@ -335,7 +335,7 @@ function TelegramDeepLinkHandler() {
       if (wishlistTarget) {
         window.sessionStorage.removeItem("wished/tgStartParam");
         let url =
-          `/users?profile=${encodeURIComponent(wishlistTarget.username)}` +
+          `/users?profile_id=${encodeURIComponent(wishlistTarget.userId)}` +
           `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`;
         if (wishlistTarget.shareToken) {
           url += `&share_token=${encodeURIComponent(wishlistTarget.shareToken)}`;

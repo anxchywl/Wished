@@ -174,12 +174,12 @@ async def share_wishlist(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict:
     """send a formatted share message to the owner's telegram chat via bot"""
-    if not settings.telegram_bot_token or not current_user.username:
+    if not settings.telegram_bot_token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="share unavailable")
 
     wishlist = await get_wishlist(db, current_user, wishlist_id)
 
-    start_param = _encode_wishlist_start_param(current_user.username, str(wishlist_id))
+    start_param = _encode_wishlist_start_param(str(current_user.id), str(wishlist_id))
     bot_username = settings.telegram_bot_username or ""
     mini_app_url = f"https://t.me/{bot_username}/wished?startapp={start_param}"
 
@@ -204,8 +204,8 @@ async def share_wishlist(
     return {"ok": True}
 
 
-def _encode_wishlist_start_param(username: str, wishlist_id: str) -> str:
-    payload = json.dumps({"username": username, "wishlistId": wishlist_id}, separators=(",", ":"))
+def _encode_wishlist_start_param(user_id: str, wishlist_id: str) -> str:
+    payload = json.dumps({"userId": user_id, "wishlistId": wishlist_id}, separators=(",", ":"))
     b64 = base64.urlsafe_b64encode(payload.encode()).rstrip(b"=").decode()
     return f"wl_{b64}"
 

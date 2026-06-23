@@ -1,9 +1,10 @@
 const WISHLIST_PREFIX = "wl_";
 
 type WishlistStartParam = {
-  username: string;
+  userId: string;
   wishlistId: string;
   shareToken?: string;
+  username?: string;
 };
 
 function toBase64Url(value: string) {
@@ -23,8 +24,8 @@ function fromBase64Url(value: string) {
   return new TextDecoder().decode(bytes);
 }
 
-export function encodeWishlistStartParam(username: string, wishlistId: string, shareToken?: string) {
-  const payload: WishlistStartParam = { username, wishlistId };
+export function encodeWishlistStartParam(userId: string, wishlistId: string, shareToken?: string) {
+  const payload: WishlistStartParam = { userId, wishlistId };
   if (shareToken) payload.shareToken = shareToken;
   return `${WISHLIST_PREFIX}${toBase64Url(JSON.stringify(payload))}`;
 }
@@ -33,19 +34,19 @@ export function decodeWishlistStartParam(value: string): WishlistStartParam | nu
   if (!value.startsWith(WISHLIST_PREFIX)) return null;
 
   try {
-    const parsed = JSON.parse(fromBase64Url(value.slice(WISHLIST_PREFIX.length))) as Partial<WishlistStartParam>;
-    if (
-      typeof parsed.username !== "string" ||
-      !parsed.username ||
-      typeof parsed.wishlistId !== "string" ||
-      !parsed.wishlistId
-    ) {
+    const parsed = JSON.parse(fromBase64Url(value.slice(WISHLIST_PREFIX.length))) as Record<string, unknown>;
+    if (typeof parsed.wishlistId !== "string" || !parsed.wishlistId) {
+      return null;
+    }
+    // old links encoded username instead of userId — treat as unresolvable
+    if (typeof parsed.userId !== "string" || !parsed.userId) {
       return null;
     }
     return {
-      username: parsed.username,
+      userId: parsed.userId,
       wishlistId: parsed.wishlistId,
       shareToken: typeof parsed.shareToken === "string" ? parsed.shareToken : undefined,
+      username: typeof parsed.username === "string" ? parsed.username : undefined,
     };
   } catch {
     return null;

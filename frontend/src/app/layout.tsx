@@ -56,16 +56,15 @@ const captureTelegramInitDataScript = `
         for (var i = 0; i < padLen; i++) b64 += "=";
         var json = decodeURIComponent(escape(atob(b64)));
         var parsed = JSON.parse(json);
-        if (parsed && typeof parsed.username === "string" && typeof parsed.wishlistId === "string") {
-          var targetSearch = "?profile=" + encodeURIComponent(parsed.username) +
+        if (parsed && typeof parsed.wishlistId === "string" && typeof parsed.userId === "string" && parsed.userId) {
+          var targetSearch = "?profile_id=" + encodeURIComponent(parsed.userId) +
             "&wishlist=" + encodeURIComponent(parsed.wishlistId);
           if (parsed.shareToken && typeof parsed.shareToken === "string") {
             targetSearch += "&share_token=" + encodeURIComponent(parsed.shareToken);
           }
           var currentSearch = new URLSearchParams(window.location.search);
           var alreadyThere =
-            currentSearch.get("profile") &&
-            currentSearch.get("profile").toLowerCase() === parsed.username.toLowerCase() &&
+            currentSearch.get("profile_id") === parsed.userId &&
             currentSearch.get("wishlist") === parsed.wishlistId;
           if (!alreadyThere) {
             window.history.replaceState(null, "", "/users" + targetSearch);

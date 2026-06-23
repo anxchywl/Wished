@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 class UserProfileResponse(BaseModel):
     """user profile response"""
+    user_id: str
     username: str | None
     first_name: str | None
     last_name: str | None
