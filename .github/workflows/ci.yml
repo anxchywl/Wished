@@ -57,4 +57,4 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: cd ${{ secrets.SSH_PATH }} && make deploy
+          script: cd /home/deploy/wished && make deploy
