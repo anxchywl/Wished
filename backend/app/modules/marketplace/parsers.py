@@ -204,6 +204,25 @@ class WildberriesParser:
         return result
 
 
+_OZON_BOILERPLATE = re.compile(
+    r"успейте купить по выгодной цене|лучшие цены на ozon|доставка по казахстану|доставка по всему",
+    re.IGNORECASE,
+)
+
+_OZON_GENERIC_TITLES = re.compile(
+    r"^(товар|продукт|product)\s*(в казахстане|в России)?$",
+    re.IGNORECASE,
+)
+
+
+def _ozon_filter(result: ProductData) -> None:
+    """strip Ozon short-URL boilerplate that carries no product-specific information"""
+    if result.description and _OZON_BOILERPLATE.search(result.description):
+        result.description = None
+    if result.title and _OZON_GENERIC_TITLES.match(result.title.strip()):
+        result.title = None
+
+
 def _ozon_image_from_state(html: str) -> str | None:
     """extract first product image URL from Ozon's embedded JS state blob"""
     # ir.ozon.com is Ozon's primary image CDN; URLs appear quoted inside JSON blobs
@@ -238,10 +257,12 @@ class OzonParser:
         if _parse_og_into(html, result, "RUB"):
             if not result.image_url:
                 result.image_url = _ozon_image_from_state(html)
+            _ozon_filter(result)
             return result
 
         result.title = _h1_text(html)
         result.image_url = _ozon_image_from_state(html)
+        _ozon_filter(result)
         return result
 
 
