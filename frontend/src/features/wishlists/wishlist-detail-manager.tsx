@@ -1437,6 +1437,20 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
         if (result.price && !price.trim()) {
           setPrice(normalizePriceInput(result.price));
         }
+        if (result.image_url && !coverPreview) {
+          setCoverPreview(result.image_url);
+          fetch(result.image_url)
+            .then((r) => r.blob())
+            .then((blob) => {
+              const ext = result.image_url!.split(".").pop()?.split("?")[0] ?? "jpg";
+              const f = new File([blob], `cover.${ext}`, { type: blob.type || "image/jpeg" }) as PreviewFile;
+              f.previewUrl = result.image_url!;
+              setCoverFile(f);
+            })
+            .catch(() => {
+              // CORS or network failure — preview shown but file won't be auto-uploaded
+            });
+        }
         setLinkPreviewStatus(result.title || result.description ? "found" : "failed");
       } catch {
         setLinkPreviewStatus("failed");
