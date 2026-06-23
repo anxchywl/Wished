@@ -21,7 +21,7 @@ class User(Base):
     language_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_premium: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     birthday: Mapped[date | None] = mapped_column(Date, nullable=True)
-    profile_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
+    profile_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="public")
     birthday_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
     wishlist_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
     booking_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="hide")
