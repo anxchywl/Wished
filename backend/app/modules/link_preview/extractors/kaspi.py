@@ -1,5 +1,6 @@
 """Kaspi marketplace product metadata extractor"""
 
+import asyncio
 import logging
 
 import httpx
@@ -9,18 +10,22 @@ from app.modules.marketplace.parsers import KaspiParser
 
 logger = logging.getLogger(__name__)
 
+_EMPTY = LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="kaspi")
+
 
 class KaspiExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
         try:
             resp = await client.get(url)
+            if resp.status_code == 429:
+                retry_after = int(resp.headers.get("Retry-After", "3"))
+                await asyncio.sleep(min(retry_after, 5))
+                resp = await client.get(url)
             resp.raise_for_status()
             html = resp.text
         except Exception as exc:
             logger.debug("Kaspi page fetch failed for %s: %s", url, exc)
-            return LinkPreviewResponse(
-                title=None, description=None, image_url=None, price=None, currency=None, source="kaspi"
-            )
+            return _EMPTY
 
         parser = KaspiParser()
         data = parser.parse(html, url, hostname)

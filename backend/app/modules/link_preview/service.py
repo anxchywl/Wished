@@ -188,5 +188,7 @@ async def fetch_link_preview(
     if result.description:
         result = result.model_copy(update={"description": truncate_to_sentences(result.description, 3)})
 
-    await _set_cached(redis, url, result)
+    # only cache successful extractions — don't lock out URLs that failed due to rate limits or transient errors
+    if result.title or result.image_url or result.price:
+        await _set_cached(redis, url, result)
     return result
