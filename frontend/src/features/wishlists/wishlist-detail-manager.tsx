@@ -1388,7 +1388,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
   const [coverFile, setCoverFile] = useState<PreviewFile | undefined>();
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [linkPreviewStatus, setLinkPreviewStatus] = useState<"idle" | "loading" | "found" | "failed">("idle");
+  const [linkPreviewStatus, setLinkPreviewStatus] = useState<"idle" | "loading" | "found" | "imageOnly" | "failed">("idle");
   const linkPreviewMutation = useLinkPreviewMutation();
   const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1442,16 +1442,39 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
           fetch(result.image_url)
             .then((r) => r.blob())
             .then((blob) => {
-              const ext = result.image_url!.split(".").pop()?.split("?")[0] ?? "jpg";
-              const f = new File([blob], `cover.${ext}`, { type: blob.type || "image/jpeg" }) as PreviewFile;
-              f.previewUrl = result.image_url!;
-              setCoverFile(f);
+              if (blob.size < 100) return;
+              const previewUrl = result.image_url!;
+              const img = new Image();
+              const blobUrl = URL.createObjectURL(blob);
+              img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext("2d");
+                if (!ctx) { URL.revokeObjectURL(blobUrl); return; }
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(blobUrl);
+                canvas.toBlob((jpegBlob) => {
+                  if (!jpegBlob) return;
+                  const f = new File([jpegBlob], "cover.jpg", { type: "image/jpeg" }) as PreviewFile;
+                  f.previewUrl = previewUrl;
+                  setCoverFile(f);
+                }, "image/jpeg", 0.92);
+              };
+              img.onerror = () => URL.revokeObjectURL(blobUrl);
+              img.src = blobUrl;
             })
             .catch(() => {
               // CORS or network failure — preview shown but file won't be auto-uploaded
             });
         }
-        setLinkPreviewStatus(result.title || result.description ? "found" : "failed");
+        setLinkPreviewStatus(
+          result.title || result.description ? "found"
+          : result.image_url ? "imageOnly"
+          : "failed"
+        );
       } catch {
         setLinkPreviewStatus("failed");
       }
@@ -1547,6 +1570,9 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                   )}
                   {linkPreviewStatus === "found" && (
                     <p className="text-[11px] text-primary">{t("linkPreviewFound") ?? "Product information found"}</p>
+                  )}
+                  {linkPreviewStatus === "imageOnly" && (
+                    <p className="text-[11px] text-muted">{t("linkPreviewImageOnly") ?? "Image found — please fill in the title"}</p>
                   )}
                   {linkPreviewStatus === "failed" && (
                     <p className="text-[11px] text-muted">{t("linkPreviewFailed") ?? "Could not automatically extract product information"}</p>

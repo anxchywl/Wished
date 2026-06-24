@@ -223,6 +223,7 @@ export const dict = {
     accountRestrictedBody: "Your account has been restricted. If you believe this is a mistake, contact support.",
     linkPreviewLoading: "Fetching product information...",
     linkPreviewFound: "Product information found",
+    linkPreviewImageOnly: "Image found — please fill in the title",
     linkPreviewFailed: "Could not automatically extract product information",
   },
   ru: {
@@ -448,6 +449,7 @@ export const dict = {
     accountRestrictedBody: "Ваш аккаунт был ограничен. Если вы считаете это ошибкой, обратитесь в поддержку.",
     linkPreviewLoading: "Загрузка информации о товаре...",
     linkPreviewFound: "Информация о товаре найдена",
+    linkPreviewImageOnly: "Изображение найдено — введите название вручную",
     linkPreviewFailed: "Не удалось автоматически загрузить информацию о товаре",
   },
   kz: {
@@ -673,6 +675,7 @@ export const dict = {
     accountRestrictedBody: "Аккаунтыңыз шектелді. Бұл қате деп санасаңыз, қолдау қызметіне хабарласыңыз.",
     linkPreviewLoading: "Тауар ақпараты жүктелуде...",
     linkPreviewFound: "Тауар ақпараты табылды",
+    linkPreviewImageOnly: "Сурет табылды — атауын қолмен енгізіңіз",
     linkPreviewFailed: "Тауар ақпаратын автоматты түрде жүктеу мүмкін болмады",
   }
 };
