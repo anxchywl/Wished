@@ -27,6 +27,7 @@ _RATE_LIMIT_WINDOW = 3600  # 1 hour
 _WB_HOSTS = frozenset({
     "wildberries.ru", "www.wildberries.ru",
     "wildberries.kz", "www.wildberries.kz",
+    "global.wildberries.ru", "www.global.wildberries.ru",
 })
 _OZON_HOSTS = frozenset({"ozon.ru", "www.ozon.ru", "ozon.kz", "www.ozon.kz"})
 _KASPI_HOSTS = frozenset({"kaspi.kz", "www.kaspi.kz"})
