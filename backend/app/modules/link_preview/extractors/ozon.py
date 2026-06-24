@@ -30,17 +30,38 @@ def _title_from_slug(url: str) -> str | None:
 class OzonExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
         html: str | None = None
+        final_url = url
         try:
             resp = await client.get(url)
-            resp.raise_for_status()
-            if "Antibot Challenge" not in resp.text:
+            final_url = str(resp.url)
+            # check antibot before raising — antibot pages return 403
+            if "Antibot Challenge" in resp.text:
+                logger.debug("Ozon antibot for %s (final: %s)", url, final_url)
+            else:
+                resp.raise_for_status()
                 html = resp.text
         except Exception as exc:
             logger.debug("Ozon page fetch failed for %s: %s", url, exc)
 
         if html:
             parser = OzonParser()
-            data = parser.parse(html, url, hostname)
+            data = parser.parse(html, final_url, hostname)
+
+            # teaser pages (short URL landing) have title/image but no price;
+            # try the canonical og:url to get the full product page with JSON-LD
+            if data.price is None:
+                from app.modules.marketplace.parsers import _meta_content
+                og_url = _meta_content(html, "og:url")
+                if og_url and og_url != final_url and "/product/" in og_url:
+                    try:
+                        resp2 = await client.get(og_url)
+                        if resp2.status_code == 200 and "Antibot Challenge" not in resp2.text:
+                            data2 = parser.parse(resp2.text, og_url, hostname)
+                            if data2.price is not None:
+                                data = data2
+                    except Exception as exc:
+                        logger.debug("Ozon og:url fetch failed for %s: %s", og_url, exc)
+
             price = str(data.price) if data.price is not None else None
             return LinkPreviewResponse(
                 title=data.title,
@@ -51,9 +72,9 @@ class OzonExtractor:
                 source="ozon",
             )
 
-        # antibot or fetch failure — extract what we can from the URL itself
+        # antibot or fetch failure — use redirect URL slug for at least the title
         return LinkPreviewResponse(
-            title=_title_from_slug(url),
+            title=_title_from_slug(final_url) or _title_from_slug(url),
             description=None,
             image_url=None,
             price=None,

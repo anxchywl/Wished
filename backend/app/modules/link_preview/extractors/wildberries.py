@@ -85,8 +85,11 @@ def _parse_wb_cdn_card(data: dict) -> dict:
     return {"title": title, "description": description}
 
 
-async def _fetch_wb_cdn_price(article_id: int, basket: str, client: httpx.AsyncClient) -> str | None:
-    """fetch current price from WB CDN price-history — works from any IP, price in kopecks"""
+async def _fetch_wb_cdn_price(article_id: int, basket: str, client: httpx.AsyncClient) -> tuple[str, str] | None:
+    """fetch current price from WB CDN price-history — works from any IP, price in kopecks.
+
+    Returns (price_str, currency) preferring KZT when available.
+    """
     vol = article_id // 100000
     part = article_id // 1000
     url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/price-history.json"
@@ -97,9 +100,10 @@ async def _fetch_wb_cdn_price(article_id: int, basket: str, client: httpx.AsyncC
         if not entries:
             return None
         latest = entries[-1].get("price") or {}
-        price_kopecks = latest.get("RUB") or latest.get("KZT")
-        if price_kopecks:
-            return str(Decimal(price_kopecks) / 100)
+        if latest.get("KZT"):
+            return str(Decimal(latest["KZT"]) / 100), "KZT"
+        if latest.get("RUB"):
+            return str(Decimal(latest["RUB"]) / 100), "RUB"
     except Exception as exc:
         logger.debug("WB CDN price-history failed for %s: %s", article_id, exc)
     return None
@@ -158,16 +162,25 @@ class WildberriesExtractor:
         if probe_result:
             basket, raw_card = probe_result
             cdn_data = _parse_wb_cdn_card(raw_card)
-            cdn_price = await _fetch_wb_cdn_price(article_id, basket, client)
+            cdn_price_result = await _fetch_wb_cdn_price(article_id, basket, client)
         else:
-            basket, cdn_data, cdn_price = None, None, None
+            basket, cdn_data, cdn_price_result = None, None, None
 
         image_url = _wb_image_url(article_id, basket)
 
         title = (cdn_data or {}).get("title")
         description = (cdn_data or {}).get("description")
+
         # prefer card API sale price; fall back to CDN list price
-        price = (api_data or {}).get("price") or cdn_price
+        # CDN price-history also carries the correct currency (KZT preferred over RUB)
+        api_price = (api_data or {}).get("price")
+        if api_price:
+            price = api_price
+            # keep hostname-derived currency for card API prices
+        elif cdn_price_result:
+            price, currency = cdn_price_result
+        else:
+            price = None
 
         if title:
             return LinkPreviewResponse(
