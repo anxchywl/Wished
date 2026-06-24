@@ -458,7 +458,7 @@ async def test_kaspi_extractor_extracts_metadata() -> None:
     """
 
     mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
+    mock_response.status_code = 200
     mock_response.text = html
 
     mock_client = MagicMock()
