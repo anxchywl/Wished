@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     marketplace_import_rate_per_hour: int = 20
 
     link_preview_rate_per_hour: int = 20
+    # optional residential proxy for marketplaces that block datacenter IPs (e.g. Kaspi)
+    # format: http://user:pass@host:port  — leave empty to disable
+    kaspi_proxy_url: str = ""
 
     # wishlist mutation rate limits
     wishlist_create_per_hour: int = 20

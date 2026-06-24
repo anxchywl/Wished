@@ -177,11 +177,14 @@ async def fetch_link_preview(
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
 
+    proxy = settings.kaspi_proxy_url if hostname in _KASPI_HOSTS and settings.kaspi_proxy_url else None
+
     async with httpx.AsyncClient(
         timeout=_FETCH_TIMEOUT,
         follow_redirects=True,
         max_redirects=5,
         headers=headers,
+        proxy=proxy or None,
     ) as client:
         result = await extractor.extract(url, hostname, client)
 
