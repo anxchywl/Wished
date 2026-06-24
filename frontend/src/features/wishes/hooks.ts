@@ -8,6 +8,7 @@ import {
   deleteWish,
   deleteWishImage,
   fetchLinkPreview,
+  storeLinkPreviewImage,
   importProductUrl,
   listWishes,
   reorderWishes,
@@ -53,6 +54,14 @@ export function useLinkPreviewMutation() {
 
   return useMutation<LinkPreviewResult, Error, LinkPreviewRequest>({
     mutationFn: (payload: LinkPreviewRequest) => fetchLinkPreview(accessToken ?? "", payload),
+  });
+}
+
+export function useStoreLinkPreviewImageMutation() {
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation<{ pending_image_id: string; thumbnail_url: string | null }, Error, string>({
+    mutationFn: (imageUrl: string) => storeLinkPreviewImage(accessToken ?? "", imageUrl),
   });
 }
 

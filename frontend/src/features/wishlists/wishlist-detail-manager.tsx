@@ -55,6 +55,7 @@ import {
   useDeleteWishMutation,
   useDeleteWishImageMutation,
   useLinkPreviewMutation,
+  useStoreLinkPreviewImageMutation,
   useReorderWishesMutation,
   useUpdateWishMutation,
   useUploadWishImageMutation,
@@ -1386,10 +1387,12 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
   const [compressing, setCompressing] = useState(false);
   const [coverPreview, setCoverPreview] = useState("");
   const [coverFile, setCoverFile] = useState<PreviewFile | undefined>();
+  const [pendingImageId, setPendingImageId] = useState<string | null>(null);
   const [pendingCropFile, setPendingCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [linkPreviewStatus, setLinkPreviewStatus] = useState<"idle" | "loading" | "found" | "imageOnly" | "failed">("idle");
   const linkPreviewMutation = useLinkPreviewMutation();
+  const storeImageMutation = useStoreLinkPreviewImageMutation();
   const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -1403,6 +1406,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
       setCurrency("");
       setCoverPreview("");
       setCoverFile(undefined);
+      setPendingImageId(null);
       setPendingCropFile(null);
       setLinkPreviewStatus("idle");
     } else {
@@ -1442,36 +1446,14 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
         }
         if (result.image_url && !coverPreview) {
           setCoverPreview(result.image_url);
-          fetch(result.image_url)
-            .then((r) => r.blob())
-            .then((blob) => {
-              if (blob.size < 100) return;
-              const previewUrl = result.image_url!;
-              const img = new Image();
-              const blobUrl = URL.createObjectURL(blob);
-              img.onload = () => {
-                const canvas = document.createElement("canvas");
-                canvas.width = img.naturalWidth;
-                canvas.height = img.naturalHeight;
-                const ctx = canvas.getContext("2d");
-                if (!ctx) { URL.revokeObjectURL(blobUrl); return; }
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
-                URL.revokeObjectURL(blobUrl);
-                canvas.toBlob((jpegBlob) => {
-                  if (!jpegBlob) return;
-                  const f = new File([jpegBlob], "cover.jpg", { type: "image/jpeg" }) as PreviewFile;
-                  f.previewUrl = previewUrl;
-                  setCoverFile(f);
-                }, "image/jpeg", 0.92);
-              };
-              img.onerror = () => URL.revokeObjectURL(blobUrl);
-              img.src = blobUrl;
-            })
-            .catch(() => {
-              // CORS or network failure — preview shown but file won't be auto-uploaded
-            });
+          storeImageMutation.mutate(result.image_url, {
+            onSuccess: (stored) => {
+              setPendingImageId(stored.pending_image_id);
+              if (stored.thumbnail_url) {
+                setCoverPreview(stored.thumbnail_url);
+              }
+            },
+          });
         }
         setLinkPreviewStatus(
           result.title || result.description ? "found"
@@ -1520,7 +1502,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
       coverFile,
       cleanUrl,
       null,
-      null,
+      pendingImageId,
     );
   }
 
@@ -1759,6 +1741,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
               const res = await fetch(dataUrl);
               const blob = await res.blob();
               setCoverPreview(dataUrl);
+              setPendingImageId(null);
               setCoverFile(Object.assign(new File([blob], croppedFile.name, { type: croppedFile.type }), { previewUrl: dataUrl }));
             } catch (err) {
               console.error("Image upload failed", err);

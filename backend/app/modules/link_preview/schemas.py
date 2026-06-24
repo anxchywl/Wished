@@ -17,3 +17,17 @@ class LinkPreviewResponse(BaseModel):
     price: str | None
     currency: str | None
     source: str | None
+
+
+class StoreImageRequest(BaseModel):
+    image_url: str = Field(min_length=1, max_length=2048)
+
+    @field_validator("image_url")
+    @classmethod
+    def strip_url(cls, v: str) -> str:
+        return v.strip()
+
+
+class StoreImageResponse(BaseModel):
+    pending_image_id: str
+    thumbnail_url: str | None

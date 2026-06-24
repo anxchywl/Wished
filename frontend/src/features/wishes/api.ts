@@ -35,6 +35,17 @@ export function fetchLinkPreview(accessToken: string, payload: LinkPreviewReques
 }
 
 /**
+ * download an external image server-side and return a pending image id
+ */
+export function storeLinkPreviewImage(accessToken: string, imageUrl: string) {
+  return apiClient<{ pending_image_id: string; thumbnail_url: string | null }>("/link-preview/store-image", {
+    method: "POST",
+    accessToken,
+    body: { image_url: imageUrl },
+  });
+}
+
+/**
  * list wishes
  */
 export function listWishes(accessToken: string, wishlistId: string, shareToken?: string | null) {

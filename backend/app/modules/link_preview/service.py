@@ -154,6 +154,54 @@ def _choose_extractor(hostname: str):
     return GenericExtractor()
 
 
+async def store_preview_image(
+    image_url: str,
+    user_id: UUID,
+    redis: Redis,
+    settings: Settings,
+) -> tuple[str, str | None] | None:
+    """download a preview image server-side and store it as a pending marketplace image"""
+    import json
+    from app.modules.marketplace.service import _download_and_process_image, _image_meta_cache_key
+    from app.integrations.minio import get_presigned_url
+
+    parsed = urlparse(image_url)
+    if parsed.scheme not in ("http", "https"):
+        return None
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        return None
+    await _check_host_not_private(hostname)
+
+    result = await _download_and_process_image(image_url, user_id, settings)
+    if result is None:
+        return None
+
+    img_uuid, full_key, thumb_key, medium_key, size_bytes = result
+    img_meta = {
+        "bucket": settings.minio_media_bucket,
+        "full_key": full_key,
+        "thumb_key": thumb_key,
+        "medium_key": medium_key,
+        "size_bytes": size_bytes,
+    }
+    try:
+        await redis.setex(
+            _image_meta_cache_key(user_id, img_uuid),
+            86400,
+            json.dumps(img_meta),
+        )
+    except Exception:
+        pass
+
+    try:
+        thumbnail_url = get_presigned_url(settings.minio_media_bucket, thumb_key)
+    except Exception:
+        thumbnail_url = None
+
+    return str(img_uuid), thumbnail_url
+
+
 async def fetch_link_preview(
     url: str,
     hostname: str,
