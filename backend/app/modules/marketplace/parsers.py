@@ -149,7 +149,11 @@ def _parse_json_ld_into(ld: dict, result: ProductData, default_currency: str) ->
 
     offers = ld.get("offers") or {}
     if isinstance(offers, list):
-        offers = offers[0] if offers else {}
+        # pick the first Offer with a non-null price; skip AggregateOffer entries
+        offers = next(
+            (o for o in offers if isinstance(o, dict) and o.get("price") is not None),
+            offers[0] if offers else {},
+        )
     if offers.get("price") is not None:
         result.price = _parse_price(str(offers["price"]))
         if result.price is not None:
