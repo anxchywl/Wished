@@ -13,7 +13,7 @@ from decimal import Decimal, InvalidOperation
 import httpx
 
 from app.modules.link_preview.schemas import LinkPreviewResponse
-from app.modules.marketplace.parsers import WildberriesParser
+from app.modules.marketplace.parsers import WildberriesParser, truncate_to_sentences
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,8 @@ async def _fetch_wb_cdn_card(article_id: int, client: httpx.AsyncClient) -> dict
         brand = (data.get("selling", {}).get("brand_name") or "").strip()
         name = (data.get("imt_name") or "").strip()
         title = f"{brand} {name}".strip() if brand and name else (brand or name or None)
-        description = (data.get("description") or "").strip() or None
+        raw_desc = (data.get("description") or "").strip()
+        description = truncate_to_sentences(raw_desc, 3) if raw_desc else None
 
         return {"title": title, "description": description}
     except Exception as exc:

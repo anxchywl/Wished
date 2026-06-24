@@ -22,6 +22,20 @@ class ProductData:
     marketplace: str | None = None
 
 
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)", re.MULTILINE)
+
+
+def truncate_to_sentences(text: str, max_sentences: int = 3) -> str:
+    """return the first max_sentences complete sentences from text"""
+    text = text.strip()
+    count = 0
+    for m in _SENTENCE_END.finditer(text):
+        count += 1
+        if count >= max_sentences:
+            return text[: m.end()].strip()
+    return text
+
+
 def _parse_price(text: str) -> Decimal | None:
     """parse price strings with various locale formats"""
     if not text or not text.strip():

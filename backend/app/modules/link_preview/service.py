@@ -15,6 +15,7 @@ from redis.asyncio import Redis
 
 from app.core.config import Settings
 from app.modules.link_preview.schemas import LinkPreviewResponse
+from app.modules.marketplace.parsers import truncate_to_sentences
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +183,9 @@ async def fetch_link_preview(
         headers=headers,
     ) as client:
         result = await extractor.extract(url, hostname, client)
+
+    if result.description:
+        result = result.model_copy(update={"description": truncate_to_sentences(result.description, 3)})
 
     await _set_cached(redis, url, result)
     return result
