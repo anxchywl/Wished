@@ -383,8 +383,14 @@ async def test_wildberries_extractor_uses_cdn_and_card_api() -> None:
             resp.json = MagicMock(return_value={})
         return resp
 
+    async def mock_head(url, **kwargs):
+        resp = MagicMock()
+        resp.status_code = 200 if ("wbbasket.ru" in url and "card.json" in url) else 404
+        return resp
+
     mock_client = MagicMock()
     mock_client.get = AsyncMock(side_effect=mock_get)
+    mock_client.head = AsyncMock(side_effect=mock_head)
 
     extractor = WildberriesExtractor()
     result = await extractor.extract(
@@ -420,8 +426,12 @@ async def test_wildberries_extractor_falls_back_to_html_when_cdn_fails() -> None
         resp.text = html
         return resp
 
+    async def mock_head(url, **kwargs):
+        raise httpx.ConnectError("down")
+
     mock_client = MagicMock()
     mock_client.get = AsyncMock(side_effect=mock_get)
+    mock_client.head = AsyncMock(side_effect=mock_head)
 
     extractor = WildberriesExtractor()
     result = await extractor.extract(

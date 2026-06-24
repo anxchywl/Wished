@@ -23,26 +23,56 @@ _WB_CARD_API_TIMEOUT = 5.0
 
 
 def _wb_basket(article_id: int) -> str:
+    """compute the CDN basket number for a WB article ID (best guess; probe if it returns 404)"""
     vol = article_id // 100000
     thresholds = [
         143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601,
-        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269,
+        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269, 3485,
+        3701, 3917, 4133, 4349, 4565, 4781, 4997, 5213, 5429, 5645,
+        5861, 6077, 6293, 6509, 6725, 6941, 7157, 7373, 7589, 7805,
+        8021, 8237, 8453, 8669, 8885, 9101, 9317, 9533, 9749, 9965,
     ]
-    return next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "20")
+    return next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "51")
 
 
-def _wb_image_url(article_id: int) -> str:
+async def _resolve_wb_basket(article_id: int, client: httpx.AsyncClient) -> str | None:
+    """find the CDN basket that actually serves card.json for this article"""
     vol = article_id // 100000
     part = article_id // 1000
-    basket = _wb_basket(article_id)
-    return f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/images/big/1.webp"
+    primary = _wb_basket(article_id)
+    primary_int = int(primary)
+
+    async def _try(basket_num: int) -> str | None:
+        b = f"{basket_num:02d}"
+        url = f"https://basket-{b}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/ru/card.json"
+        try:
+            r = await client.head(url, timeout=3.0)
+            return b if r.status_code == 200 else None
+        except Exception:
+            return None
+
+    # fast path: primary basket
+    result = await _try(primary_int)
+    if result:
+        return result
+
+    # slow path: probe ±10 neighbors in parallel
+    neighbors = [n for n in range(max(1, primary_int - 10), primary_int + 11) if n != primary_int]
+    results = await asyncio.gather(*[_try(n) for n in neighbors])
+    return next((r for r in results if r), None)
 
 
-async def _fetch_wb_cdn_card(article_id: int, client: httpx.AsyncClient) -> dict | None:
+def _wb_image_url(article_id: int, basket: str | None = None) -> str:
+    vol = article_id // 100000
+    part = article_id // 1000
+    b = basket or _wb_basket(article_id)
+    return f"https://basket-{b}.wbbasket.ru/vol{vol}/part{part}/{article_id}/images/big/1.webp"
+
+
+async def _fetch_wb_cdn_card(article_id: int, basket: str, client: httpx.AsyncClient) -> dict | None:
     """fetch product info from WB's public CDN JSON — works from any IP"""
     vol = article_id // 100000
     part = article_id // 1000
-    basket = _wb_basket(article_id)
     url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/ru/card.json"
     try:
         resp = await client.get(url, timeout=_WB_CDN_TIMEOUT)
@@ -61,11 +91,10 @@ async def _fetch_wb_cdn_card(article_id: int, client: httpx.AsyncClient) -> dict
         return None
 
 
-async def _fetch_wb_cdn_price(article_id: int, client: httpx.AsyncClient) -> str | None:
+async def _fetch_wb_cdn_price(article_id: int, basket: str, client: httpx.AsyncClient) -> str | None:
     """fetch current price from WB CDN price-history — works from any IP, price in kopecks"""
     vol = article_id // 100000
     part = article_id // 1000
-    basket = _wb_basket(article_id)
     url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/price-history.json"
     try:
         resp = await client.get(url, timeout=_WB_CDN_TIMEOUT)
@@ -124,14 +153,23 @@ class WildberriesExtractor:
             return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="wildberries")
 
         article_id = int(match.group(1))
-        image_url = _wb_image_url(article_id)
         currency = "KZT" if "wildberries.kz" in hostname else "RUB"
 
-        cdn_data, api_data, cdn_price = await asyncio.gather(
-            _fetch_wb_cdn_card(article_id, client),
+        # resolve correct CDN basket (extended threshold list + probe fallback)
+        basket, api_data = await asyncio.gather(
+            _resolve_wb_basket(article_id, client),
             _fetch_wb_card_api(article_id, client),
-            _fetch_wb_cdn_price(article_id, client),
         )
+
+        image_url = _wb_image_url(article_id, basket)
+
+        if basket:
+            cdn_data, cdn_price = await asyncio.gather(
+                _fetch_wb_cdn_card(article_id, basket, client),
+                _fetch_wb_cdn_price(article_id, basket, client),
+            )
+        else:
+            cdn_data, cdn_price = None, None
 
         title = (cdn_data or {}).get("title")
         description = (cdn_data or {}).get("description")
