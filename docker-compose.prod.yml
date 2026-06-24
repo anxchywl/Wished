@@ -53,6 +53,7 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-[]}
       ADMIN_TELEGRAM_IDS: ${ADMIN_TELEGRAM_IDS:-}
       TRUST_PROXY_HEADERS: "true"
+      KASPI_PROXY_URL: ${KASPI_PROXY_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
