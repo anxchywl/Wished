@@ -177,7 +177,8 @@ async def fetch_link_preview(
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
 
-    proxy = settings.kaspi_proxy_url if hostname in _KASPI_HOSTS and settings.kaspi_proxy_url else None
+    _PROXY_HOSTS = _KASPI_HOSTS | _OZON_HOSTS
+    proxy = settings.marketplace_proxy_url if hostname in _PROXY_HOSTS and settings.marketplace_proxy_url else None
 
     async with httpx.AsyncClient(
         timeout=_FETCH_TIMEOUT,
