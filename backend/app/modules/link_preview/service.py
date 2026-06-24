@@ -30,7 +30,7 @@ _WB_HOSTS = frozenset({
     "global.wildberries.ru", "www.global.wildberries.ru",
 })
 _OZON_HOSTS = frozenset({"ozon.ru", "www.ozon.ru", "ozon.kz", "www.ozon.kz"})
-_KASPI_HOSTS = frozenset({"kaspi.kz", "www.kaspi.kz"})
+_KASPI_HOSTS = frozenset({"kaspi.kz", "www.kaspi.kz", "l.kaspi.kz"})
 
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
