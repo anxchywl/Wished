@@ -22,7 +22,8 @@ class ProductData:
     marketplace: str | None = None
 
 
-_SENTENCE_END = re.compile(r"[.!?](?=\s|$)", re.MULTILINE)
+# sentence boundary: punctuation followed by whitespace, end, or an uppercase letter
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$|[А-ЯЁA-Z])", re.MULTILINE)
 
 
 def truncate_to_sentences(text: str, max_sentences: int = 3) -> str:
