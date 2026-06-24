@@ -6,6 +6,7 @@ Strategy:
 3. Page HTML fallback
 """
 
+import asyncio
 import logging
 import re
 from decimal import Decimal, InvalidOperation
@@ -60,8 +61,29 @@ async def _fetch_wb_cdn_card(article_id: int, client: httpx.AsyncClient) -> dict
         return None
 
 
+async def _fetch_wb_cdn_price(article_id: int, client: httpx.AsyncClient) -> str | None:
+    """fetch current price from WB CDN price-history — works from any IP, price in kopecks"""
+    vol = article_id // 100000
+    part = article_id // 1000
+    basket = _wb_basket(article_id)
+    url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/price-history.json"
+    try:
+        resp = await client.get(url, timeout=_WB_CDN_TIMEOUT)
+        resp.raise_for_status()
+        entries = resp.json()
+        if not entries:
+            return None
+        latest = entries[-1].get("price") or {}
+        price_kopecks = latest.get("RUB") or latest.get("KZT")
+        if price_kopecks:
+            return str(Decimal(price_kopecks) / 100)
+    except Exception as exc:
+        logger.debug("WB CDN price-history failed for %s: %s", article_id, exc)
+    return None
+
+
 async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict | None:
-    """fetch price from WB card API — geo-blocked on non-RU IPs"""
+    """fetch sale price from WB card API — geo-blocked on non-RU IPs, but preferred when available"""
     try:
         api_url = (
             f"https://card.wb.ru/cards/v2/detail"
@@ -104,11 +126,16 @@ class WildberriesExtractor:
         article_id = int(match.group(1))
         image_url = _wb_image_url(article_id)
 
-        cdn_data, api_data = await _fetch_wb_cdn_card(article_id, client), await _fetch_wb_card_api(article_id, client)
+        cdn_data, api_data, cdn_price = await asyncio.gather(
+            _fetch_wb_cdn_card(article_id, client),
+            _fetch_wb_card_api(article_id, client),
+            _fetch_wb_cdn_price(article_id, client),
+        )
 
         title = (cdn_data or {}).get("title")
         description = (cdn_data or {}).get("description")
-        price = (api_data or {}).get("price")
+        # prefer card API sale price; fall back to CDN list price
+        price = (api_data or {}).get("price") or cdn_price
 
         if title:
             return LinkPreviewResponse(
