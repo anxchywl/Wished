@@ -1436,6 +1436,9 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
         }
         if (result.price && !price.trim()) {
           setPrice(normalizePriceInput(result.price));
+          if (result.currency && !currency.trim()) {
+            setCurrency(normalizeCurrencyInput(result.currency));
+          }
         }
         if (result.image_url && !coverPreview) {
           setCoverPreview(result.image_url);

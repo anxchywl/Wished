@@ -15,4 +15,5 @@ class LinkPreviewResponse(BaseModel):
     description: str | None
     image_url: str | None
     price: str | None
+    currency: str | None
     source: str | None

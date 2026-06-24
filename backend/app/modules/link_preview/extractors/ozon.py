@@ -41,11 +41,13 @@ class OzonExtractor:
         if html:
             parser = OzonParser()
             data = parser.parse(html, url, hostname)
+            price = str(data.price) if data.price is not None else None
             return LinkPreviewResponse(
                 title=data.title,
                 description=data.description,
                 image_url=data.image_url,
-                price=str(data.price) if data.price is not None else None,
+                price=price,
+                currency=data.currency if price else None,
                 source="ozon",
             )
 
@@ -55,5 +57,6 @@ class OzonExtractor:
             description=None,
             image_url=None,
             price=None,
+            currency=None,
             source="ozon",
         )

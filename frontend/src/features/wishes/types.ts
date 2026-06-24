@@ -90,5 +90,6 @@ export type LinkPreviewResult = {
   description: string | null;
   image_url: string | null;
   price: string | null;
+  currency: string | null;
   source: string | null;
 };

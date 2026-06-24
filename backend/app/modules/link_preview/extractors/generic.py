@@ -36,7 +36,7 @@ class GenericExtractor:
         except Exception as exc:
             logger.debug("generic page fetch failed for %s: %s", url, exc)
             return LinkPreviewResponse(
-                title=None, description=None, image_url=None, price=None, source=None
+                title=None, description=None, image_url=None, price=None, currency=None, source=None
             )
 
         title = (
@@ -58,5 +58,6 @@ class GenericExtractor:
             description=description.strip() if description else None,
             image_url=image_url,
             price=None,
+            currency=None,
             source=None,
         )

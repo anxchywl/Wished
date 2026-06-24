@@ -210,6 +210,7 @@ async def test_cache_hit_returns_cached_result() -> None:
         description="A great product",
         image_url="https://example.com/img.jpg",
         price="1990",
+        currency=None,
         source="wildberries",
     )
     redis = MagicMock()
@@ -239,6 +240,7 @@ async def test_cache_stores_result() -> None:
         description=None,
         image_url=None,
         price="500",
+        currency=None,
         source="kaspi",
     )
     redis = MagicMock()
@@ -538,6 +540,7 @@ async def test_fetch_link_preview_uses_cache_on_hit() -> None:
         description=None,
         image_url=None,
         price=None,
+        currency=None,
         source="wildberries",
     )
     redis = MagicMock()

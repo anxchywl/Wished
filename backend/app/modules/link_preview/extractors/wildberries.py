@@ -121,10 +121,11 @@ class WildberriesExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
         match = re.search(r"/catalog/(\d+)/", url)
         if not match:
-            return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, source="wildberries")
+            return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="wildberries")
 
         article_id = int(match.group(1))
         image_url = _wb_image_url(article_id)
+        currency = "KZT" if "wildberries.kz" in hostname else "RUB"
 
         cdn_data, api_data, cdn_price = await asyncio.gather(
             _fetch_wb_cdn_card(article_id, client),
@@ -143,6 +144,7 @@ class WildberriesExtractor:
                 description=description,
                 image_url=image_url,
                 price=price,
+                currency=currency if price else None,
                 source="wildberries",
             )
 
@@ -151,14 +153,16 @@ class WildberriesExtractor:
             resp = await client.get(url)
             resp.raise_for_status()
             data = WildberriesParser().parse(resp.text, url, hostname)
+            html_price = str(data.price) if data.price is not None else price
             return LinkPreviewResponse(
                 title=data.title,
                 description=data.description,
                 image_url=data.image_url or image_url,
-                price=str(data.price) if data.price is not None else price,
+                price=html_price,
+                currency=currency if html_price else None,
                 source="wildberries",
             )
         except Exception as exc:
             logger.debug("WB page fetch failed for %s: %s", url, exc)
 
-        return LinkPreviewResponse(title=None, description=description, image_url=image_url, price=price, source="wildberries")
+        return LinkPreviewResponse(title=None, description=description, image_url=image_url, price=price, currency=currency if price else None, source="wildberries")
