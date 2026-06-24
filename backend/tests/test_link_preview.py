@@ -352,10 +352,15 @@ async def test_generic_extractor_returns_empty_on_fetch_failure() -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_wildberries_extractor_uses_card_api() -> None:
+async def test_wildberries_extractor_uses_cdn_and_card_api() -> None:
     from app.modules.link_preview.extractors.wildberries import WildberriesExtractor
 
-    api_response = {
+    cdn_response = {
+        "imt_name": "Air Max 90",
+        "description": "Great shoe",
+        "selling": {"brand_name": "Nike"},
+    }
+    card_api_response = {
         "data": {
             "products": [{
                 "brand": "Nike",
@@ -365,12 +370,19 @@ async def test_wildberries_extractor_uses_card_api() -> None:
         }
     }
 
-    mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json = MagicMock(return_value=api_response)
+    async def mock_get(url, **kwargs):
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        if "wbbasket.ru" in url and "card.json" in url:
+            resp.json = MagicMock(return_value=cdn_response)
+        elif "card.wb.ru" in url:
+            resp.json = MagicMock(return_value=card_api_response)
+        else:
+            resp.json = MagicMock(return_value={})
+        return resp
 
     mock_client = MagicMock()
-    mock_client.get = AsyncMock(return_value=mock_response)
+    mock_client.get = AsyncMock(side_effect=mock_get)
 
     extractor = WildberriesExtractor()
     result = await extractor.extract(
@@ -380,12 +392,13 @@ async def test_wildberries_extractor_uses_card_api() -> None:
     )
 
     assert result.title == "Nike Air Max 90"
+    assert result.description == "Great shoe"
     assert result.price == "5990"
     assert result.source == "wildberries"
 
 
 @pytest.mark.asyncio
-async def test_wildberries_extractor_falls_back_to_html_on_api_failure() -> None:
+async def test_wildberries_extractor_falls_back_to_html_when_cdn_fails() -> None:
     from app.modules.link_preview.extractors.wildberries import WildberriesExtractor
     import httpx
 
@@ -397,13 +410,9 @@ async def test_wildberries_extractor_falls_back_to_html_on_api_failure() -> None
     </head><body></body></html>
     """
 
-    call_count = 0
-
     async def mock_get(url, **kwargs):
-        nonlocal call_count
-        call_count += 1
-        if "card.wb.ru" in url:
-            raise httpx.ConnectError("API down")
+        if "wbbasket.ru" in url or "card.wb.ru" in url:
+            raise httpx.ConnectError("down")
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
         resp.text = html

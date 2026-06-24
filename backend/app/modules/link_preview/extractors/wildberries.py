@@ -1,8 +1,9 @@
 """Wildberries product metadata extractor
 
 Strategy:
-1. Wildberries public card API (works from datacenter IPs, returns title + price)
-2. Fetch page HTML and parse with WildberriesParser
+1. WB CDN card.json  — public, globally accessible, has title + brand + description
+2. WB card API       — has price; geo-blocked on non-RU IPs (returns 404)
+3. Page HTML fallback
 """
 
 import logging
@@ -16,32 +17,56 @@ from app.modules.marketplace.parsers import WildberriesParser
 
 logger = logging.getLogger(__name__)
 
-_WB_CARD_API_TIMEOUT = 8.0
+_WB_CDN_TIMEOUT = 6.0
+_WB_CARD_API_TIMEOUT = 5.0
+
+
+def _wb_basket(article_id: int) -> str:
+    vol = article_id // 100000
+    thresholds = [
+        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601,
+        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269,
+    ]
+    return next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "20")
 
 
 def _wb_image_url(article_id: int) -> str:
     vol = article_id // 100000
     part = article_id // 1000
-    thresholds = [
-        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601,
-        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269,
-    ]
-    basket = next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "20")
+    basket = _wb_basket(article_id)
     return f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/images/big/1.webp"
 
 
+async def _fetch_wb_cdn_card(article_id: int, client: httpx.AsyncClient) -> dict | None:
+    """fetch product info from WB's public CDN JSON — works from any IP"""
+    vol = article_id // 100000
+    part = article_id // 1000
+    basket = _wb_basket(article_id)
+    url = f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/info/ru/card.json"
+    try:
+        resp = await client.get(url, timeout=_WB_CDN_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+
+        brand = (data.get("selling", {}).get("brand_name") or "").strip()
+        name = (data.get("imt_name") or "").strip()
+        title = f"{brand} {name}".strip() if brand and name else (brand or name or None)
+        description = (data.get("description") or "").strip() or None
+
+        return {"title": title, "description": description}
+    except Exception as exc:
+        logger.debug("WB CDN card.json failed for %s: %s", article_id, exc)
+        return None
+
+
 async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict | None:
+    """fetch price from WB card API — geo-blocked on non-RU IPs"""
     try:
         api_url = (
             f"https://card.wb.ru/cards/v2/detail"
             f"?appType=1&curr=rub&dest=-1257786&nm={article_id}"
         )
         headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
             "Referer": "https://www.wildberries.ru/",
             "Origin": "https://www.wildberries.ru",
             "Accept": "application/json, text/plain, */*",
@@ -55,10 +80,6 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
             return None
 
         product = products[0]
-        brand = (product.get("brand") or "").strip()
-        name = (product.get("name") or "").strip()
-        title = f"{brand} {name}".strip() if brand and name else (brand or name or None)
-
         price: str | None = None
         sale_price_u = product.get("salePriceU") or product.get("priceU")
         if sale_price_u:
@@ -67,11 +88,7 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
             except (InvalidOperation, TypeError):
                 pass
 
-        return {
-            "title": title,
-            "price": price,
-            "image_url": _wb_image_url(article_id),
-        }
+        return {"price": price}
     except Exception as exc:
         logger.debug("WB card API failed for article %s: %s", article_id, exc)
         return None
@@ -80,48 +97,40 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
 class WildberriesExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
         match = re.search(r"/catalog/(\d+)/", url)
-        if match:
-            article_id = int(match.group(1))
-            api_data = await _fetch_wb_card_api(article_id, client)
-            if api_data and api_data.get("title"):
-                return LinkPreviewResponse(
-                    title=api_data["title"],
-                    description=None,
-                    image_url=api_data.get("image_url"),
-                    price=api_data.get("price"),
-                    source="wildberries",
-                )
-            # api returned image url even if title missing
-            if api_data and api_data.get("image_url"):
-                image_url = api_data["image_url"]
-            elif match:
-                image_url = _wb_image_url(article_id)
-            else:
-                image_url = None
-        else:
-            image_url = None
+        if not match:
+            return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, source="wildberries")
 
-        # fallback: fetch page and parse HTML
+        article_id = int(match.group(1))
+        image_url = _wb_image_url(article_id)
+
+        cdn_data, api_data = await _fetch_wb_cdn_card(article_id, client), await _fetch_wb_card_api(article_id, client)
+
+        title = (cdn_data or {}).get("title")
+        description = (cdn_data or {}).get("description")
+        price = (api_data or {}).get("price")
+
+        if title:
+            return LinkPreviewResponse(
+                title=title,
+                description=description,
+                image_url=image_url,
+                price=price,
+                source="wildberries",
+            )
+
+        # fallback: fetch page HTML
         try:
             resp = await client.get(url)
             resp.raise_for_status()
-            html = resp.text
-            parser = WildberriesParser()
-            data = parser.parse(html, url, hostname)
+            data = WildberriesParser().parse(resp.text, url, hostname)
             return LinkPreviewResponse(
                 title=data.title,
                 description=data.description,
                 image_url=data.image_url or image_url,
-                price=str(data.price) if data.price is not None else None,
+                price=str(data.price) if data.price is not None else price,
                 source="wildberries",
             )
         except Exception as exc:
             logger.debug("WB page fetch failed for %s: %s", url, exc)
 
-        return LinkPreviewResponse(
-            title=None,
-            description=None,
-            image_url=image_url,
-            price=None,
-            source="wildberries",
-        )
+        return LinkPreviewResponse(title=None, description=description, image_url=image_url, price=price, source="wildberries")
