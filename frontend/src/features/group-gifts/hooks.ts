@@ -100,14 +100,24 @@ export function useJoinGroupGiftMutation(wishId: string, groupGiftId: string) {
         groupGiftQueryKeys.gift(wishId),
         (current) => {
           if (!current) return current;
+          const nextCollected = current.collection_type === "commit"
+            ? String(Number(current.collected_amount) + Number(result.amount))
+            : current.collected_amount;
+          const nextPercent = current.collection_type === "commit" && current.total_amount
+            ? Math.min(100, Math.trunc((Number(nextCollected) / Number(current.total_amount)) * 100))
+            : current.percent_complete;
           return {
             ...current,
+            collected_amount: nextCollected,
+            percent_complete: nextPercent,
             is_contributor: true,
             my_contribution: result,
             contributor_count: current.contributor_count + 1,
           };
         },
       );
+      queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
     },
   });
 }
@@ -150,6 +160,7 @@ export function useLeaveGroupGiftMutation(wishId: string, contributionId: string
         },
       );
       queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
     },
   });
 }

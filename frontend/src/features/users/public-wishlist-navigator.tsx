@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
-import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
+import { ViewGroupGiftContent } from "@/features/group-gifts/view-group-gift-sheet";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
@@ -38,7 +38,7 @@ type PublicWishlistNavigatorProps = {
   onClose: () => void;
 };
 
-type NavigationView = "user" | "wishlist" | "wish" | "copy" | "createGroupGift";
+type NavigationView = "user" | "wishlist" | "wish" | "copy" | "createGroupGift" | "viewGroupGift";
 type NavigationFrame = {
   view: NavigationView;
   wishlistId?: string;
@@ -153,6 +153,12 @@ export function PublicWishlistNavigator({
     setStack((currentStack) => [...currentStack, { view: "createGroupGift", wishlistId, wishId }]);
   }
 
+  function handleViewGroupGiftOpen(wishlistId: string, wishId: string) {
+    setDirection("forward");
+    setPreviousFrame(current);
+    setStack((currentStack) => [...currentStack, { view: "viewGroupGift", wishlistId, wishId }]);
+  }
+
   function renderFrame(frame: NavigationFrame) {
     if (frame.view === "user") {
       return (
@@ -178,6 +184,7 @@ export function PublicWishlistNavigator({
           wishId={frame.wishId}
           shareToken={shareToken}
           onOpenCreateGroupGift={handleCreateGroupGiftOpen}
+          onOpenViewGroupGift={handleViewGroupGiftOpen}
         />
       );
     }
@@ -190,6 +197,16 @@ export function PublicWishlistNavigator({
       return (
         <PublicCreateGroupGiftView
           wishId={frame.wishId}
+          onDone={handleBack}
+        />
+      );
+    }
+
+    if (frame.view === "viewGroupGift" && frame.wishlistId && frame.wishId) {
+      return (
+        <PublicViewGroupGiftView
+          wishId={frame.wishId}
+          shareToken={shareToken}
           onDone={handleBack}
         />
       );
@@ -229,6 +246,8 @@ export function PublicWishlistNavigator({
               ? (current.wishTitle ?? t("wishes"))
               : current.view === "createGroupGift"
               ? t("createGroupGift")
+              : current.view === "viewGroupGift"
+              ? t("groupGift")
               : t("copyToMyWishlist")}
           </h2>
           <span className="w-10" />
@@ -615,12 +634,19 @@ type PublicWishViewProps = {
   wishId: string;
   shareToken?: string | null;
   onOpenCreateGroupGift: (wishlistId: string, wishId: string) => void;
+  onOpenViewGroupGift: (wishlistId: string, wishId: string) => void;
 };
 
 /**
  * show public wish
  */
-function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift }: PublicWishViewProps) {
+function PublicWishView({
+  wishlistId,
+  wishId,
+  shareToken,
+  onOpenCreateGroupGift,
+  onOpenViewGroupGift,
+}: PublicWishViewProps) {
   const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
   const wish = useMemo(
     () => wishesQuery.data?.items.find((item) => item.id === wishId) ?? null,
@@ -635,7 +661,6 @@ function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift 
   const isCompleted = wish?.status === "completed";
   const hasActiveGroupGift =
     wish?.group_gift?.status === "active" || status?.has_active_group_gift === true;
-  const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
 
   function handleBook() {
     if (!isReserved && !isCompleted) {
@@ -686,7 +711,7 @@ function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift 
               <button
                 type="button"
                 className="public-action-button public-action-primary"
-                onClick={() => setViewGroupGiftSheetOpen(true)}
+                onClick={() => onOpenViewGroupGift(wishlistId, wishId)}
               >
                 {t("joinGiftButton")}
               </button>
@@ -718,7 +743,7 @@ function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift 
             <button
               type="button"
               className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
-              onClick={() => setViewGroupGiftSheetOpen(true)}
+              onClick={() => onOpenViewGroupGift(wishlistId, wishId)}
             >
               <div className="flex justify-between items-center text-xs text-muted">
                 <span>{t("groupGift")}</span>
@@ -776,20 +801,18 @@ function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift 
       )}
 
       {wish.description ? (
-        <section className="flex flex-col items-center px-4 mt-2">
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
+        <section className="px-4 mt-2">
+          <div className="rounded-xl border border-border bg-muted/5 px-3 py-2.5 text-left">
+            <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-muted mb-1.5">
+              {t("descriptionLabel")}
+            </h4>
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80">
             {wish.description}
-          </p>
+            </p>
+          </div>
         </section>
       ) : null}
 
-      {viewGroupGiftSheetOpen && (
-        <ViewGroupGiftSheet
-          wishId={wishId}
-          shareToken={shareToken}
-          onClose={() => setViewGroupGiftSheetOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -806,6 +829,25 @@ function PublicCreateGroupGiftView({ wishId, onDone }: PublicCreateGroupGiftView
         wishId={wishId}
         showTitle={false}
         onCancel={onDone}
+        onClose={onDone}
+      />
+    </div>
+  );
+}
+
+type PublicViewGroupGiftViewProps = {
+  wishId: string;
+  shareToken?: string | null;
+  onDone: () => void;
+};
+
+function PublicViewGroupGiftView({ wishId, shareToken, onDone }: PublicViewGroupGiftViewProps) {
+  return (
+    <div className="public-nav-content px-4">
+      <ViewGroupGiftContent
+        wishId={wishId}
+        shareToken={shareToken}
+        showTitle={false}
         onClose={onDone}
       />
     </div>

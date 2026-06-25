@@ -21,9 +21,37 @@ type Props = {
   onClose: () => void;
 };
 
+type ContentProps = Props & {
+  showTitle?: boolean;
+};
+
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
-  const { t } = useTranslation();
   const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setActive(true));
+  }, []);
+
+  function handleClose() {
+    setActive(false);
+    window.setTimeout(onClose, 340);
+  }
+
+  return (
+    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
+      <div
+        className={`modal-sheet ${active ? "visible" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-handle" />
+        <ViewGroupGiftContent wishId={wishId} shareToken={shareToken} onClose={handleClose} />
+      </div>
+    </div>
+  );
+}
+
+export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true }: ContentProps) {
+  const { t } = useTranslation();
 
   const giftQuery = useGroupGiftQuery(wishId, shareToken);
   const gift = giftQuery.data ?? null;
@@ -50,10 +78,6 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [percentOpacity, setPercentOpacity] = useState(1);
 
   useEffect(() => {
-    requestAnimationFrame(() => setActive(true));
-  }, []);
-
-  useEffect(() => {
     if (!gift) return;
     if (gift.percent_complete !== prevPercent.current) {
       setPercentOpacity(0);
@@ -71,11 +95,6 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
     setPaymentPhoneError("");
   }, [editingPayment, gift]);
 
-  function handleClose() {
-    setActive(false);
-    window.setTimeout(onClose, 340);
-  }
-
   function handleCopyPhone() {
     if (!gift?.payment_phone) return;
     navigator.clipboard.writeText(gift.payment_phone).then(() => {
@@ -89,7 +108,7 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
       setCancelConfirming(true);
       return;
     }
-    cancelMutation.mutate(undefined, { onSuccess: () => handleClose() });
+    cancelMutation.mutate(undefined, { onSuccess: () => onClose() });
   }
 
   function handleSavePaymentDetails() {
@@ -143,13 +162,10 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   }
 
   return (
-    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
-      <div
-        className={`modal-sheet ${active ? "visible" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-handle" />
+    <>
+      {showTitle ? (
         <h3 className="modal-title font-bold text-base mb-4 text-center">{t("groupGift")}</h3>
+      ) : null}
 
         {giftQuery.isPending ? (
           <div className="flex items-center justify-center py-8">
@@ -159,23 +175,14 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
           <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
         ) : (
           <div className="flex flex-col gap-4">
-            {/* collection type badge */}
-            <div className="flex justify-center">
-              <span className="text-xs font-semibold text-muted bg-muted/10 px-3 py-1 rounded-full">
-                {gift.collection_type === "immediate"
-                  ? t("collectionTypeImmediate")
-                  : t("collectionTypeCommit")}
-              </span>
-            </div>
-
             {/* progress section */}
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between text-sm">
+            <div className="flex flex-col gap-2.5">
+              <div className="flex justify-between text-sm leading-tight">
                 <span className="text-muted">{t("collected")}</span>
                 <span className="font-semibold text-foreground">{gift.collected_amount}</span>
               </div>
               {gift.total_amount ? (
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-sm leading-tight">
                   <span className="text-muted">{t("target")}</span>
                   <span className="font-semibold text-foreground">{gift.total_amount}</span>
                 </div>
@@ -188,7 +195,7 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
                 />
               </div>
 
-              <div className="flex justify-between items-center text-xs">
+              <div className="flex flex-col gap-1 text-xs">
                 <span
                   className="text-muted transition-opacity duration-300"
                   style={{ opacity: percentOpacity }}
@@ -209,23 +216,38 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </>
   );
 
   function renderPaymentDetails() {
     if (!gift) return null;
     return (
-      <div className="flex flex-col gap-2 bg-muted/5 rounded-2xl p-4 border border-border">
-        <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">
-          {t("organizerRequisites")}
-        </p>
+      <div className="flex flex-col gap-1.5 bg-muted/5 rounded-xl p-3 border border-border">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+            {t("organizerRequisites")}
+          </p>
+          {gift.is_organizer ? (
+            <button
+              type="button"
+              className="w-7 h-7 inline-flex items-center justify-center text-primary"
+              onClick={() => setEditingPayment(true)}
+              aria-label={t("editPaymentDetails")}
+              title={t("editPaymentDetails")}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.875 4.5" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
         {gift.payment_method ? (
-          <p className="text-sm text-foreground">{gift.payment_method}</p>
+          <p className="text-sm leading-tight text-foreground">{gift.payment_method}</p>
         ) : null}
         {gift.payment_phone ? (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-foreground">{gift.payment_phone}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm leading-tight font-semibold text-foreground">{gift.payment_phone}</p>
             <button
               type="button"
               className="text-xs font-semibold text-primary shrink-0"
@@ -236,7 +258,7 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
           </div>
         ) : null}
         {gift.payment_comment ? (
-          <p className="text-xs text-muted mt-1">{gift.payment_comment}</p>
+          <p className="text-xs leading-snug text-muted">{gift.payment_comment}</p>
         ) : null}
       </div>
     );
@@ -340,16 +362,6 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
       return (
         <div className="flex flex-col gap-3">
           {editingPayment ? renderPaymentDetailsForm() : renderPaymentDetails()}
-
-          {!editingPayment ? (
-            <button
-              type="button"
-              className="w-full h-11 rounded-xl bg-muted/10 text-foreground text-sm font-medium"
-              onClick={() => setEditingPayment(true)}
-            >
-              {t("editPaymentDetails")}
-            </button>
-          ) : null}
 
           {purchaseConfirming ? (
             <div className="flex flex-col gap-2">

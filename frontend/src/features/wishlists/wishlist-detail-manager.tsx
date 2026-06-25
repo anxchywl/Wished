@@ -79,7 +79,7 @@ import {
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
-import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
+import { ViewGroupGiftContent } from "@/features/group-gifts/view-group-gift-sheet";
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
@@ -791,11 +791,14 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {createGroupGiftOpen ? (
+          {createGroupGiftOpen || viewGroupGiftSheetOpen ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
-              onClick={() => setCreateGroupGiftOpen(false)}
+              onClick={() => {
+                setCreateGroupGiftOpen(false);
+                setViewGroupGiftSheetOpen(false);
+              }}
               aria-label={t("back")}
             >
               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -832,9 +835,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             <span className="w-10" />
           )}
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
-            {createGroupGiftOpen ? t("createGroupGift") : wish.title}
+            {createGroupGiftOpen
+              ? t("createGroupGift")
+              : viewGroupGiftSheetOpen
+              ? t("groupGift")
+              : wish.title}
           </h3>
-          {createGroupGiftOpen ? (
+          {createGroupGiftOpen || viewGroupGiftSheetOpen ? (
             <span className="w-10" />
           ) : isOwner && !removeBookingConfirming ? (
             <button
@@ -859,6 +866,14 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               showTitle={false}
               onCancel={() => setCreateGroupGiftOpen(false)}
               onClose={() => setCreateGroupGiftOpen(false)}
+            />
+          </div>
+        ) : viewGroupGiftSheetOpen ? (
+          <div className="modal-footer-transition opacity-100 max-h-[760px] scale-100">
+            <ViewGroupGiftContent
+              wishId={wish.id}
+              showTitle={false}
+              onClose={() => setViewGroupGiftSheetOpen(false)}
             />
           </div>
         ) : (
@@ -1047,11 +1062,14 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {wish.description ? (
-            <div className="w-full">
-              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
+            <section className="w-full rounded-xl border border-border bg-muted/5 px-3 py-2.5 text-left">
+              <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-muted mb-1.5">
+                {t("descriptionLabel")}
+              </h4>
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80">
                 {wish.description}
               </p>
-            </div>
+            </section>
           ) : null}
         </div>
         </div>
@@ -1071,12 +1089,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         }}
         isPending={copyWish.isPending}
       />
-      {viewGroupGiftSheetOpen && (
-        <ViewGroupGiftSheet
-          wishId={wish.id}
-          onClose={() => setViewGroupGiftSheetOpen(false)}
-        />
-      )}
     </div>
   );
 }
