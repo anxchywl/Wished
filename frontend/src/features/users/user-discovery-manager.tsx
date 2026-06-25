@@ -165,7 +165,7 @@ export function UserDiscoveryManager() {
           </div>
         ) : followedUsers.length > 0 ? (
           <>
-          <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start">
+          <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
             <div className="px-4 py-3 border-b border-border">
               <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
             </div>
