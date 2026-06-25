@@ -31,6 +31,70 @@ _WB_HOSTS = frozenset({
 })
 _OZON_HOSTS = frozenset({"ozon.ru", "www.ozon.ru", "ozon.kz", "www.ozon.kz"})
 _KASPI_HOSTS = frozenset({"kaspi.kz", "www.kaspi.kz", "l.kaspi.kz"})
+_AMAZON_HOSTS = frozenset({
+    "amazon.com", "www.amazon.com",
+    "amazon.co.uk", "www.amazon.co.uk",
+    "amazon.de", "www.amazon.de",
+    "amazon.fr", "www.amazon.fr",
+    "amazon.co.jp", "www.amazon.co.jp",
+    "amazon.ca", "www.amazon.ca",
+    "amazon.in", "www.amazon.in",
+    "amazon.com.au", "www.amazon.com.au",
+    "amazon.com.br", "www.amazon.com.br",
+    "amazon.com.mx", "www.amazon.com.mx",
+    "amazon.es", "www.amazon.es",
+    "amazon.it", "www.amazon.it",
+    "amazon.nl", "www.amazon.nl",
+    "amazon.se", "www.amazon.se",
+    "amazon.pl", "www.amazon.pl",
+    "amazon.sg", "www.amazon.sg",
+    "amazon.ae", "www.amazon.ae",
+    "amazon.sa", "www.amazon.sa",
+    # short-link domains that redirect to amazon.com product pages
+    "a.co", "amzn.to", "amzn.eu",
+})
+_TEMU_HOSTS = frozenset({
+    "temu.com", "www.temu.com",
+    "share.temu.com",
+})
+_EBAY_HOSTS = frozenset({
+    "ebay.com", "www.ebay.com",
+    "ebay.co.uk", "www.ebay.co.uk",
+    "ebay.de", "www.ebay.de",
+    "ebay.fr", "www.ebay.fr",
+    "ebay.it", "www.ebay.it",
+    "ebay.es", "www.ebay.es",
+    "ebay.com.au", "www.ebay.com.au",
+    "ebay.ca", "www.ebay.ca",
+    "ebay.at", "www.ebay.at",
+    "ebay.be", "www.ebay.be",
+    "ebay.nl", "www.ebay.nl",
+    "ebay.pl", "www.ebay.pl",
+    "ebay.ie", "www.ebay.ie",
+    "ebay.ch", "www.ebay.ch",
+    "ebay.in", "www.ebay.in",
+    "ebay.sg", "www.ebay.sg",
+    "ebay.ph", "www.ebay.ph",
+    "ebay.com.my", "www.ebay.com.my",
+    "ebay.com.hk", "www.ebay.com.hk",
+})
+_ALIBABA_HOSTS = frozenset({
+    "alibaba.com", "www.alibaba.com",
+    "aliexpress.com", "www.aliexpress.com",
+    "aliexpress.ru", "www.aliexpress.ru",
+    "ru.aliexpress.com",
+})
+_OLX_HOSTS = frozenset({
+    "olx.kz", "www.olx.kz",
+    "olx.ru", "www.olx.ru",
+    "olx.ua", "www.olx.ua",
+    "olx.uz", "www.olx.uz",
+    "olx.pl", "www.olx.pl",
+    "olx.ro", "www.olx.ro",
+    "olx.bg", "www.olx.bg",
+    "olx.pt", "www.olx.pt",
+    "olx.in", "www.olx.in",
+})
 
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -150,6 +214,21 @@ def _choose_extractor(hostname: str):
     if hostname in _KASPI_HOSTS:
         from app.modules.link_preview.extractors.kaspi import KaspiExtractor
         return KaspiExtractor()
+    if hostname in _AMAZON_HOSTS:
+        from app.modules.link_preview.extractors.amazon import AmazonExtractor
+        return AmazonExtractor()
+    if hostname in _TEMU_HOSTS:
+        from app.modules.link_preview.extractors.temu import TemuExtractor
+        return TemuExtractor()
+    if hostname in _EBAY_HOSTS:
+        from app.modules.link_preview.extractors.ebay import EbayExtractor
+        return EbayExtractor()
+    if hostname in _ALIBABA_HOSTS:
+        from app.modules.link_preview.extractors.alibaba import AlibabaExtractor
+        return AlibabaExtractor()
+    if hostname in _OLX_HOSTS:
+        from app.modules.link_preview.extractors.olx import OlxExtractor
+        return OlxExtractor()
     from app.modules.link_preview.extractors.generic import GenericExtractor
     return GenericExtractor()
 
@@ -225,7 +304,7 @@ async def fetch_link_preview(
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
     }
 
-    _PROXY_HOSTS = _KASPI_HOSTS | _OZON_HOSTS
+    _PROXY_HOSTS = _KASPI_HOSTS | _OZON_HOSTS | _AMAZON_HOSTS | _EBAY_HOSTS | _ALIBABA_HOSTS
     proxy = settings.marketplace_proxy_url if hostname in _PROXY_HOSTS and settings.marketplace_proxy_url else None
 
     async with httpx.AsyncClient(

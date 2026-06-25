@@ -278,8 +278,10 @@ def test_choose_extractor_kaspi() -> None:
 
 def test_choose_extractor_generic_for_unknown_host() -> None:
     from app.modules.link_preview.service import _choose_extractor
+    from app.modules.link_preview.extractors.amazon import AmazonExtractor
     from app.modules.link_preview.extractors.generic import GenericExtractor
-    assert isinstance(_choose_extractor("amazon.com"), GenericExtractor)
+    assert isinstance(_choose_extractor("amazon.com"), AmazonExtractor)
+    assert isinstance(_choose_extractor("www.amazon.com"), AmazonExtractor)
     assert isinstance(_choose_extractor("somestore.kz"), GenericExtractor)
 
 
