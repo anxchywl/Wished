@@ -251,7 +251,7 @@ function BookedWishesPanel({
 
   return (
     <>
-      <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start">
+      <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
         <div className="px-4 py-3 border-b border-border">
           <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
@@ -289,7 +289,8 @@ function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
   return (
     <button
       type="button"
-      className={`flex items-center gap-3 px-4 py-3 text-left w-full ${isDeleted ? "opacity-50" : ""}`}
+      className={`flex items-center gap-3 px-4 text-left w-full min-h-14 ${isDeleted ? "opacity-50" : ""}`}
+      style={{ paddingTop: 10, paddingBottom: 10 }}
       onClick={onOpen}
     >
       <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
