@@ -260,7 +260,7 @@ export function WishlistManager() {
                 <div className="h-px bg-border/60" />
                 <button
                   onClick={() => setModalOpen(true)}
-                  className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-semibold text-sm cursor-pointer"
+                  className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"
                 >
                   <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

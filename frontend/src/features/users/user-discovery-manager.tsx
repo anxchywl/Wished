@@ -212,7 +212,7 @@ export function UserDiscoveryManager() {
           <>
           <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
             <div className="px-4 py-3 border-b border-border/60">
-              <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
+              <h3 className="text-sm font-extrabold text-foreground">{t("friends")}</h3>
             </div>
             <div className="discover-following">
               {followedUsers.map((user, index) => (
@@ -234,7 +234,7 @@ export function UserDiscoveryManager() {
             <div className="h-px bg-border/60" />
             <button
               type="button"
-              className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-semibold text-sm cursor-pointer"
+              className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"
               onClick={openTelegramFriendPicker}
             >
               <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -301,7 +301,7 @@ function BookedWishesPanel({
     <>
       <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
         <div className="px-4 py-3 border-b border-border/60">
-          <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
+          <h3 className="text-sm font-extrabold text-foreground">{t("bookedWishes")}</h3>
         </div>
         <div className="flex flex-col">
           {items.map((item, index) => (

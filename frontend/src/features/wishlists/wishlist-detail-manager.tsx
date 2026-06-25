@@ -426,7 +426,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         {!wishesQuery.isError ? (
           <div className="panel flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-border/60 pb-3 mb-1">
-              <h2 className="text-base font-bold text-foreground">{t("wishes") ?? "Wishes"}</h2>
+              <h2 className="text-base font-extrabold text-foreground">{t("wishes") ?? "Wishes"}</h2>
               {isOwner && wishes.length > 0 && (
                 <button
                   onClick={() => setWishModalOpen(true)}

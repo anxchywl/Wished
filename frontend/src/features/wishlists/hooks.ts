@@ -20,6 +20,7 @@ import type {
   WishlistReorderInput,
   WishlistUpdateInput,
 } from "@/features/wishlists/types";
+import { userQueryKeys } from "@/features/users/hooks";
 import { useAuthStore, useSyncTgUserId } from "@/stores/auth-store";
 
 /**
@@ -112,9 +113,27 @@ export function useUpdateWishlistMutation() {
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: WishlistUpdateInput }) =>
       updateWishlist(accessToken ?? "", id, input),
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
       queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.detail(variables.id) });
+      queryClient.setQueriesData<WishlistListResponse>({ queryKey: ["wishlists", "user"] }, (current) => {
+        if (!current) return current;
+        const withoutUpdated = current.items.filter((item) => item.id !== data.id);
+        if (data.visibility !== "public") return { items: withoutUpdated };
+        const hasSameOwner = current.items.some((item) => item.owner_user_id === data.owner_user_id);
+        if (!hasSameOwner) return current;
+        return { items: [...withoutUpdated, data].sort((a, b) => a.position - b.position) };
+      });
+      queryClient.setQueriesData<WishlistListResponse>({ queryKey: userQueryKeys.all }, (current) => {
+        if (!current || !Array.isArray(current.items)) return current;
+        const withoutUpdated = current.items.filter((item) => item.id !== data.id);
+        if (data.visibility !== "public") return { items: withoutUpdated };
+        const hasSameOwner = current.items.some((item) => item.owner_user_id === data.owner_user_id);
+        if (!hasSameOwner) return current;
+        return { items: [...withoutUpdated, data].sort((a, b) => a.position - b.position) };
+      });
+      queryClient.invalidateQueries({ queryKey: ["wishlists", "user"] });
+      queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
     },
   });
 }
