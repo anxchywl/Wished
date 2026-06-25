@@ -707,6 +707,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
   const [groupGiftActionMode, setGroupGiftActionMode] = useState("overview");
   const [groupGiftResetTrigger, setGroupGiftResetTrigger] = useState(0);
+  const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
@@ -726,6 +727,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       setCreateGroupGiftOpen(false);
       setViewGroupGiftSheetOpen(false);
       setGroupGiftActionMode("overview");
+      setGroupGiftFocusMode(false);
     }
   }, [open]);
 
@@ -789,7 +791,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       onClick={handleClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
@@ -880,6 +882,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               showTitle={false}
               onCancel={() => setCreateGroupGiftOpen(false)}
               onClose={() => setCreateGroupGiftOpen(false)}
+              onFocusModeChange={setGroupGiftFocusMode}
             />
           </div>
         ) : viewGroupGiftSheetOpen ? (
@@ -889,6 +892,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               showTitle={false}
               onClose={() => setViewGroupGiftSheetOpen(false)}
               onActionModeChange={setGroupGiftActionMode}
+              onFocusModeChange={setGroupGiftFocusMode}
               resetTrigger={groupGiftResetTrigger}
             />
           </div>

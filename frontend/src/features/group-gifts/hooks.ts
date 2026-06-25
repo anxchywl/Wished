@@ -30,8 +30,8 @@ export function useGroupGiftQuery(wishId: string, shareToken?: string | null) {
     queryKey,
     queryFn: () => getGroupGift(accessToken, wishId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
-    staleTime: 30_000,
-    refetchInterval: 30_000,
+    staleTime: 5_000,
+    refetchInterval: 5_000,
   });
 }
 

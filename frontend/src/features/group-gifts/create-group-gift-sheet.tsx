@@ -7,6 +7,7 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useCreateGroupGiftMutation } from "@/features/group-gifts/hooks";
 import type { GroupGiftCreatePayload } from "@/features/group-gifts/api";
 import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
+import { useModalFocusMode } from "@/features/wishlists/use-modal-focus-mode";
 
 type Props = {
   wishId: string;
@@ -19,6 +20,7 @@ type CreateGroupGiftContentProps = {
   onClose: () => void;
   onCancel?: () => void;
   showTitle?: boolean;
+  onFocusModeChange?: (isFocus: boolean) => void;
 };
 
 const ERROR_MAP: Record<string, string> = {
@@ -56,8 +58,10 @@ export function CreateGroupGiftContent({
   onClose,
   onCancel,
   showTitle = true,
+  onFocusModeChange,
 }: CreateGroupGiftContentProps) {
   const { t } = useTranslation();
+  const focusMode = useModalFocusMode();
   const [step, setStep] = useState<1 | 2>(1);
   const [collectionType, setCollectionType] = useState<"immediate" | "commit" | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -67,6 +71,11 @@ export function CreateGroupGiftContent({
   const [submitError, setSubmitError] = useState("");
 
   const createMutation = useCreateGroupGiftMutation(wishId);
+
+  useEffect(() => {
+    onFocusModeChange?.(focusMode.isFocusMode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMode.isFocusMode]);
 
   function handlePhoneBlur() {
     if (paymentPhone && !validatePhoneOrCredentials(paymentPhone)) {
@@ -168,7 +177,7 @@ export function CreateGroupGiftContent({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
+            <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("method")}`}>
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
                 {t("paymentMethodLabel")}
               </label>
@@ -179,11 +188,13 @@ export function CreateGroupGiftContent({
                 placeholder={t("paymentMethodPlaceholder")}
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
+                onBlur={focusMode.onFieldBlur}
                 required
+                {...focusMode.fieldFocusProps("method")}
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("phone")}`}>
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
                 {isPhoneMode(paymentPhone) ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
               </label>
@@ -199,18 +210,18 @@ export function CreateGroupGiftContent({
                   setPaymentPhone(isPhoneMode(paymentPhone) || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
                   setPhoneError("");
                 }}
-                onBlur={handlePhoneBlur}
+                onBlur={() => { handlePhoneBlur(); focusMode.onFieldBlur(); }}
                 required
+                {...focusMode.fieldFocusProps("phone")}
               />
               {phoneError ? (
                 <p className="text-xs text-destructive">{phoneError}</p>
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("comment")}`}>
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-                {t("paymentCommentLabel")}{" "}
-                <span className="normal-case font-normal">{t("paymentCommentOptional")}</span>
+                {t("paymentCommentLabel")}
               </label>
               <textarea
                 className="min-h-16 max-h-24 rounded-xl border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
@@ -218,6 +229,8 @@ export function CreateGroupGiftContent({
                 placeholder={t("paymentCommentPlaceholder")}
                 value={paymentComment}
                 onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
+                onBlur={focusMode.onFieldBlur}
+                {...focusMode.fieldFocusProps("comment")}
               />
             </div>
 
@@ -225,25 +238,35 @@ export function CreateGroupGiftContent({
               <p className="text-xs text-destructive">{submitError}</p>
             ) : null}
 
-            <div className="border-t border-border pt-3">
-              <div className="flex gap-2">
+            <div className="modal-focus-footer border-t border-border pt-3">
+              {focusMode.isFocusMode ? (
                 <button
                   type="button"
-                  className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-                  onClick={() => setStep(1)}
-                  disabled={createMutation.isPending}
+                  className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold"
+                  onClick={focusMode.clearFocus}
                 >
-                  {t("back")}
+                  {t("done")}
                 </button>
-                <button
-                  type="button"
-                  className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-                  disabled={createMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
-                  onClick={handleSubmit}
-                >
-                  {createMutation.isPending ? t("creating") : t("createGiftButton")}
-                </button>
-              </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+                    onClick={() => setStep(1)}
+                    disabled={createMutation.isPending}
+                  >
+                    {t("back")}
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+                    disabled={createMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
+                    onClick={handleSubmit}
+                  >
+                    {createMutation.isPending ? t("creating") : t("createGiftButton")}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

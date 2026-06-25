@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
+import { useModalFocusMode } from "@/features/wishlists/use-modal-focus-mode";
 import {
   useGroupGiftQuery,
   useCancelGroupGiftMutation,
@@ -26,6 +27,7 @@ type Props = {
 type ContentProps = Props & {
   showTitle?: boolean;
   onActionModeChange?: (mode: ActionMode) => void;
+  onFocusModeChange?: (isFocus: boolean) => void;
   resetTrigger?: number;
 };
 
@@ -56,8 +58,9 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   );
 }
 
-export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true, onActionModeChange, resetTrigger }: ContentProps) {
+export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true, onActionModeChange, onFocusModeChange, resetTrigger }: ContentProps) {
   const { t } = useTranslation();
+  const focusMode = useModalFocusMode();
 
   const giftQuery = useGroupGiftQuery(wishId, shareToken);
   const gift = giftQuery.data ?? null;
@@ -85,6 +88,11 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     if (resetTrigger) changeActionMode("overview");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetTrigger]);
+
+  useEffect(() => {
+    onFocusModeChange?.(focusMode.isFocusMode);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMode.isFocusMode]);
 
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
@@ -281,7 +289,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     const phoneMode = isPhoneMode(paymentPhone);
     return (
       <div className="flex flex-col gap-2.5">
-        <div className="flex flex-col gap-1.5">
+        <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("method")}`}>
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {t("paymentMethodLabel")}
           </label>
@@ -291,10 +299,12 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             placeholder={t("paymentMethodPlaceholder")}
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
+            onBlur={focusMode.onFieldBlur}
+            {...focusMode.fieldFocusProps("method")}
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("phone")}`}>
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {phoneMode ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
           </label>
@@ -309,21 +319,23 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               if (paymentPhone.trim()) {
                 setPaymentPhoneError(validatePhoneOrCredentials(paymentPhone) ? "" : t("invalidPhoneNumber"));
               }
+              focusMode.onFieldBlur();
             }}
             onChange={(e) => {
               const raw = e.currentTarget.value.replace(/^\s+/, "");
               setPaymentPhone(phoneMode || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
               setPaymentPhoneError("");
             }}
+            {...focusMode.fieldFocusProps("phone")}
           />
           {paymentPhoneError ? (
             <p className="text-xs text-red-500">{paymentPhoneError}</p>
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("comment")}`}>
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-            {t("paymentCommentLabel")} {t("paymentCommentOptional")}
+            {t("paymentCommentLabel")}
           </label>
           <textarea
             className="min-h-16 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -331,31 +343,45 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             placeholder={t("paymentCommentPlaceholder")}
             value={paymentComment}
             onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
+            onBlur={focusMode.onFieldBlur}
+            {...focusMode.fieldFocusProps("comment")}
           />
         </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-            onClick={() => {
-              changeActionMode("overview");
-              setPaymentMethod(gift?.payment_method ?? "");
-              setPaymentPhone(gift?.payment_phone ?? "");
-              setPaymentComment(gift?.payment_comment ?? "");
-              setPaymentPhoneError("");
-            }}
-          >
-            {t("cancelButton")}
-          </button>
-          <button
-            type="button"
-            className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-            disabled={updatePaymentMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
-            onClick={handleSavePaymentDetails}
-          >
-            {updatePaymentMutation.isPending ? t("saving") : t("savePaymentDetails")}
-          </button>
+        <div className="modal-focus-footer flex gap-2">
+          {focusMode.isFocusMode ? (
+            <button
+              type="button"
+              className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold"
+              onClick={focusMode.clearFocus}
+            >
+              {t("done")}
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+                onClick={() => {
+                  changeActionMode("overview");
+                  setPaymentMethod(gift?.payment_method ?? "");
+                  setPaymentPhone(gift?.payment_phone ?? "");
+                  setPaymentComment(gift?.payment_comment ?? "");
+                  setPaymentPhoneError("");
+                }}
+              >
+                {t("cancelButton")}
+              </button>
+              <button
+                type="button"
+                className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+                disabled={updatePaymentMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
+                onClick={handleSavePaymentDetails}
+              >
+                {updatePaymentMutation.isPending ? t("saving") : t("savePaymentDetails")}
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -364,28 +390,41 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   function renderMembers() {
     const members = membersQuery.data ?? [];
     if (!members.length) return null;
+    // count includes organizer
+    const total = members.length;
     return (
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-          {t("contributors")} ({gift?.contributor_count ?? members.length})
+          {t("contributors")} ({total})
         </p>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {members.map((member) => {
             const displayName = member.first_name || (member.username ? `@${member.username}` : t("unknownUser"));
+            const isOrganizer = member.role === "organizer";
             return (
               <div
                 key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}
                 className="flex items-center justify-between gap-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {displayName}
-                    {member.role === "organizer" ? (
-                      <span className="ml-2 text-xs font-medium text-muted">{t("groupGiftCreator")}</span>
+                <div className="min-w-0 flex items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                    {member.username ? (
+                      <button
+                        type="button"
+                        className="truncate text-xs text-muted pressable-link text-left"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`@${member.username}`).catch(() => {});
+                        }}
+                      >
+                        @{member.username}
+                      </button>
                     ) : null}
-                  </p>
-                  {member.username ? (
-                    <p className="truncate text-xs text-muted">@{member.username}</p>
+                  </div>
+                  {isOrganizer ? (
+                    <span className="shrink-0 text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                      {t("groupGiftCreator")}
+                    </span>
                   ) : null}
                 </div>
                 {member.amount ? (
@@ -520,7 +559,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               disabled={purchaseMutation.isPending}
               onClick={handleMarkPurchased}
             >
-              {purchaseMutation.isPending ? t("saving") : t("markGiftPurchased")}
+              {purchaseMutation.isPending ? t("saving") : t("actionPurchased")}
             </button>
           </div>
         </div>,
@@ -545,7 +584,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               disabled={cancelMutation.isPending}
               onClick={handleCancelGift}
             >
-              {cancelMutation.isPending ? t("deleting") : t("cancelGiftButton")}
+              {cancelMutation.isPending ? t("deleting") : t("actionCancel")}
             </button>
           </div>
         </div>,
