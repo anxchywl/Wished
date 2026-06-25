@@ -170,18 +170,20 @@ export function UserDiscoveryManager() {
               <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
             </div>
             <div className="discover-following">
-              {followedUsers.map((user) => (
-                <button
-                  key={user.user_id}
-                  type="button"
-                  className="discover-following-row pressable-action"
-                  onClick={() => {
-                    router.replace(`/users?profile_id=${encodeURIComponent(user.user_id)}`);
-                  }}
-                >
-                  <UserAvatar user={user} />
-                  <span>{user.first_name || user.username}</span>
-                </button>
+              {followedUsers.map((user, index) => (
+                <div key={user.user_id}>
+                  <button
+                    type="button"
+                    className="discover-following-row pressable-action"
+                    onClick={() => {
+                      router.replace(`/users?profile_id=${encodeURIComponent(user.user_id)}`);
+                    }}
+                  >
+                    <UserAvatar user={user} />
+                    <span>{user.first_name || user.username}</span>
+                  </button>
+                  {index < followedUsers.length - 1 && <div className="h-px bg-border/60 ml-[64px]" />}
+                </div>
               ))}
             </div>
             <button
@@ -259,7 +261,7 @@ function BookedWishesPanel({
           {items.map((item, index) => (
             <div key={item.reservation_id}>
               <BookedWishRow item={item} onOpen={() => setSelectedWish(item)} />
-              {index < items.length - 1 && <div className="h-px bg-border/60 mx-3" />}
+              {index < items.length - 1 && <div className="h-px bg-border/60 ml-[68px]" />}
             </div>
           ))}
         </div>

@@ -231,15 +231,16 @@ export function WishlistManager() {
                   onDragEnd={handleDragEnd}
                   onDragCancel={handleDragCancel}
                 >
-                  <div className="divide-y divide-border">
+                  <div className="flex flex-col">
                     <SortableContext
                       items={resolvedOrderIds}
                       strategy={verticalListSortingStrategy}
                     >
-                      {orderedWishlists.map((wishlist) => (
+                      {orderedWishlists.map((wishlist, index) => (
                         <SortableWishlistRow
                           key={wishlist.id}
                           wishlist={wishlist}
+                          isLast={index === orderedWishlists.length - 1}
                         />
                       ))}
                     </SortableContext>
@@ -284,7 +285,7 @@ export function WishlistManager() {
 /**
  * sortable wishlist item wrapper
  */
-function SortableWishlistRow({ wishlist }: { wishlist: Wishlist }) {
+function SortableWishlistRow({ wishlist, isLast }: { wishlist: Wishlist; isLast: boolean }) {
   const {
     attributes,
     listeners,
@@ -308,6 +309,7 @@ function SortableWishlistRow({ wishlist }: { wishlist: Wishlist }) {
       {...listeners}
     >
       <WishlistRowBase wishlist={wishlist} />
+      {!isLast && <div className="h-px bg-border/60 ml-4" />}
     </div>
   );
 }

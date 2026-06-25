@@ -616,7 +616,7 @@ function SortableWishRow({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwn
       {...listeners}
     >
       <WishRowBase wish={wish} isOwner={isOwner} isLast={isLast} onClick={onClick} />
-      {!isLast && <div className="h-px bg-border/60 mx-3" />}
+      {!isLast && <div className="h-px bg-border/60 ml-[60px]" />}
     </div>
   );
 }

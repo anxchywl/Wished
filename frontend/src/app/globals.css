@@ -247,9 +247,6 @@ html[data-theme="dark"] .auth-loading-screen {
   text-align: left;
 }
 
-.discover-following-row + .discover-following-row {
-  border-top: 1px solid rgb(var(--color-border));
-}
 
 .discover-launch h2 {
   margin: 0;
