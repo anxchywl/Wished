@@ -57,19 +57,28 @@ def _image_from_url(url: str) -> str | None:
     return None
 
 
+def _title_from_og(html: str) -> str | None:
+    m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    if m:
+        return m.group(1).strip() or None
+    m = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*property=["\']og:title["\']', html, re.IGNORECASE)
+    if m:
+        return m.group(1).strip() or None
+    return None
+
+
 class TemuExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
-        # For share links, httpx already followed redirects before we get here.
-        # client has follow_redirects=True, so url here may still be the original;
-        # we need to make one request to get the final URL and its query params.
         final_url = url
+        html = ""
         try:
             resp = await client.get(url)
             final_url = str(resp.url)
+            html = resp.text
         except Exception as exc:
             logger.debug("Temu fetch failed for %s: %s", url, exc)
 
-        title = _title_from_url(final_url) or _title_from_url(url)
+        title = _title_from_url(final_url) or _title_from_url(url) or _title_from_og(html)
         image_url = _image_from_url(final_url) or _image_from_url(url)
 
         return LinkPreviewResponse(

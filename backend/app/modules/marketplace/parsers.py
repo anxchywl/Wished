@@ -76,6 +76,37 @@ def _parse_price(text: str) -> Decimal | None:
         return None
 
 
+def _extract_next_data_product(html: str) -> dict | None:
+    """extract a Product-like dict from Next.js __NEXT_DATA__ script tag"""
+    m = re.search(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        blob = json.loads(m.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    def _walk(obj: object) -> dict | None:
+        if isinstance(obj, dict):
+            t = obj.get("@type") or obj.get("type") or ""
+            if str(t).lower() in ("product", "товар"):
+                return obj
+            if "name" in obj and ("price" in obj or "offers" in obj or "image" in obj):
+                return obj
+            for v in obj.values():
+                result = _walk(v)
+                if result:
+                    return result
+        elif isinstance(obj, list):
+            for item in obj:
+                result = _walk(item)
+                if result:
+                    return result
+        return None
+
+    return _walk(blob)
+
+
 def _extract_json_ld(html: str) -> dict | None:
     """find first JSON-LD script block with @type: Product"""
     for match in re.finditer(
@@ -285,20 +316,32 @@ class OzonParser:
         return result
 
 
+def _currency_for_host(hostname: str) -> str:
+    if hostname.endswith(".kz"):
+        return "KZT"
+    return "RUB"
+
+
 class LamodaParser:
     def parse(self, html: str, url: str, hostname: str) -> ProductData:
+        cur = _currency_for_host(hostname)
         result = ProductData(marketplace="lamoda")
 
         ld = _extract_json_ld(html)
         if ld:
-            _parse_json_ld_into(ld, result, "RUB")
+            _parse_json_ld_into(ld, result, cur)
             if result.title:
                 return result
 
-        if _parse_og_into(html, result, "RUB"):
+        if _parse_og_into(html, result, cur):
             return result
 
-        # site-specific fallbacks
+        nd = _extract_next_data_product(html)
+        if nd:
+            _parse_json_ld_into(nd, result, cur)
+            if result.title:
+                return result
+
         result.title = (
             _element_text_by_class(html, "x-atomo-pdp-header-title__brand-and-name")
             or _element_text_by_class(html, "product-title")
@@ -311,34 +354,39 @@ class LamodaParser:
         if price_text:
             result.price = _parse_price(price_text)
             if result.price is not None:
-                result.currency = "RUB"
+                result.currency = cur
         return result
 
 
 class DnsParser:
     def parse(self, html: str, url: str, hostname: str) -> ProductData:
+        cur = _currency_for_host(hostname)
         result = ProductData(marketplace="dns")
 
         ld = _extract_json_ld(html)
         if ld:
-            _parse_json_ld_into(ld, result, "RUB")
+            _parse_json_ld_into(ld, result, cur)
             if result.title:
                 return result
 
-        if _parse_og_into(html, result, "RUB"):
+        if _parse_og_into(html, result, cur):
             return result
 
-        # site-specific fallbacks — DNS uses microdata itemprop attributes
+        nd = _extract_next_data_product(html)
+        if nd:
+            _parse_json_ld_into(nd, result, cur)
+            if result.title:
+                return result
+
         result.title = (
             _element_text_by_class(html, "product-card-top__title")
             or _h1_text(html)
         )
-        # DNS price: <span class="product-buy__price">12 990 ₽</span>
         price_text = _element_text_by_class(html, "product-buy__price")
         if price_text:
             result.price = _parse_price(price_text)
             if result.price is not None:
-                result.currency = "RUB"
+                result.currency = cur
         return result
 
 
@@ -355,7 +403,12 @@ class MVideoParser:
         if _parse_og_into(html, result, "RUB"):
             return result
 
-        # site-specific fallbacks
+        nd = _extract_next_data_product(html)
+        if nd:
+            _parse_json_ld_into(nd, result, "RUB")
+            if result.title:
+                return result
+
         result.title = (
             _element_text_by_class(html, "product-page-title__title")
             or _h1_text(html)

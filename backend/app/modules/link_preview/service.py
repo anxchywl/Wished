@@ -98,7 +98,7 @@ _OLX_HOSTS = frozenset({
     "olx.in", "www.olx.in",
 })
 _LAMODA_HOSTS = frozenset({"lamoda.ru", "www.lamoda.ru", "lamoda.kz", "www.lamoda.kz"})
-_DNS_HOSTS = frozenset({"dns-shop.ru", "www.dns-shop.ru"})
+_DNS_HOSTS = frozenset({"dns-shop.ru", "www.dns-shop.ru", "dns-shop.kz", "www.dns-shop.kz"})
 _MVIDEO_HOSTS = frozenset({"mvideo.ru", "www.mvideo.ru"})
 
 _USER_AGENT = (
