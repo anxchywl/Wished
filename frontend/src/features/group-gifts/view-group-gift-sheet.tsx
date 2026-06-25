@@ -26,12 +26,13 @@ type Props = {
 
 type ContentProps = Props & {
   showTitle?: boolean;
+  actionMode?: ActionMode;
   onActionModeChange?: (mode: ActionMode) => void;
   onFocusModeChange?: (isFocus: boolean) => void;
   resetTrigger?: number;
 };
 
-type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
+export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
 
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [active, setActive] = useState(false);
@@ -58,7 +59,7 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   );
 }
 
-export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true, onActionModeChange, onFocusModeChange, resetTrigger }: ContentProps) {
+export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true, actionMode: controlledActionMode, onActionModeChange, onFocusModeChange, resetTrigger }: ContentProps) {
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
 
@@ -77,10 +78,11 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   const [joinAmount, setJoinAmount] = useState("");
   const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
-  const [actionMode, setActionMode] = useState<ActionMode>("overview");
+  const [internalActionMode, setInternalActionMode] = useState<ActionMode>("overview");
+  const actionMode = controlledActionMode ?? internalActionMode;
 
   function changeActionMode(mode: ActionMode) {
-    setActionMode(mode);
+    if (controlledActionMode === undefined) setInternalActionMode(mode);
     onActionModeChange?.(mode);
   }
 
@@ -221,7 +223,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               </div>
 
               <span
-                className="text-xs text-muted transition-opacity duration-300"
+                className="text-xs text-muted transition-opacity duration-300 text-center"
                 style={{ opacity: percentOpacity }}
               >
                 {gift.percent_complete >= 100
@@ -338,7 +340,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             {t("paymentCommentLabel")}
           </label>
           <textarea
-            className="min-h-16 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="min-h-16 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
             maxLength={300}
             placeholder={t("paymentCommentPlaceholder")}
             value={paymentComment}
@@ -509,10 +511,9 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     );
   }
 
-  function renderActionState(title: string, children: ReactNode, danger = false) {
+  function renderActionState(children: ReactNode) {
     return (
       <div className="flex flex-col gap-3">
-        <p className={`text-sm font-bold ${danger ? "text-red-500" : "text-foreground"}`}>{title}</p>
         {children}
       </div>
     );
@@ -533,14 +534,13 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     }
 
     if (actionMode === "contribute") {
-      return renderActionState(t("makeContribution"), renderContributionForm());
+      return renderActionState(renderContributionForm());
     }
     if (actionMode === "editPayment") {
-      return renderActionState(t("editPaymentDetails"), renderPaymentDetailsForm());
+      return renderActionState(renderPaymentDetailsForm());
     }
     if (actionMode === "purchase") {
       return renderActionState(
-        t("markGiftPurchased"),
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
           <div className="flex gap-2">
@@ -565,7 +565,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     }
     if (actionMode === "cancel") {
       return renderActionState(
-        t("cancelGiftButton"),
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
           <div className="flex gap-2">
@@ -586,7 +585,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             </button>
           </div>
         </div>,
-        true,
       );
     }
 

@@ -79,7 +79,7 @@ import {
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
-import { ViewGroupGiftContent } from "@/features/group-gifts/view-group-gift-sheet";
+import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
@@ -705,7 +705,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
   const [createGroupGiftOpen, setCreateGroupGiftOpen] = useState(false);
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
-  const [groupGiftActionMode, setGroupGiftActionMode] = useState("overview");
+  const [groupGiftActionMode, setGroupGiftActionMode] = useState<ActionMode>("overview");
   const [groupGiftResetTrigger, setGroupGiftResetTrigger] = useState(0);
   const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
@@ -796,14 +796,17 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {(createGroupGiftOpen || viewGroupGiftSheetOpen) && groupGiftActionMode === "overview" ? (
+          {(createGroupGiftOpen || viewGroupGiftSheetOpen) ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
               onClick={() => {
-                setCreateGroupGiftOpen(false);
-                setViewGroupGiftSheetOpen(false);
-                setGroupGiftActionMode("overview");
+                if (groupGiftActionMode !== "overview") {
+                  setGroupGiftActionMode("overview");
+                } else {
+                  setCreateGroupGiftOpen(false);
+                  setViewGroupGiftSheetOpen(false);
+                }
               }}
               aria-label={t("back")}
             >
@@ -811,8 +814,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-          ) : (createGroupGiftOpen || viewGroupGiftSheetOpen) && groupGiftActionMode !== "overview" ? (
-            <span className="w-10" />
           ) : isOwner && !removeBookingConfirming ? (
             <button
               type="button"
@@ -890,6 +891,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             <ViewGroupGiftContent
               wishId={wish.id}
               showTitle={false}
+              actionMode={groupGiftActionMode}
               onClose={() => setViewGroupGiftSheetOpen(false)}
               onActionModeChange={setGroupGiftActionMode}
               onFocusModeChange={setGroupGiftFocusMode}

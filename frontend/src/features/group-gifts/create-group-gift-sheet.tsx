@@ -224,7 +224,7 @@ export function CreateGroupGiftContent({
                 {t("paymentCommentLabel")}
               </label>
               <textarea
-                className="min-h-16 max-h-24 rounded-xl border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                className="min-h-16 rounded-xl border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 maxLength={300}
                 placeholder={t("paymentCommentPlaceholder")}
                 value={paymentComment}

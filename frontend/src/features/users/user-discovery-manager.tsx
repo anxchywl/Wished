@@ -227,7 +227,7 @@ export function UserDiscoveryManager() {
                     <UserAvatar user={user} />
                     <span>{user.first_name || user.username}</span>
                   </button>
-                  {index < followedUsers.length - 1 && <div className="h-px bg-border/60 ml-[64px]" />}
+                  {index < followedUsers.length - 1 && <div className="h-px bg-border" />}
                 </div>
               ))}
             </div>
