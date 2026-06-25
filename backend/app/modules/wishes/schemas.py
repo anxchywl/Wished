@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.media.schemas import WishImageResponse
+from app.modules.group_gifts.schemas import GroupGiftSummary
 
 
 class WishCreateRequest(BaseModel):
@@ -157,6 +158,7 @@ class WishResponse(BaseModel):
     original_product_url: str | None = None
     source_marketplace: str | None = None
     images: list[WishImageResponse] = Field(default_factory=list)
+    group_gift: GroupGiftSummary | None = None
     created_at: datetime
     updated_at: datetime
 

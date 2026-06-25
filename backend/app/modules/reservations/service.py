@@ -3,12 +3,13 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Reservation, User, Wish, Wishlist
+from app.db.models.group_gifts import GroupGift
 from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
     BookedWishItem,
@@ -27,6 +28,18 @@ async def create_reservation(
 ) -> ReservationResponse:
     """create reservation for a wish — owner may reserve their own wish"""
     await _get_accessible_wish(db, current_user, wish_id, share_token=share_token, redis=redis)
+
+    result = await db.execute(
+        select(GroupGift).where(
+            GroupGift.wish_id == wish_id,
+            GroupGift.status == "active",
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This wish has an active group gift",
+        )
 
     # check for existing active reservation inside a transaction
     result = await db.execute(
@@ -142,6 +155,14 @@ async def get_wish_reservation_status(
     wish = await _get_accessible_wish(db, current_user, wish_id, require_active=False, share_token=share_token, redis=redis)
     is_owner = wish.wishlist.owner_user_id == current_user.id
 
+    gift_count = await db.scalar(
+        select(func.count()).select_from(GroupGift).where(
+            GroupGift.wish_id == wish_id,
+            GroupGift.status == "active",
+        )
+    )
+    has_active_group_gift = (gift_count or 0) > 0
+
     result = await db.execute(
         select(Reservation).where(
             Reservation.wish_id == wish_id,
@@ -157,6 +178,7 @@ async def get_wish_reservation_status(
             is_mine=False,
             reservation_id=None,
             owner_booking_visibility=current_user.booking_visibility if is_owner else None,
+            has_active_group_gift=has_active_group_gift,
         )
 
     is_mine = reservation.reserver_user_id == current_user.id
@@ -179,6 +201,7 @@ async def get_wish_reservation_status(
             reservation_id=None,
             owner_booking_visibility=visibility,
             reserver_display_name=reserver_display_name,
+            has_active_group_gift=has_active_group_gift,
         )
 
     return WishReservationStatusResponse(
@@ -187,6 +210,7 @@ async def get_wish_reservation_status(
         is_mine=is_mine,
         # only expose reservation id to the reserver
         reservation_id=reservation.id if is_mine else None,
+        has_active_group_gift=has_active_group_gift,
     )
 
 

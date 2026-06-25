@@ -197,12 +197,12 @@ describe("cache-persister — user-scoped cache keys", () => {
     // Write a fake snapshot under user A's key
     window.localStorage.setItem(
       `wished/query-cache/v1/${USER_A_ID}`,
-      JSON.stringify({ timestamp: Date.now(), buster: "2", clientState: {} }),
+      JSON.stringify({ timestamp: Date.now(), buster: "3", clientState: {} }),
     );
     // Write a fake snapshot under user B's key (should never be read for user A)
     window.localStorage.setItem(
       `wished/query-cache/v1/${USER_B_ID}`,
-      JSON.stringify({ timestamp: Date.now(), buster: "2", clientState: { queries: [{ key: ["user-b-data"] }] } }),
+      JSON.stringify({ timestamp: Date.now(), buster: "3", clientState: { queries: [{ key: ["user-b-data"] }] } }),
     );
 
     const snapshot = readPersistedSnapshot();

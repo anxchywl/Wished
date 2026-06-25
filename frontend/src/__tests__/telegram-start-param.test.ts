@@ -8,14 +8,16 @@ import {
 describe("wishlist Telegram start parameter", () => {
   it("round-trips a wishlist target using Telegram-safe characters", () => {
     const encoded = encodeWishlistStartParam(
-      "emkaept",
+      "00000000-0000-0000-0000-000000000001",
       "b86aa973-3d01-4c6a-98bb-dcf4e42d7cdf",
     );
 
     expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(decodeWishlistStartParam(encoded)).toEqual({
-      username: "emkaept",
+      userId: "00000000-0000-0000-0000-000000000001",
       wishlistId: "b86aa973-3d01-4c6a-98bb-dcf4e42d7cdf",
+      shareToken: undefined,
+      username: undefined,
     });
   });
 

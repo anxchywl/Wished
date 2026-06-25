@@ -7,6 +7,11 @@ from redis.asyncio import Redis
 
 from app.modules.notifications.handlers import (
     handle_followed,
+    handle_group_gift_completed,
+    handle_group_gift_created,
+    handle_transfer_confirmed,
+    handle_transfer_rejected,
+    handle_transfer_reported,
     handle_wish_created,
     handle_wish_fulfilled,
     handle_wishlist_created,
@@ -22,6 +27,11 @@ _HANDLERS = {
     "WISHLIST_CREATED": handle_wishlist_created,
     "WISH_CREATED": handle_wish_created,
     "WISH_FULFILLED": handle_wish_fulfilled,
+    "GROUP_GIFT_CREATED": handle_group_gift_created,
+    "TRANSFER_REPORTED": handle_transfer_reported,
+    "TRANSFER_CONFIRMED": handle_transfer_confirmed,
+    "TRANSFER_REJECTED": handle_transfer_rejected,
+    "GROUP_GIFT_COMPLETED": handle_group_gift_completed,
 }
 
 

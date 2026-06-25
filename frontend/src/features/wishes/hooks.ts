@@ -179,6 +179,7 @@ export function useCreateWishMutation(wishlistId: string) {
           : [],
         created_at: timestamp,
         updated_at: timestamp,
+        group_gift: null,
       };
 
       queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => ({

@@ -1,0 +1,138 @@
+# group gifts api routes
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Response, status
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps.auth import get_current_user
+from app.api.deps.database import get_db_session
+from app.api.deps.redis import get_redis
+from app.db.models import User
+from app.modules.group_gifts import (
+    cancel_group_gift,
+    confirm_transfer,
+    create_group_gift,
+    get_gift_members,
+    get_group_gift,
+    join_group_gift,
+    leave_group_gift,
+    report_transfer,
+)
+from app.modules.group_gifts.rate_limit import (
+    check_contribution_create_limit,
+    check_gift_create_limit,
+)
+from app.modules.group_gifts.schemas import (
+    ContributionCreateRequest,
+    ContributionSummary,
+    GroupGiftCreateRequest,
+    GroupGiftResponse,
+    TransferConfirmRequest,
+)
+
+router = APIRouter(tags=["group_gifts"])
+
+
+@router.post(
+    "/wishes/{wish_id}/group-gift",
+    response_model=GroupGiftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_group_gift(
+    wish_id: UUID,
+    payload: GroupGiftCreateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> GroupGiftResponse:
+    await check_gift_create_limit(redis, current_user.id)
+    return await create_group_gift(db, current_user, wish_id, payload, redis=redis)
+
+
+@router.get("/wishes/{wish_id}/group-gift", response_model=GroupGiftResponse, response_model_exclude_none=False)
+async def get_wish_group_gift(
+    wish_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    response: Response,
+) -> GroupGiftResponse | None:
+    result = await get_group_gift(db, current_user, wish_id)
+    if result is None:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return None
+    return result
+
+
+@router.delete("/group-gifts/{group_gift_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_group_gift(
+    group_gift_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> Response:
+    await cancel_group_gift(db, current_user, group_gift_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/group-gifts/{group_gift_id}/join",
+    response_model=ContributionSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_join_group_gift(
+    group_gift_id: UUID,
+    payload: ContributionCreateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> ContributionSummary:
+    await check_contribution_create_limit(redis, current_user.id)
+    return await join_group_gift(db, current_user, group_gift_id, payload, redis=redis)
+
+
+@router.post(
+    "/contributions/{contribution_id}/transfer",
+    response_model=ContributionSummary,
+)
+async def post_report_transfer(
+    contribution_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> ContributionSummary:
+    return await report_transfer(db, current_user, contribution_id, redis=redis)
+
+
+@router.post(
+    "/contributions/{contribution_id}/confirm",
+    response_model=ContributionSummary,
+)
+async def post_confirm_transfer(
+    contribution_id: UUID,
+    body: TransferConfirmRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> ContributionSummary:
+    return await confirm_transfer(db, current_user, contribution_id, body.confirmed, redis=redis)
+
+
+@router.delete("/contributions/{contribution_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_contribution(
+    contribution_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> Response:
+    await leave_group_gift(db, current_user, contribution_id, redis=redis)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/group-gifts/{group_gift_id}/members", response_model=list[ContributionSummary])
+async def get_group_gift_members(
+    group_gift_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[ContributionSummary]:
+    return await get_gift_members(db, current_user, group_gift_id)

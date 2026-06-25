@@ -1,6 +1,7 @@
 # telegram bot service
 import asyncio
 import logging
+from uuid import UUID
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
@@ -18,8 +19,10 @@ from redis.exceptions import RedisError
 
 from app.core.config import get_settings
 from app.db.models import User
+from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.db.session import async_session_factory, dispose_db
 from app.integrations.redis import close_redis, get_redis_client
+from app.modules.group_gifts import service as group_gift_service
 from app.modules.notifications.worker import run_notification_worker
 from app.modules.users.discovery import create_discovery_token
 
@@ -386,6 +389,126 @@ def _urlencode(value: str) -> str:
     return quote(value, safe="")
 
 
+async def gg_confirm_handler(callback: types.CallbackQuery) -> None:
+    """confirm a reported group gift transfer"""
+    if not callback.data or not callback.from_user:
+        await callback.answer()
+        return
+
+    contribution_id_str = callback.data.split(":", 1)[1]
+
+    try:
+        contribution_id = UUID(contribution_id_str)
+    except ValueError:
+        await callback.answer("Invalid request", show_alert=True)
+        return
+
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(GroupGiftContribution).where(GroupGiftContribution.id == contribution_id)
+        )
+        contribution = result.scalar_one_or_none()
+        if contribution is None:
+            await callback.answer("Not found", show_alert=True)
+            return
+
+        result = await db.execute(
+            select(GroupGift).where(GroupGift.id == contribution.group_gift_id)
+        )
+        gift = result.scalar_one_or_none()
+
+        result = await db.execute(
+            select(User).where(User.telegram_id == callback.from_user.id)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            await callback.answer("Not authorized", show_alert=True)
+            return
+
+        if gift is None or user.id != gift.organizer_user_id:
+            await callback.answer("Not authorized", show_alert=True)
+            return
+
+        if contribution.status != "waiting_confirmation":
+            await callback.answer("Already actioned", show_alert=True)
+            return
+
+        try:
+            redis = get_redis_client()
+            await group_gift_service.confirm_transfer(db, user, contribution.id, confirmed=True, redis=redis)
+        except Exception:
+            logger.exception("gg_confirm_handler: confirm_transfer failed for contribution_id=%s", contribution_id)
+            await callback.answer("Something went wrong", show_alert=True)
+            return
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass  # message may be too old to edit — not fatal
+
+    await callback.answer()
+
+
+async def gg_reject_handler(callback: types.CallbackQuery) -> None:
+    """reject a reported group gift transfer"""
+    if not callback.data or not callback.from_user:
+        await callback.answer()
+        return
+
+    contribution_id_str = callback.data.split(":", 1)[1]
+
+    try:
+        contribution_id = UUID(contribution_id_str)
+    except ValueError:
+        await callback.answer("Invalid request", show_alert=True)
+        return
+
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(GroupGiftContribution).where(GroupGiftContribution.id == contribution_id)
+        )
+        contribution = result.scalar_one_or_none()
+        if contribution is None:
+            await callback.answer("Not found", show_alert=True)
+            return
+
+        result = await db.execute(
+            select(GroupGift).where(GroupGift.id == contribution.group_gift_id)
+        )
+        gift = result.scalar_one_or_none()
+
+        result = await db.execute(
+            select(User).where(User.telegram_id == callback.from_user.id)
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            await callback.answer("Not authorized", show_alert=True)
+            return
+
+        if gift is None or user.id != gift.organizer_user_id:
+            await callback.answer("Not authorized", show_alert=True)
+            return
+
+        if contribution.status != "waiting_confirmation":
+            await callback.answer("Already actioned", show_alert=True)
+            return
+
+        try:
+            redis = get_redis_client()
+            await group_gift_service.confirm_transfer(db, user, contribution.id, confirmed=False, redis=redis)
+        except Exception:
+            logger.exception("gg_reject_handler: confirm_transfer failed for contribution_id=%s", contribution_id)
+            await callback.answer("Something went wrong", show_alert=True)
+            return
+
+    try:
+        await callback.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass  # message may be too old to edit — not fatal
+
+    await callback.answer()
+
+
 async def main() -> None:
     """start telegram bot polling"""
     settings = get_settings()
@@ -400,6 +523,8 @@ async def main() -> None:
     dp.message.register(find_handler, Command("find"))
     dp.message.register(users_shared_handler, F.users_shared)
     dp.message.register(language_text_handler, F.text.in_(LANG_BUTTON_LABELS.keys()))
+    dp.callback_query.register(gg_confirm_handler, F.data.startswith("gg_confirm:"))
+    dp.callback_query.register(gg_reject_handler, F.data.startswith("gg_reject:"))
 
     web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
     await bot.set_chat_menu_button(

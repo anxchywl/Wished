@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
+import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
 import { userQueryKeys, useFollowMutation, useFollowByIdMutation, useUserProfileQuery, useUserProfileByIdQuery, useUserWishlistsByIdQuery } from "@/features/users/hooks";
@@ -606,6 +607,9 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
   const isReserved = status?.is_reserved ?? false;
   const isBusy = createReservation.isPending;
   const isCompleted = wish?.status === "completed";
+  const hasActiveGroupGift =
+    wish?.group_gift?.status === "active" || status?.has_active_group_gift === true;
+  const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
 
   function handleBook() {
     if (!isReserved && !isCompleted) {
@@ -650,14 +654,54 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
 
       {!isCompleted ? (
         <section className="flex flex-col gap-2 w-full mt-3 px-4">
-          <button
-            type="button"
-            className="public-action-button public-action-primary"
-            onClick={handleBook}
-            disabled={isBusy || isReserved}
-          >
-            {bookButtonLabel()}
-          </button>
+          {/* Slot 1 — primary action button */}
+          {hasActiveGroupGift ? (
+            wish.group_gift?.is_organizer || wish.group_gift?.is_contributor ? null : (
+              <button
+                type="button"
+                className="public-action-button public-action-primary"
+                onClick={() => setViewGroupGiftSheetOpen(true)}
+              >
+                {t("joinGiftButton")}
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              className="public-action-button public-action-primary"
+              onClick={handleBook}
+              disabled={isBusy || isReserved}
+            >
+              {bookButtonLabel()}
+            </button>
+          )}
+
+          {/* Slot 2 — group gift progress row */}
+          {wish.group_gift ? (
+            <button
+              type="button"
+              className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
+              onClick={() => setViewGroupGiftSheetOpen(true)}
+            >
+              <div className="flex justify-between items-center text-xs text-muted">
+                <span>{t("groupGift")}</span>
+                <span>
+                  {wish.group_gift.status === "cancelled"
+                    ? t("giftCancelled")
+                    : wish.group_gift.status === "completed" || wish.group_gift.percent_complete >= 100
+                    ? t("giftComplete")
+                    : t("giftProgress").replace("{percent}", String(wish.group_gift.percent_complete))}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.min(100, wish.group_gift.percent_complete)}%` }}
+                />
+              </div>
+            </button>
+          ) : null}
+
           {wish.original_product_url ? (
             <a
               href={wish.original_product_url}
@@ -701,6 +745,14 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
           </p>
         </section>
       ) : null}
+
+      {viewGroupGiftSheetOpen && (
+        <ViewGroupGiftSheet
+          wishId={wishId}
+          shareToken={shareToken}
+          onClose={() => setViewGroupGiftSheetOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,6 @@
+import type { GroupGiftSummary } from "@/features/group-gifts/api";
+export type { GroupGiftSummary };
+
 export type WishImage = {
   id: string;
   wish_id: string;
@@ -28,6 +31,7 @@ export type Wish = {
   images: WishImage[];
   created_at: string;
   updated_at: string;
+  group_gift: GroupGiftSummary | null;
 };
 
 export type WishListResponse = {

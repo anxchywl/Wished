@@ -16,6 +16,7 @@ export type ProfileResponse = {
     birthday_visibility: string;
     wishlist_visibility: string;
     booking_visibility: "hide" | "anonymous" | "names";
+    group_gift_visibility: "hide" | "anonymous" | "names";
   };
 };
 
@@ -47,6 +48,7 @@ export function patchPrivacy(
     birthday_visibility?: string;
     wishlist_visibility?: string;
     booking_visibility?: string;
+    group_gift_visibility?: string;
   },
 ) {
   return apiClient<ProfileResponse>("/me", {

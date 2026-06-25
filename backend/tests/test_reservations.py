@@ -88,12 +88,12 @@ class TestCreateReservation:
         wish = _wish(owner_id=uuid4())  # user is not owner
 
         db = AsyncMock()
-        # execute calls: (1) _get_accessible_wish, (2) FOR UPDATE check
+        # execute calls: (1) _get_accessible_wish, (2) group gift check, (3) FOR UPDATE check
         wish_result = AsyncMock()
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         no_existing = AsyncMock()
         no_existing.scalar_one_or_none = MagicMock(return_value=None)
-        db.execute = AsyncMock(side_effect=[wish_result, no_existing])
+        db.execute = AsyncMock(side_effect=[wish_result, no_existing, no_existing])
         db.add = MagicMock()
         db.commit = AsyncMock()
         db.refresh = AsyncMock(side_effect=lambda r: setattr(r, "id", rsv_id) or setattr(r, "wish_id", wish_id) or setattr(r, "reserver_user_id", user.id) or setattr(r, "status", "active") or None)
@@ -134,9 +134,11 @@ class TestCreateReservation:
         db = AsyncMock()
         wish_result = AsyncMock()
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
+        no_group_gift = AsyncMock()
+        no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
         existing_result = AsyncMock()
         existing_result.scalar_one_or_none = MagicMock(return_value=existing)
-        db.execute = AsyncMock(side_effect=[wish_result, existing_result])
+        db.execute = AsyncMock(side_effect=[wish_result, no_group_gift, existing_result])
 
         client = TestClient(_make_app(db, user))
         resp = client.post(f"/api/v1/wishes/{wish_id}/reserve")
@@ -153,9 +155,11 @@ class TestCreateReservation:
         db = AsyncMock()
         wish_result = AsyncMock()
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
+        no_group_gift = AsyncMock()
+        no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
         existing_result = AsyncMock()
         existing_result.scalar_one_or_none = MagicMock(return_value=existing)
-        db.execute = AsyncMock(side_effect=[wish_result, existing_result])
+        db.execute = AsyncMock(side_effect=[wish_result, no_group_gift, existing_result])
 
         client = TestClient(_make_app(db, user))
         resp = client.post(f"/api/v1/wishes/{wish_id}/reserve")
@@ -174,7 +178,7 @@ class TestCreateReservation:
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         no_existing = AsyncMock()
         no_existing.scalar_one_or_none = MagicMock(return_value=None)
-        db.execute = AsyncMock(side_effect=[wish_result, no_existing])
+        db.execute = AsyncMock(side_effect=[wish_result, no_existing, no_existing])
         db.add = MagicMock()
         db.commit = AsyncMock(side_effect=IntegrityError("uq_reservations_wish_active", {}, None))
         db.rollback = AsyncMock()
@@ -361,6 +365,7 @@ class TestReservationStatus:
         no_rsv = AsyncMock()
         no_rsv.scalar_one_or_none = MagicMock(return_value=None)
         db.execute = AsyncMock(side_effect=[wish_result, no_rsv])
+        db.scalar = AsyncMock(return_value=0)
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")
@@ -387,6 +392,7 @@ class TestReservationStatus:
         rsv_result = AsyncMock()
         rsv_result.scalar_one_or_none = MagicMock(return_value=rsv)
         db.execute = AsyncMock(side_effect=[wish_result, rsv_result])
+        db.scalar = AsyncMock(return_value=0)
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")
@@ -414,6 +420,7 @@ class TestReservationStatus:
         rsv_result = AsyncMock()
         rsv_result.scalar_one_or_none = MagicMock(return_value=rsv)
         db.execute = AsyncMock(side_effect=[wish_result, rsv_result])
+        db.scalar = AsyncMock(return_value=0)
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")

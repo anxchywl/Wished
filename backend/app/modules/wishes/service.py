@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
@@ -9,9 +10,11 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
 from app.db.models import Reservation, User, Wish, WishImage, Wishlist
+from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.modules.events import publish_event
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
 from app.modules.media.schemas import WishImageResponse
+from app.modules.group_gifts.schemas import GroupGiftSummary
 from app.modules.wishes.schemas import (
     WishCopyRequest,
     WishCreateRequest,
@@ -39,7 +42,8 @@ async def list_wishlist_wishes(
     redis: Redis | None = None,
 ) -> WishListResponse:
     """list wishlist wishes — owner views are Redis-cached; shared views bypass cache"""
-    await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    is_owner = wishlist.owner_user_id == current_user.id
 
     async def _fetch() -> WishListResponse:
         query = (
@@ -54,14 +58,20 @@ async def list_wishlist_wishes(
     # only cache for the authenticated owner; shared-token views skip the cache
     # to avoid leaking stale data across share-token holders
     if redis is not None and not share_token:
-        return await cache_get_or_fetch(
+        response = await cache_get_or_fetch(
             redis,
             wishes_cache_key(wishlist_id),
             WISHES_TTL,
             WishListResponse,
             _fetch,
         )
-    return await _fetch()
+    else:
+        response = await _fetch()
+
+    # group_gift is user-specific and cannot be cached — enrich after cache lookup
+    if response.items:
+        response = await _enrich_with_group_gifts(db, response, current_user, is_owner)
+    return response
 
 
 async def copy_wish(
@@ -122,7 +132,7 @@ async def copy_wish(
         await cache_delete(redis, wishes_cache_key(payload.wishlist_id))
         if source.wishlist_id != payload.wishlist_id:
             await cache_delete(redis, wishes_cache_key(source.wishlist_id))
-    return _to_response(copied)
+    return _to_response(copied, _build_group_gift_summary(copied.group_gift, current_user, True))
 
 
 async def create_wish(
@@ -165,7 +175,7 @@ async def create_wish(
             "owner_user_id": current_user.id,
         })
 
-    return _to_response(wish)
+    return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
 async def _attach_marketplace_image(
@@ -212,7 +222,10 @@ async def reorder_wishes(
     await _get_owned_wishlist(db, current_user, wishlist_id)
     result = await db.execute(
         select(Wish)
-        .options(selectinload(Wish.images))
+        .options(
+            selectinload(Wish.images),
+            selectinload(Wish.group_gift).selectinload(GroupGift.contributions),
+        )
         .where(Wish.wishlist_id == wishlist_id)
     )
     wishes = result.scalars().all()
@@ -225,7 +238,12 @@ async def reorder_wishes(
         wishes_by_id[wish_id].position = position
 
     ordered = [wishes_by_id[wish_id] for wish_id in payload.wish_ids]
-    response = WishListResponse(items=[_to_response(wish) for wish in ordered])
+    response = WishListResponse(
+        items=[
+            _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
+            for wish in ordered
+        ]
+    )
     await db.commit()
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
@@ -270,7 +288,7 @@ async def update_wish(
         # if moved to another wishlist, invalidate that wishlist's cache too
         if payload.wishlist_id and payload.wishlist_id != wishlist_id:
             await cache_delete(redis, wishes_cache_key(payload.wishlist_id))
-    return _to_response(wish)
+    return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
 async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> None:
@@ -278,6 +296,16 @@ async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis
     wish = await _get_owned_wish(db, current_user, wish_id)
     wishlist_id = wish.wishlist_id
     objects_to_delete = _collect_image_objects(wish.images)
+    result = await db.execute(
+        select(GroupGift).where(
+            GroupGift.wish_id == wish_id,
+            GroupGift.status == "active",
+        )
+    )
+    active_gift = result.scalar_one_or_none()
+    if active_gift is not None:
+        await _cancel_gift_for_deletion(db, active_gift)
+
     await db.delete(wish)
     await db.commit()
     if redis is not None:
@@ -287,6 +315,20 @@ async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis
             delete_object(bucket, obj)
         except Exception as exc:
             logger.error("failed to delete minio object %s/%s: %s", bucket, obj, exc)
+
+
+async def _cancel_gift_for_deletion(db: AsyncSession, gift: GroupGift) -> None:
+    """cancel an active gift before its wish is deleted"""
+    gift.status = "cancelled"
+    result = await db.execute(
+        select(GroupGiftContribution).where(
+            GroupGiftContribution.group_gift_id == gift.id,
+            ~GroupGiftContribution.status.in_(["cancelled", "confirmed", "notified"]),
+        )
+    )
+    for contribution in result.scalars().all():
+        contribution.status = "cancelled"
+    await db.commit()
 
 
 async def complete_wish(
@@ -326,7 +368,7 @@ async def complete_wish(
             "owner_user_id": current_user.id,
         })
 
-    return _to_response(wish)
+    return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
 async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> WishResponse:
@@ -345,7 +387,7 @@ async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, r
     wish = await _get_owned_wish(db, current_user, wish_id)
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
-    return _to_response(wish)
+    return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
 async def _get_owned_wishlist(
@@ -370,7 +412,10 @@ async def _get_owned_wish(db: AsyncSession, current_user: User, wish_id: UUID) -
     """find owned wish"""
     result = await db.execute(
         select(Wish)
-        .options(selectinload(Wish.images))
+        .options(
+            selectinload(Wish.images),
+            selectinload(Wish.group_gift).selectinload(GroupGift.contributions),
+        )
         .join(Wishlist, Wishlist.id == Wish.wishlist_id)
         .where(Wish.id == wish_id, Wishlist.owner_user_id == current_user.id)
     )
@@ -415,7 +460,74 @@ def _collect_image_objects(images: list[WishImage]) -> list[tuple[str, str]]:
     return pairs
 
 
-def _to_response(wish: Wish) -> WishResponse:
+def _build_group_gift_summary(
+    gift: GroupGift | None,
+    current_user: User,
+    is_owner: bool,
+) -> GroupGiftSummary | None:
+    """compute caller-specific group gift summary from loaded gift object"""
+    if not gift or gift.status != "active":
+        return None
+
+    group_gift_visibility = getattr(current_user, "group_gift_visibility", "hide")
+    if is_owner and group_gift_visibility == "hide":
+        return None
+
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    confirmed_statuses = {"confirmed", "pledged", "notified"}
+    collected_amount = sum(
+        (c.amount for c in non_cancelled if c.status in confirmed_statuses),
+        Decimal("0"),
+    )
+    total_amount = gift.wish.price if gift.wish else None
+    percent_complete = (
+        min(100, int(collected_amount / total_amount * 100))
+        if total_amount and total_amount > 0
+        else 0
+    )
+
+    is_organizer = gift.organizer_user_id == current_user.id
+    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
+
+    return GroupGiftSummary(
+        id=gift.id,
+        status=gift.status,
+        collection_type=gift.collection_type,
+        collected_amount=collected_amount,
+        percent_complete=percent_complete,
+        contributor_count=len(non_cancelled),
+        is_organizer=is_organizer,
+        is_contributor=is_contributor,
+    )
+
+
+async def _enrich_with_group_gifts(
+    db: AsyncSession,
+    response: WishListResponse,
+    current_user: User,
+    is_owner: bool,
+) -> WishListResponse:
+    """bulk-load active group gifts for a wish list and attach summaries"""
+    wish_ids = [item.id for item in response.items]
+    result = await db.execute(
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.wish),
+        )
+        .where(GroupGift.wish_id.in_(wish_ids), GroupGift.status == "active")
+    )
+    gifts_by_wish_id = {g.wish_id: g for g in result.scalars().all()}
+
+    enriched = []
+    for item in response.items:
+        gift = gifts_by_wish_id.get(item.id)
+        summary = _build_group_gift_summary(gift, current_user, is_owner)
+        enriched.append(item.model_copy(update={"group_gift": summary}))
+    return WishListResponse(items=enriched)
+
+
+def _to_response(wish: Wish, group_gift_summary: GroupGiftSummary | None = None) -> WishResponse:
     """build wish response with presigned image URLs"""
     return WishResponse(
         id=wish.id,
@@ -453,6 +565,7 @@ def _to_response(wish: Wish) -> WishResponse:
             )
             for image in wish.images
         ],
+        group_gift=group_gift_summary,
         created_at=wish.created_at,
         updated_at=wish.updated_at,
     )

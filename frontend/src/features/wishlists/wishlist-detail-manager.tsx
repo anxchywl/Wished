@@ -78,6 +78,8 @@ import {
   useCompleteWishMutation,
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
+import { CreateGroupGiftSheet } from "@/features/group-gifts/create-group-gift-sheet";
+import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
@@ -701,6 +703,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [active, setActive] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
+  const [createGroupGiftSheetOpen, setCreateGroupGiftSheetOpen] = useState(false);
+  const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
@@ -715,7 +719,11 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     } else {
       setActive(false);
     }
-    if (!open) setRemoveBookingConfirming(false);
+    if (!open) {
+      setRemoveBookingConfirming(false);
+      setCreateGroupGiftSheetOpen(false);
+      setViewGroupGiftSheetOpen(false);
+    }
   }, [open]);
 
   if (!open || !wish) return null;
@@ -732,6 +740,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const ownerBookingVisibility = reservStatus?.owner_booking_visibility ?? "hide";
   const reserverDisplayName = reservStatus?.reserver_display_name ?? null;
   const isCompleted = wish.status === "completed";
+  const hasActiveGroupGift =
+    wish.group_gift?.status === "active" || reservStatus?.has_active_group_gift === true;
 
   // booking actions available to non-owner viewer
   function handleBookToggle() {
@@ -882,7 +892,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {/* owner self-booking controls */}
-          {isOwner && !isCompleted && (isMine || ownerBookingVisibility !== "hide") && (
+          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide") && (
             <div className="w-full flex flex-col gap-2">
               {isMine ? (
                 <button
@@ -918,6 +928,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                   }
                 </button>
               )}
+              <button
+                type="button"
+                className="w-full h-11 rounded-xl border border-border bg-background text-primary text-sm font-semibold inline-flex items-center justify-center"
+                onClick={() => setCreateGroupGiftSheetOpen(true)}
+              >
+                {t("createGroupGift")}
+              </button>
             </div>
           )}
 
@@ -927,16 +944,28 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {/* non-owner booking controls */}
-          {!isOwner && (
+          {!isOwner && !isCompleted && (
             <div className="w-full flex flex-col gap-2">
-              <button
-                type="button"
-                className={bookButtonClass()}
-                onClick={handleBookToggle}
-                disabled={isBusy || (isReserved && !isMine)}
-              >
-                <span>{bookButtonLabel()}</span>
-              </button>
+              {hasActiveGroupGift ? (
+                wish.group_gift?.is_contributor || wish.group_gift?.is_organizer ? null : (
+                  <button
+                    type="button"
+                    className="w-full h-12 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center justify-center"
+                    onClick={() => setViewGroupGiftSheetOpen(true)}
+                  >
+                    {t("joinGiftButton")}
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  className={bookButtonClass()}
+                  onClick={handleBookToggle}
+                  disabled={isBusy || (isReserved && !isMine)}
+                >
+                  <span>{bookButtonLabel()}</span>
+                </button>
+              )}
               <button
                 type="button"
                 className="w-full h-12 rounded-xl border border-border bg-background text-primary text-sm font-bold inline-flex items-center justify-center"
@@ -946,6 +975,32 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               </button>
             </div>
           )}
+
+          {/* Slot 2 — group gift progress row */}
+          {wish.group_gift ? (
+            <button
+              type="button"
+              className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
+              onClick={() => setViewGroupGiftSheetOpen(true)}
+            >
+              <div className="flex justify-between items-center text-xs text-muted">
+                <span>{t("groupGift")}</span>
+                <span>
+                  {wish.group_gift.status === "cancelled"
+                    ? t("giftCancelled")
+                    : wish.group_gift.status === "completed" || wish.group_gift.percent_complete >= 100
+                    ? t("giftComplete")
+                    : t("giftProgress").replace("{percent}", String(wish.group_gift.percent_complete))}
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.min(100, wish.group_gift.percent_complete)}%` }}
+                />
+              </div>
+            </button>
+          ) : null}
 
           {wish.original_product_url ? (
             <a
@@ -986,6 +1041,18 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         }}
         isPending={copyWish.isPending}
       />
+      {createGroupGiftSheetOpen && (
+        <CreateGroupGiftSheet
+          wishId={wish.id}
+          onClose={() => setCreateGroupGiftSheetOpen(false)}
+        />
+      )}
+      {viewGroupGiftSheetOpen && (
+        <ViewGroupGiftSheet
+          wishId={wish.id}
+          onClose={() => setViewGroupGiftSheetOpen(false)}
+        />
+      )}
     </div>
   );
 }

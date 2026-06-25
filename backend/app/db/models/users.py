@@ -25,6 +25,9 @@ class User(Base):
     birthday_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
     wishlist_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
     booking_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="hide")
+    group_gift_visibility: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="hide", server_default="hide"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

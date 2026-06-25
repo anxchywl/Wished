@@ -25,6 +25,7 @@ def build_profile_response(user: User) -> ProfileResponse:
             birthday_visibility=user.birthday_visibility,
             wishlist_visibility=user.wishlist_visibility,
             booking_visibility=user.booking_visibility,
+            group_gift_visibility=user.group_gift_visibility,
         ),
         created_at=user.created_at,
         updated_at=user.updated_at,
@@ -53,6 +54,8 @@ async def update_current_profile(
             user.wishlist_visibility = payload.privacy.wishlist_visibility
         if "booking_visibility" in privacy_data:
             user.booking_visibility = payload.privacy.booking_visibility
+        if "group_gift_visibility" in privacy_data:
+            user.group_gift_visibility = payload.privacy.group_gift_visibility
 
     await db.commit()
     await db.refresh(user)

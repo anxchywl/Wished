@@ -32,6 +32,7 @@ def test_get_me_returns_current_profile() -> None:
             "birthday_visibility": "private",
             "wishlist_visibility": "public",
             "booking_visibility": "hide",
+            "group_gift_visibility": "hide",
         },
         "created_at": "2026-06-14T10:00:00Z",
         "updated_at": "2026-06-14T10:00:00Z",
@@ -53,6 +54,7 @@ def test_patch_me_updates_profile_fields() -> None:
             "privacy": {
                 "birthday_visibility": "private",
                 "wishlist_visibility": "private",
+                "group_gift_visibility": "names",
             },
         },
     )
@@ -64,10 +66,12 @@ def test_patch_me_updates_profile_fields() -> None:
         "birthday_visibility": "private",
         "wishlist_visibility": "private",
         "booking_visibility": "hide",
+        "group_gift_visibility": "names",
     }
     assert user.birthday is None
     assert user.birthday_visibility == "private"
     assert user.wishlist_visibility == "private"
+    assert user.group_gift_visibility == "names"
     assert db.committed is True
     assert db.refreshed_user is user
 
@@ -120,6 +124,7 @@ def _user() -> SimpleNamespace:
         birthday_visibility="private",
         wishlist_visibility="public",
         booking_visibility="hide",
+        group_gift_visibility="hide",
         created_at=timestamp,
         updated_at=timestamp,
         last_login_at=timestamp,

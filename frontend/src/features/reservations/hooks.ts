@@ -104,6 +104,7 @@ export function useCreateReservationMutation(wishlistId: string, shareToken?: st
           reservation_id: reservation.id,
           owner_booking_visibility: null,
           reserver_display_name: null,
+          has_active_group_gift: false,
         },
       );
       queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });

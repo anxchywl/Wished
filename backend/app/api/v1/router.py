@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.admin.router import router as admin_router
 from app.api.v1.auth.router import router as auth_router
+from app.api.v1.group_gifts.router import router as group_gifts_router
 from app.api.v1.health.router import router as health_router
 from app.api.v1.link_preview.router import router as link_preview_router
 from app.api.v1.marketplace.router import router as marketplace_router
@@ -15,6 +16,7 @@ from app.api.v1.wishlists.router import router as wishlists_router
 api_v1_router = APIRouter()
 api_v1_router.include_router(admin_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(group_gifts_router)
 api_v1_router.include_router(health_router, tags=["health"])
 api_v1_router.include_router(link_preview_router)
 api_v1_router.include_router(marketplace_router)

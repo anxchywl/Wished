@@ -37,10 +37,24 @@ export function BookingVisibilityHeaderButton() {
 
   const currentVisibility =
     (profileQuery.data?.privacy?.booking_visibility as BookingVisibility | undefined) ?? "hide";
+  const currentGroupGiftVisibility =
+    (profileQuery.data?.privacy?.group_gift_visibility as BookingVisibility | undefined) ?? "hide";
 
   function handleChange(value: BookingVisibility) {
     updatePrivacy.mutate(
       { booking_visibility: value },
+      {
+        onSuccess: () => {
+          setActive(false);
+          window.setTimeout(() => setOpen(false), 340);
+        },
+      },
+    );
+  }
+
+  function handleGroupGiftChange(value: BookingVisibility) {
+    updatePrivacy.mutate(
+      { group_gift_visibility: value },
       {
         onSuccess: () => {
           setActive(false);
@@ -95,6 +109,37 @@ export function BookingVisibilityHeaderButton() {
                       : option === "anonymous"
                       ? t("bookingVisibilityAnonymousDesc")
                       : t("bookingVisibilityNamesDesc")}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <h3 className="modal-title font-bold text-base mt-5 mb-4 text-center">{t("groupGiftVisibilityTitle")}</h3>
+            <div className="flex flex-col gap-2">
+              {(["hide", "anonymous", "names"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={`flex flex-col items-start px-4 py-3 rounded-xl border transition-all text-left ${
+                    currentGroupGiftVisibility === option
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border bg-background text-foreground"
+                  }`}
+                  onClick={() => handleGroupGiftChange(option)}
+                  disabled={updatePrivacy.isPending}
+                >
+                  <span className="text-sm font-bold">
+                    {option === "hide"
+                      ? t("groupGiftVisibilityHide")
+                      : option === "anonymous"
+                      ? t("groupGiftVisibilityAnonymous")
+                      : t("groupGiftVisibilityNames")}
+                  </span>
+                  <span className="text-xs text-muted mt-0.5">
+                    {option === "hide"
+                      ? t("groupGiftVisibilityHideDesc")
+                      : option === "anonymous"
+                      ? t("groupGiftVisibilityAnonymousDesc")
+                      : t("groupGiftVisibilityNamesDesc")}
                   </span>
                 </button>
               ))}

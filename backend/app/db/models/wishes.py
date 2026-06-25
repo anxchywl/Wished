@@ -48,3 +48,4 @@ class Wish(Base):
     wishlist = relationship("Wishlist", back_populates="wishes")
     images = relationship("WishImage", back_populates="wish", cascade="all, delete-orphan")
     reservation = relationship("Reservation", back_populates="wish", uselist=False, cascade="all, delete-orphan")
+    group_gift = relationship("GroupGift", back_populates="wish", uselist=False, lazy="selectin")

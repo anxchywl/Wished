@@ -30,6 +30,17 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Open Wish",
         "wish_fulfilled_title": "Wish fulfilled",
         "wish_fulfilled_body": "{actor} marked a wish as fulfilled.\n{title}",
+        "gg_transfer_reported_body": "{contributor} reported a transfer.\nAmount: {amount} {currency}\nWish: {wish_title}",
+        "gg_confirm_btn": "Confirm",
+        "gg_reject_btn": "Reject",
+        "gg_transfer_confirmed_body": "Your transfer was confirmed.\nWish: {wish_title}\nProgress: {percent}%",
+        "gg_transfer_rejected_body": "Your transfer could not be confirmed.\nWish: {wish_title}\nPlease transfer the amount again and tap 'I have transferred'.",
+        "gg_completed_organizer_immediate": "The group gift is complete.\nWish: {wish_title}\nTotal collected: {amount} {currency}",
+        "gg_completed_organizer_commit": "The goal has been reached.\nWish: {wish_title}\nTotal pledged: {amount} {currency}\n\nCollect transfers via:\n{payment_method}: {payment_phone}",
+        "gg_completed_contributor_immediate": "The group gift is complete.\nWish: {wish_title}",
+        "gg_completed_contributor_commit": "The goal has been reached.\nWish: {wish_title}\n\nPlease transfer your pledge to the organizer:\n{payment_method}: {payment_phone}",
+        "gg_gift_started_body": "Someone started a group gift for your wish '{wish_title}'.",
+        "gg_open_gift": "Open Gift",
     },
     "ru": {
         "followed_title": "Новый подписчик",
@@ -43,6 +54,17 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Открыть желание",
         "wish_fulfilled_title": "Желание исполнено",
         "wish_fulfilled_body": "{actor} отметил(а) желание как исполненное.\n{title}",
+        "gg_transfer_reported_body": "{contributor} сообщил(а) о переводе.\nСумма: {amount} {currency}\nЖелание: {wish_title}",
+        "gg_confirm_btn": "Подтвердить",
+        "gg_reject_btn": "Отклонить",
+        "gg_transfer_confirmed_body": "Ваш перевод подтверждён.\nЖелание: {wish_title}\nПрогресс: {percent}%",
+        "gg_transfer_rejected_body": "Ваш перевод не удалось подтвердить.\nЖелание: {wish_title}\nПожалуйста, переведите сумму снова и нажмите «Я перевёл(а)».",
+        "gg_completed_organizer_immediate": "Групповой подарок завершён.\nЖелание: {wish_title}\nВсего собрано: {amount} {currency}",
+        "gg_completed_organizer_commit": "Цель достигнута.\nЖелание: {wish_title}\nВсего обещано: {amount} {currency}\n\nПолучите переводы через:\n{payment_method}: {payment_phone}",
+        "gg_completed_contributor_immediate": "Групповой подарок завершён.\nЖелание: {wish_title}",
+        "gg_completed_contributor_commit": "Цель достигнута.\nЖелание: {wish_title}\n\nПожалуйста, переведите вашу долю организатору:\n{payment_method}: {payment_phone}",
+        "gg_gift_started_body": "Кто-то начал групповой подарок на ваше желание «{wish_title}».",
+        "gg_open_gift": "Открыть подарок",
     },
     "kz": {
         "followed_title": "Жаңа жазылушы",
@@ -56,6 +78,17 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Тілекті ашу",
         "wish_fulfilled_title": "Тілек орындалды",
         "wish_fulfilled_body": "{actor} тілекті орындалды деп белгіледі.\n{title}",
+        "gg_transfer_reported_body": "{contributor} аударым туралы хабарлады.\nСома: {amount} {currency}\nТілек: {wish_title}",
+        "gg_confirm_btn": "Растау",
+        "gg_reject_btn": "Қабылдамау",
+        "gg_transfer_confirmed_body": "Сіздің аударымыңыз расталды.\nТілек: {wish_title}\nПрогресс: {percent}%",
+        "gg_transfer_rejected_body": "Сіздің аударымыңызды растау мүмкін болмады.\nТілек: {wish_title}\nСоманы қайта аударып, «Аударым жасадым» батырмасын басыңыз.",
+        "gg_completed_organizer_immediate": "Топтық сыйлық аяқталды.\nТілек: {wish_title}\nЖалпы жиналды: {amount} {currency}",
+        "gg_completed_organizer_commit": "Мақсатқа жетілді.\nТілек: {wish_title}\nЖалпы уәде: {amount} {currency}\n\nАударымдарды қабылдаңыз:\n{payment_method}: {payment_phone}",
+        "gg_completed_contributor_immediate": "Топтық сыйлық аяқталды.\nТілек: {wish_title}",
+        "gg_completed_contributor_commit": "Мақсатқа жетілді.\nТілек: {wish_title}\n\nҮлесіңізді ұйымдастырушыға аударыңыз:\n{payment_method}: {payment_phone}",
+        "gg_gift_started_body": "Біреу '{wish_title}' тілегіңізге топтық сыйлық бастады.",
+        "gg_open_gift": "Сыйлықты ашу",
     },
 }
 
@@ -300,3 +333,249 @@ async def _get_followers(db: AsyncSession, owner_id: UUID) -> list[tuple[int, st
         .where(Follow.followed_user_id == owner_id)
     )
     return list(result.all())
+
+
+async def handle_transfer_reported(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify organizer when a contributor reports a transfer, with confirm/reject buttons"""
+    organizer_id = UUID(event["organizer_user_id"])
+    event_id = event["event_id"]
+
+    result = await db.execute(select(User).where(User.id == organizer_id))
+    organizer = result.scalar_one_or_none()
+    if organizer is None or organizer.telegram_id is None:
+        return
+
+    if await _is_duplicate(redis, event_id, organizer.telegram_id):
+        return
+
+    if not await _check_outbound_rate(redis):
+        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_REPORTED for telegram_id=%s", organizer.telegram_id)
+        return
+
+    t = _text(organizer.language_code)
+    text = t["gg_transfer_reported_body"].format(
+        contributor=event["contributor_first_name"],
+        amount=event["amount"],
+        currency=event["currency"],
+        wish_title=event["wish_title"],
+    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=t["gg_confirm_btn"],
+            callback_data=f"gg_confirm:{event['contribution_id']}",
+        ),
+        InlineKeyboardButton(
+            text=t["gg_reject_btn"],
+            callback_data=f"gg_reject:{event['contribution_id']}",
+        ),
+    ]])
+    try:
+        await bot.send_message(chat_id=organizer.telegram_id, text=text, reply_markup=keyboard)
+        logger.info("sent TRANSFER_REPORTED notification to telegram_id=%s", organizer.telegram_id)
+    except Exception:
+        logger.exception("failed to send TRANSFER_REPORTED notification to telegram_id=%s", organizer.telegram_id)
+
+
+async def handle_transfer_confirmed(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify contributor that their transfer was confirmed"""
+    contributor_id = UUID(event["contributor_user_id"])
+    event_id = event["event_id"]
+
+    result = await db.execute(select(User).where(User.id == contributor_id))
+    contributor = result.scalar_one_or_none()
+    if contributor is None or contributor.telegram_id is None:
+        return
+
+    if await _is_duplicate(redis, event_id, contributor.telegram_id):
+        return
+
+    if not await _check_outbound_rate(redis):
+        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_CONFIRMED for telegram_id=%s", contributor.telegram_id)
+        return
+
+    t = _text(contributor.language_code)
+    text = t["gg_transfer_confirmed_body"].format(
+        wish_title=event["wish_title"],
+        percent=event["percent_complete"],
+    )
+    url = wish_url_by_id(
+        mini_app_url,
+        event["owner_user_id"],
+        event["wishlist_id"],
+        event["wish_id"],
+    )
+    try:
+        await _send(bot, contributor.telegram_id, text, t["gg_open_gift"], url)
+        logger.info("sent TRANSFER_CONFIRMED notification to telegram_id=%s", contributor.telegram_id)
+    except Exception:
+        logger.exception("failed to send TRANSFER_CONFIRMED notification to telegram_id=%s", contributor.telegram_id)
+
+
+async def handle_transfer_rejected(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify contributor that their reported transfer was rejected"""
+    contributor_id = UUID(event["contributor_user_id"])
+    event_id = event["event_id"]
+
+    result = await db.execute(select(User).where(User.id == contributor_id))
+    contributor = result.scalar_one_or_none()
+    if contributor is None or contributor.telegram_id is None:
+        return
+
+    if await _is_duplicate(redis, event_id, contributor.telegram_id):
+        return
+
+    if not await _check_outbound_rate(redis):
+        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_REJECTED for telegram_id=%s", contributor.telegram_id)
+        return
+
+    t = _text(contributor.language_code)
+    text = t["gg_transfer_rejected_body"].format(wish_title=event["wish_title"])
+    try:
+        await bot.send_message(chat_id=contributor.telegram_id, text=text)
+        logger.info("sent TRANSFER_REJECTED notification to telegram_id=%s", contributor.telegram_id)
+    except Exception:
+        logger.exception("failed to send TRANSFER_REJECTED notification to telegram_id=%s", contributor.telegram_id)
+
+
+async def handle_group_gift_completed(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify organizer and all contributors that the group gift goal has been reached.
+
+    The wish owner is neither the organizer nor in the contributor list, so payment
+    details are never sent to them by construction — no extra filtering needed.
+    """
+    organizer_id = UUID(event["organizer_user_id"])
+    contributor_ids = [UUID(uid) for uid in event["contributor_user_ids"]]
+    collection_type = event["collection_type"]
+    wish_title = event["wish_title"]
+    total_collected = event["total_collected"]
+    currency = event["currency"]
+    payment_method = event["payment_method"]
+    payment_phone = event["payment_phone"]
+    payment_comment = event.get("payment_comment", "")
+    group_gift_id = event["group_gift_id"]
+
+    result = await db.execute(select(User).where(User.id == organizer_id))
+    organizer = result.scalar_one_or_none()
+
+    contributors: list[User] = []
+    if contributor_ids:
+        result = await db.execute(select(User).where(User.id.in_(contributor_ids)))
+        contributors = list(result.scalars().all())
+
+    # organizer message
+    if organizer and organizer.telegram_id is not None:
+        dedup_key = f"notif:gg_complete:{group_gift_id}:{organizer.telegram_id}"
+        already_sent = await redis.set(dedup_key, "1", nx=True, ex=DEDUP_TTL_SECONDS) is None
+        if not already_sent:
+            if not await _check_outbound_rate(redis):
+                logger.warning("outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (organizer) for telegram_id=%s", organizer.telegram_id)
+            else:
+                t = _text(organizer.language_code)
+                if collection_type == "immediate":
+                    body = t["gg_completed_organizer_immediate"].format(
+                        wish_title=wish_title,
+                        amount=total_collected,
+                        currency=currency,
+                    )
+                else:
+                    body = t["gg_completed_organizer_commit"].format(
+                        wish_title=wish_title,
+                        amount=total_collected,
+                        currency=currency,
+                        payment_method=payment_method,
+                        payment_phone=payment_phone,
+                    )
+                    if payment_comment:
+                        body += f"\n\n{payment_comment}"
+                try:
+                    await bot.send_message(chat_id=organizer.telegram_id, text=body)
+                    logger.info("sent GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s", organizer.telegram_id)
+                except Exception:
+                    logger.exception("failed to send GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s", organizer.telegram_id)
+
+    # contributor messages
+    for contributor in contributors:
+        if contributor.telegram_id is None:
+            continue
+        dedup_key = f"notif:gg_complete:{group_gift_id}:{contributor.telegram_id}"
+        already_sent = await redis.set(dedup_key, "1", nx=True, ex=DEDUP_TTL_SECONDS) is None
+        if already_sent:
+            continue
+        if not await _check_outbound_rate(redis):
+            logger.warning("outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (contributor) for telegram_id=%s", contributor.telegram_id)
+            continue
+        t = _text(contributor.language_code)
+        if collection_type == "immediate":
+            body = t["gg_completed_contributor_immediate"].format(wish_title=wish_title)
+        else:
+            body = t["gg_completed_contributor_commit"].format(
+                wish_title=wish_title,
+                payment_method=payment_method,
+                payment_phone=payment_phone,
+            )
+            if payment_comment:
+                body += f"\n\n{payment_comment}"
+        try:
+            await bot.send_message(chat_id=contributor.telegram_id, text=body)
+            logger.info("sent GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s", contributor.telegram_id)
+        except Exception:
+            logger.exception("failed to send GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s", contributor.telegram_id)
+
+
+async def handle_group_gift_created(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify wish owner when a group gift is started, unless they have opted out"""
+    owner_id = UUID(event["wishlist_owner_user_id"])
+    event_id = event["event_id"]
+
+    result = await db.execute(select(User).where(User.id == owner_id))
+    owner = result.scalar_one_or_none()
+    if owner is None or owner.telegram_id is None:
+        return
+
+    if getattr(owner, "group_gift_visibility", "hide") == "hide":
+        return
+
+    if await _is_duplicate(redis, event_id, owner.telegram_id):
+        return
+
+    if not await _check_outbound_rate(redis):
+        logger.warning("outbound Telegram rate limit hit — dropping GROUP_GIFT_CREATED for telegram_id=%s", owner.telegram_id)
+        return
+
+    t = _text(owner.language_code)
+    text = t["gg_gift_started_body"].format(wish_title=event["wish_title"])
+    try:
+        await bot.send_message(chat_id=owner.telegram_id, text=text)
+        logger.info("sent GROUP_GIFT_CREATED notification to telegram_id=%s", owner.telegram_id)
+    except Exception:
+        logger.exception("failed to send GROUP_GIFT_CREATED notification to telegram_id=%s", owner.telegram_id)

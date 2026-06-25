@@ -8,6 +8,7 @@ ProfileVisibility = Literal["private", "public", "friends"]
 BirthdayVisibility = Literal["private", "public", "friends", "hidden"]
 WishlistVisibility = Literal["private", "public", "friends"]
 BookingVisibility = Literal["hide", "anonymous", "names"]
+GroupGiftVisibility = Literal["hide", "anonymous", "names"]
 
 
 class PrivacySettingsResponse(BaseModel):
@@ -16,6 +17,7 @@ class PrivacySettingsResponse(BaseModel):
     birthday_visibility: BirthdayVisibility
     wishlist_visibility: WishlistVisibility
     booking_visibility: BookingVisibility
+    group_gift_visibility: GroupGiftVisibility
 
 
 class ProfileResponse(BaseModel):
@@ -43,6 +45,7 @@ class PrivacySettingsUpdate(BaseModel):
     birthday_visibility: BirthdayVisibility | None = None
     wishlist_visibility: WishlistVisibility | None = None
     booking_visibility: BookingVisibility | None = None
+    group_gift_visibility: GroupGiftVisibility | None = None
 
 
 class ProfileUpdateRequest(BaseModel):

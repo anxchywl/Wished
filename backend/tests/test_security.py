@@ -452,7 +452,9 @@ async def test_reservation_integrity_error_raises_409() -> None:
     accessible_result = AsyncMock()
     accessible_result.scalar_one_or_none = MagicMock(return_value=wish_mock)
 
-    db.execute = AsyncMock(side_effect=[accessible_result, active_result])
+    no_group_gift = AsyncMock()
+    no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
+    db.execute = AsyncMock(side_effect=[accessible_result, no_group_gift, active_result])
     db.add = MagicMock()
     db.commit = AsyncMock(side_effect=IntegrityError("unique violation", {}, None))
     db.rollback = AsyncMock()

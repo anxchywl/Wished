@@ -46,7 +46,30 @@ export function useUpdatePrivacyMutation() {
       birthday_visibility?: string;
       wishlist_visibility?: string;
       booking_visibility?: string;
+      group_gift_visibility?: string;
     }) => patchPrivacy(accessToken ?? "", privacy),
+    onMutate: async (privacy) => {
+      await queryClient.cancelQueries({ queryKey: ["profile", tgUserId] });
+      const previousProfile = queryClient.getQueryData(["profile", tgUserId]);
+      queryClient.setQueryData(["profile", tgUserId], (current: unknown) => {
+        if (!current || typeof current !== "object" || !("privacy" in current)) {
+          return current;
+        }
+        return {
+          ...current,
+          privacy: {
+            ...(current as { privacy: Record<string, unknown> }).privacy,
+            ...privacy,
+          },
+        };
+      });
+      return { previousProfile };
+    },
+    onError: (_error, _privacy, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(["profile", tgUserId], context.previousProfile);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", tgUserId] });
     },
