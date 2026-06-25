@@ -7,7 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
 import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
-import { CreateGroupGiftSheet } from "@/features/group-gifts/create-group-gift-sheet";
+import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
 import { userQueryKeys, useFollowMutation, useFollowByIdMutation, useUserProfileQuery, useUserProfileByIdQuery, useUserWishlistsByIdQuery } from "@/features/users/hooks";
@@ -38,7 +38,7 @@ type PublicWishlistNavigatorProps = {
   onClose: () => void;
 };
 
-type NavigationView = "user" | "wishlist" | "wish" | "copy";
+type NavigationView = "user" | "wishlist" | "wish" | "copy" | "createGroupGift";
 type NavigationFrame = {
   view: NavigationView;
   wishlistId?: string;
@@ -147,6 +147,12 @@ export function PublicWishlistNavigator({
     setStack((currentStack) => [...currentStack, { view: "wish", wishlistId, wishId, wishTitle }]);
   }
 
+  function handleCreateGroupGiftOpen(wishlistId: string, wishId: string) {
+    setDirection("forward");
+    setPreviousFrame(current);
+    setStack((currentStack) => [...currentStack, { view: "createGroupGift", wishlistId, wishId }]);
+  }
+
   function renderFrame(frame: NavigationFrame) {
     if (frame.view === "user") {
       return (
@@ -166,11 +172,27 @@ export function PublicWishlistNavigator({
     }
 
     if (frame.view === "wish" && frame.wishlistId && frame.wishId) {
-      return <PublicWishView wishlistId={frame.wishlistId} wishId={frame.wishId} shareToken={shareToken} />;
+      return (
+        <PublicWishView
+          wishlistId={frame.wishlistId}
+          wishId={frame.wishId}
+          shareToken={shareToken}
+          onOpenCreateGroupGift={handleCreateGroupGiftOpen}
+        />
+      );
     }
 
     if (frame.view === "copy" && frame.wishlistId && frame.wishId) {
       return <PublicCopyView wishlistId={frame.wishlistId} wishId={frame.wishId} onCopySuccess={handleCopySuccess} />;
+    }
+
+    if (frame.view === "createGroupGift" && frame.wishlistId && frame.wishId) {
+      return (
+        <PublicCreateGroupGiftView
+          wishId={frame.wishId}
+          onDone={handleBack}
+        />
+      );
     }
 
     return null;
@@ -205,6 +227,8 @@ export function PublicWishlistNavigator({
               ? (current.wishlistTitle ?? t("wishlists"))
               : current.view === "wish"
               ? (current.wishTitle ?? t("wishes"))
+              : current.view === "createGroupGift"
+              ? t("createGroupGift")
               : t("copyToMyWishlist")}
           </h2>
           <span className="w-10" />
@@ -590,12 +614,13 @@ type PublicWishViewProps = {
   wishlistId: string;
   wishId: string;
   shareToken?: string | null;
+  onOpenCreateGroupGift: (wishlistId: string, wishId: string) => void;
 };
 
 /**
  * show public wish
  */
-function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps) {
+function PublicWishView({ wishlistId, wishId, shareToken, onOpenCreateGroupGift }: PublicWishViewProps) {
   const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
   const wish = useMemo(
     () => wishesQuery.data?.items.find((item) => item.id === wishId) ?? null,
@@ -611,7 +636,6 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
   const hasActiveGroupGift =
     wish?.group_gift?.status === "active" || status?.has_active_group_gift === true;
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
-  const [createGroupGiftSheetOpen, setCreateGroupGiftSheetOpen] = useState(false);
 
   function handleBook() {
     if (!isReserved && !isCompleted) {
@@ -681,7 +705,7 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
                 <button
                   type="button"
                   className="public-action-button border border-border bg-background text-primary"
-                  onClick={() => setCreateGroupGiftSheetOpen(true)}
+                  onClick={() => onOpenCreateGroupGift(wishlistId, wishId)}
                 >
                   {t("createGroupGift")}
                 </button>
@@ -766,13 +790,24 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
           onClose={() => setViewGroupGiftSheetOpen(false)}
         />
       )}
-      {createGroupGiftSheetOpen && (
-        <CreateGroupGiftSheet
-          wishId={wishId}
-          shareToken={shareToken}
-          onClose={() => setCreateGroupGiftSheetOpen(false)}
-        />
-      )}
+    </div>
+  );
+}
+
+type PublicCreateGroupGiftViewProps = {
+  wishId: string;
+  onDone: () => void;
+};
+
+function PublicCreateGroupGiftView({ wishId, onDone }: PublicCreateGroupGiftViewProps) {
+  return (
+    <div className="public-nav-content px-4">
+      <CreateGroupGiftContent
+        wishId={wishId}
+        showTitle={false}
+        onCancel={onDone}
+        onClose={onDone}
+      />
     </div>
   );
 }

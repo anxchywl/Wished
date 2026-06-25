@@ -78,7 +78,7 @@ import {
   useCompleteWishMutation,
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
-import { CreateGroupGiftSheet } from "@/features/group-gifts/create-group-gift-sheet";
+import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
 
 function formatPrice(price: string | null, currency: string | null) {
@@ -703,7 +703,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [active, setActive] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
-  const [createGroupGiftSheetOpen, setCreateGroupGiftSheetOpen] = useState(false);
+  const [createGroupGiftOpen, setCreateGroupGiftOpen] = useState(false);
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
@@ -721,7 +721,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     }
     if (!open) {
       setRemoveBookingConfirming(false);
-      setCreateGroupGiftSheetOpen(false);
+      setCreateGroupGiftOpen(false);
       setViewGroupGiftSheetOpen(false);
     }
   }, [open]);
@@ -791,7 +791,18 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {isOwner && !removeBookingConfirming ? (
+          {createGroupGiftOpen ? (
+            <button
+              type="button"
+              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
+              onClick={() => setCreateGroupGiftOpen(false)}
+              aria-label={t("back")}
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          ) : isOwner && !removeBookingConfirming ? (
             <button
               type="button"
               className={`pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-sm font-bold ${isCompleted ? "text-green-500" : "text-muted"}`}
@@ -821,9 +832,11 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             <span className="w-10" />
           )}
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
-            {wish.title}
+            {createGroupGiftOpen ? t("createGroupGift") : wish.title}
           </h3>
-          {isOwner && !removeBookingConfirming ? (
+          {createGroupGiftOpen ? (
+            <span className="w-10" />
+          ) : isOwner && !removeBookingConfirming ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-primary"
@@ -839,6 +852,17 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
         </div>
 
+        {createGroupGiftOpen ? (
+          <div className="modal-footer-transition opacity-100 max-h-[760px] scale-100">
+            <CreateGroupGiftContent
+              wishId={wish.id}
+              showTitle={false}
+              onCancel={() => setCreateGroupGiftOpen(false)}
+              onClose={() => setCreateGroupGiftOpen(false)}
+            />
+          </div>
+        ) : (
+          <>
         <div
           className={`modal-footer-transition ${
             removeBookingConfirming
@@ -963,7 +987,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                     <button
                       type="button"
                       className="w-full h-11 rounded-xl border border-border bg-background text-primary text-sm font-semibold inline-flex items-center justify-center"
-                      onClick={() => setCreateGroupGiftSheetOpen(true)}
+                      onClick={() => setCreateGroupGiftOpen(true)}
                     >
                       {t("createGroupGift")}
                     </button>
@@ -1031,6 +1055,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
         </div>
         </div>
+          </>
+        )}
       </div>
       <CopyWishModal
         open={copyModalOpen}
@@ -1045,12 +1071,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         }}
         isPending={copyWish.isPending}
       />
-      {createGroupGiftSheetOpen && (
-        <CreateGroupGiftSheet
-          wishId={wish.id}
-          onClose={() => setCreateGroupGiftSheetOpen(false)}
-        />
-      )}
       {viewGroupGiftSheetOpen && (
         <ViewGroupGiftSheet
           wishId={wish.id}

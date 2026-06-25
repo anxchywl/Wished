@@ -13,6 +13,13 @@ type Props = {
   onClose: () => void;
 };
 
+type CreateGroupGiftContentProps = {
+  wishId: string;
+  onClose: () => void;
+  onCancel?: () => void;
+  showTitle?: boolean;
+};
+
 const PHONE_RE = /^\+?[\d\s\-]{7,30}$/;
 
 const ERROR_MAP: Record<string, string> = {
@@ -21,17 +28,7 @@ const ERROR_MAP: Record<string, string> = {
 };
 
 export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
-  const { t } = useTranslation();
   const [active, setActive] = useState(false);
-  const [step, setStep] = useState<1 | 2>(1);
-  const [collectionType, setCollectionType] = useState<"immediate" | "commit" | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [paymentPhone, setPaymentPhone] = useState("");
-  const [paymentComment, setPaymentComment] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [submitError, setSubmitError] = useState("");
-
-  const createMutation = useCreateGroupGiftMutation(wishId);
 
   useEffect(() => {
     requestAnimationFrame(() => setActive(true));
@@ -42,9 +39,39 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
     window.setTimeout(onClose, 340);
   }
 
+  return (
+    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
+      <div
+        className={`modal-sheet ${active ? "visible" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-handle" />
+        <CreateGroupGiftContent wishId={wishId} onClose={handleClose} />
+      </div>
+    </div>
+  );
+}
+
+export function CreateGroupGiftContent({
+  wishId,
+  onClose,
+  onCancel,
+  showTitle = true,
+}: CreateGroupGiftContentProps) {
+  const { t } = useTranslation();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [collectionType, setCollectionType] = useState<"immediate" | "commit" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentPhone, setPaymentPhone] = useState("");
+  const [paymentComment, setPaymentComment] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+
+  const createMutation = useCreateGroupGiftMutation(wishId);
+
   function handlePhoneBlur() {
     if (paymentPhone && !PHONE_RE.test(paymentPhone)) {
-      setPhoneError(t("paymentPhoneLabel") + ": " + t("productUrlInvalid").replace("Kaspi, Wildberries, або Ozon", "").trim());
+      setPhoneError(t("invalidPhoneNumber"));
     } else {
       setPhoneError("");
     }
@@ -52,7 +79,7 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
 
   function validatePhone() {
     if (!PHONE_RE.test(paymentPhone)) {
-      setPhoneError(t("paymentPhoneLabel") + " invalid");
+      setPhoneError(t("invalidPhoneNumber"));
       return false;
     }
     setPhoneError("");
@@ -72,7 +99,7 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
 
     setSubmitError("");
     createMutation.mutate(payload, {
-      onSuccess: () => handleClose(),
+      onSuccess: () => onClose(),
       onError: (err) => {
         if (err instanceof ApiError) {
           const detail = (err.payload as { detail?: string } | null)?.detail ?? "";
@@ -86,15 +113,12 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
   }
 
   return (
-    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
-      <div
-        className={`modal-sheet ${active ? "visible" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-handle" />
+    <>
+      {showTitle ? (
         <h3 className="modal-title font-bold text-base mb-4 text-center">
           {t("createGroupGift")}
         </h3>
+      ) : null}
 
         {step === 1 ? (
           <div className="flex flex-col gap-3">
@@ -133,7 +157,7 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
                 <button
                   type="button"
                   className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-                  onClick={handleClose}
+                  onClick={onCancel ?? onClose}
                 >
                   {t("cancelButton")}
                 </button>
@@ -223,7 +247,6 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </>
   );
 }
