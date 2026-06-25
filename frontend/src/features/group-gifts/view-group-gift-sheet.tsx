@@ -172,6 +172,10 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </div>
         ) : !gift ? (
           <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
+        ) : actionMode !== "overview" ? (
+          <div className="transition-all duration-200">
+            {renderActionPanel()}
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2.5">
@@ -202,17 +206,14 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
                     ? t("giftComplete")
                     : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
                 </span>
-                <span className="text-muted">
-                  {t("contributors")}: {gift.contributor_count}
-                </span>
               </div>
             </div>
-
-            {renderMembers()}
 
             <div className="border-t border-border pt-4">
               {renderActionPanel()}
             </div>
+
+            {renderMembers()}
           </div>
         )}
     </>
@@ -347,7 +348,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     return (
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-          {t("contributors")}
+          {t("contributors")} ({gift?.contributor_count ?? members.length})
         </p>
         <div className="flex flex-col gap-2">
           {members.map((member) => {
@@ -422,40 +423,30 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
-            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-between gap-1.5 text-primary"
+            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-center text-primary"
             onClick={() => setActionMode("purchase")}
             aria-label={t("markGiftPurchased")}
             title={t("markGiftPurchased")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionPurchased")}</span>
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-            </svg>
           </button>
           <button
             type="button"
-            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-between gap-1.5 text-primary"
+            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-center text-primary"
             onClick={() => setActionMode("editPayment")}
             aria-label={t("editPaymentDetails")}
             title={t("editPaymentDetails")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionEdit")}</span>
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.875 4.5" />
-            </svg>
           </button>
           <button
             type="button"
-            className="h-11 rounded-xl bg-red-500/10 px-2 inline-flex items-center justify-between gap-1.5 text-red-500"
+            className="h-11 rounded-xl bg-red-500/10 px-2 inline-flex items-center justify-center text-red-500"
             onClick={() => setActionMode("cancel")}
             aria-label={t("cancelGiftButton")}
             title={t("cancelGiftButton")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
-            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
           </button>
         </div>
       </div>
