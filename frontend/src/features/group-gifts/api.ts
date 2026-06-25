@@ -45,6 +45,12 @@ export interface GroupGiftCreatePayload {
   payment_comment?: string;
 }
 
+export interface GroupGiftPaymentDetailsPayload {
+  payment_method: string;
+  payment_phone: string;
+  payment_comment?: string;
+}
+
 export function createGroupGift(
   accessToken: string | null,
   wishId: string,
@@ -74,6 +80,28 @@ export function cancelGroupGift(
     method: "DELETE",
     accessToken,
   }).then(() => undefined);
+}
+
+export function updateGroupGiftPaymentDetails(
+  accessToken: string | null,
+  groupGiftId: string,
+  payload: GroupGiftPaymentDetailsPayload,
+): Promise<GroupGiftResponse> {
+  return apiClient<GroupGiftResponse>(`/group-gifts/${groupGiftId}/payment-details`, {
+    method: "PATCH",
+    body: payload,
+    accessToken,
+  });
+}
+
+export function markGroupGiftPurchased(
+  accessToken: string | null,
+  groupGiftId: string,
+): Promise<GroupGiftResponse> {
+  return apiClient<GroupGiftResponse>(`/group-gifts/${groupGiftId}/purchase`, {
+    method: "POST",
+    accessToken,
+  });
 }
 
 export function joinGroupGift(

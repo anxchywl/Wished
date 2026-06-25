@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type ContributionSummary,
   type GroupGiftCreatePayload,
+  type GroupGiftPaymentDetailsPayload,
   type GroupGiftResponse,
   cancelGroupGift,
   createGroupGift,
@@ -11,7 +12,9 @@ import {
   getGroupGift,
   joinGroupGift,
   leaveGroupGift,
+  markGroupGiftPurchased,
   reportTransfer,
+  updateGroupGiftPaymentDetails,
 } from "@/features/group-gifts/api";
 import { groupGiftQueryKeys } from "@/features/group-gifts/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
@@ -53,6 +56,34 @@ export function useCancelGroupGiftMutation(wishId: string, groupGiftId: string) 
     mutationFn: () => cancelGroupGift(accessToken, groupGiftId),
     onSuccess: () => {
       queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
+    },
+  });
+}
+
+export function useUpdateGroupGiftPaymentDetailsMutation(wishId: string, groupGiftId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (payload: GroupGiftPaymentDetailsPayload) => (
+      updateGroupGiftPaymentDetails(accessToken, groupGiftId, payload)
+    ),
+    onSuccess: (result) => {
+      queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
+    },
+  });
+}
+
+export function useMarkGroupGiftPurchasedMutation(wishId: string, groupGiftId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: () => markGroupGiftPurchased(accessToken, groupGiftId),
+    onSuccess: (result) => {
+      queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
       queryClient.invalidateQueries({ queryKey: ["wishes"] });
     },
   });

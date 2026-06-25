@@ -32,6 +32,30 @@ class GroupGiftCreateRequest(BaseModel):
         return value
 
 
+class GroupGiftPaymentDetailsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    payment_method: str = Field(min_length=1, max_length=100)
+    payment_phone: str = Field(min_length=7, max_length=30)
+    payment_comment: str | None = Field(default=None, max_length=500)
+
+    @field_validator("payment_method", "payment_comment", mode="before")
+    @classmethod
+    def strip_strings(cls, value: str | None) -> str | None:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("payment_phone", mode="before")
+    @classmethod
+    def strip_and_validate_phone(cls, value: str) -> str:
+        if isinstance(value, str):
+            value = value.strip()
+        if not re.match(r"^\+?[\d\s\-]{7,30}$", value):
+            raise ValueError("Invalid phone number format")
+        return value
+
+
 class ContributionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

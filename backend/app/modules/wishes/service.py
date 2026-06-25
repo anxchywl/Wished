@@ -469,11 +469,14 @@ def _build_group_gift_summary(
     if not gift or gift.status != "active":
         return None
 
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    is_organizer = gift.organizer_user_id == current_user.id
+    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
+
     group_gift_visibility = getattr(current_user, "group_gift_visibility", "hide")
-    if is_owner and group_gift_visibility == "hide":
+    if is_owner and not is_organizer and not is_contributor and group_gift_visibility == "hide":
         return None
 
-    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
     confirmed_statuses = {"confirmed", "pledged", "notified"}
     collected_amount = sum(
         (c.amount for c in non_cancelled if c.status in confirmed_statuses),
@@ -485,9 +488,6 @@ def _build_group_gift_summary(
         if total_amount and total_amount > 0
         else 0
     )
-
-    is_organizer = gift.organizer_user_id == current_user.id
-    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
 
     return GroupGiftSummary(
         id=gift.id,

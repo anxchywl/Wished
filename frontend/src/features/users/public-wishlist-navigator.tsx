@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
 import { ViewGroupGiftSheet } from "@/features/group-gifts/view-group-gift-sheet";
+import { CreateGroupGiftSheet } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
 import { userQueryKeys, useFollowMutation, useFollowByIdMutation, useUserProfileQuery, useUserProfileByIdQuery, useUserWishlistsByIdQuery } from "@/features/users/hooks";
@@ -610,6 +611,7 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
   const hasActiveGroupGift =
     wish?.group_gift?.status === "active" || status?.has_active_group_gift === true;
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
+  const [createGroupGiftSheetOpen, setCreateGroupGiftSheetOpen] = useState(false);
 
   function handleBook() {
     if (!isReserved && !isCompleted) {
@@ -666,14 +668,25 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
               </button>
             )
           ) : (
-            <button
-              type="button"
-              className="public-action-button public-action-primary"
-              onClick={handleBook}
-              disabled={isBusy || isReserved}
-            >
-              {bookButtonLabel()}
-            </button>
+            <>
+              <button
+                type="button"
+                className="public-action-button public-action-primary"
+                onClick={handleBook}
+                disabled={isBusy || isReserved}
+              >
+                {bookButtonLabel()}
+              </button>
+              {!isReserved ? (
+                <button
+                  type="button"
+                  className="public-action-button border border-border bg-background text-primary"
+                  onClick={() => setCreateGroupGiftSheetOpen(true)}
+                >
+                  {t("createGroupGift")}
+                </button>
+              ) : null}
+            </>
           )}
 
           {/* Slot 2 — group gift progress row */}
@@ -751,6 +764,13 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
           wishId={wishId}
           shareToken={shareToken}
           onClose={() => setViewGroupGiftSheetOpen(false)}
+        />
+      )}
+      {createGroupGiftSheetOpen && (
+        <CreateGroupGiftSheet
+          wishId={wishId}
+          shareToken={shareToken}
+          onClose={() => setCreateGroupGiftSheetOpen(false)}
         />
       )}
     </div>

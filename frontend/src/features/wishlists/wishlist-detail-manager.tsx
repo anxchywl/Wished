@@ -928,13 +928,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                   }
                 </button>
               )}
-              <button
-                type="button"
-                className="w-full h-11 rounded-xl border border-border bg-background text-primary text-sm font-semibold inline-flex items-center justify-center"
-                onClick={() => setCreateGroupGiftSheetOpen(true)}
-              >
-                {t("createGroupGift")}
-              </button>
             </div>
           )}
 
@@ -957,14 +950,25 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                   </button>
                 )
               ) : (
-                <button
-                  type="button"
-                  className={bookButtonClass()}
-                  onClick={handleBookToggle}
-                  disabled={isBusy || (isReserved && !isMine)}
-                >
-                  <span>{bookButtonLabel()}</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={bookButtonClass()}
+                    onClick={handleBookToggle}
+                    disabled={isBusy || (isReserved && !isMine)}
+                  >
+                    <span>{bookButtonLabel()}</span>
+                  </button>
+                  {!isReserved ? (
+                    <button
+                      type="button"
+                      className="w-full h-11 rounded-xl border border-border bg-background text-primary text-sm font-semibold inline-flex items-center justify-center"
+                      onClick={() => setCreateGroupGiftSheetOpen(true)}
+                    >
+                      {t("createGroupGift")}
+                    </button>
+                  ) : null}
+                </>
               )}
               <button
                 type="button"

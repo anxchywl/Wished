@@ -8,13 +8,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import User, Wish
+from app.db.models import Reservation, User, Wish
 from app.db.models.group_gifts import GroupGift, GroupGiftContribution
+from app.modules.cache import cache_delete, wishes_cache_key
 from app.modules.events import publish_event
 from app.modules.group_gifts.schemas import (
     ContributionCreateRequest,
     ContributionSummary,
     GroupGiftCreateRequest,
+    GroupGiftPaymentDetailsUpdate,
     GroupGiftResponse,
 )
 
@@ -26,6 +28,80 @@ def _organizer_display_name(organizer: User | None) -> str | None:
     if organizer is None:
         return None
     return f"@{organizer.username}" if organizer.username else organizer.first_name
+
+
+def _build_group_gift_response(
+    wish: Wish,
+    gift: GroupGift,
+    current_user: User,
+    non_cancelled: list[GroupGiftContribution],
+    status_override: str | None = None,
+) -> GroupGiftResponse:
+    collected_amount = sum(
+        (c.amount for c in non_cancelled if c.status in _CONFIRMED_STATUSES),
+        Decimal("0"),
+    )
+    total_amount = wish.price
+    percent_complete = (
+        min(100, int(collected_amount / total_amount * 100))
+        if total_amount and total_amount > 0
+        else 0
+    )
+
+    is_organizer = current_user.id == gift.organizer_user_id
+    my_contrib = next(
+        (c for c in non_cancelled if c.contributor_user_id == current_user.id),
+        None,
+    )
+    is_contributor = my_contrib is not None
+    display_status = status_override or (
+        "cancelled" if gift.organizer and gift.organizer.is_blocked else gift.status
+    )
+
+    show_payment = display_status != "cancelled" and (is_organizer or is_contributor)
+    organizer_display_name: str | None = None
+    if is_contributor and my_contrib.status in _CONFIRMED_STATUSES:
+        organizer_display_name = _organizer_display_name(gift.organizer)
+
+    is_owner = wish.wishlist.owner_user_id == current_user.id
+    if is_owner and not is_organizer and not is_contributor:
+        visibility = getattr(current_user, "group_gift_visibility", "hide")
+        if visibility == "names":
+            organizer_display_name = _organizer_display_name(gift.organizer)
+        else:
+            organizer_display_name = None
+        show_payment = False
+
+    if display_status == "cancelled":
+        show_payment = False
+
+    return GroupGiftResponse(
+        id=gift.id,
+        wish_id=gift.wish_id,
+        collection_type=gift.collection_type,
+        status=display_status,
+        payment_method=gift.payment_method if show_payment else None,
+        payment_phone=gift.payment_phone if show_payment else None,
+        payment_comment=gift.payment_comment if show_payment else None,
+        total_amount=total_amount,
+        collected_amount=collected_amount,
+        percent_complete=percent_complete,
+        contributor_count=len(non_cancelled),
+        is_organizer=is_organizer,
+        is_contributor=is_contributor,
+        my_contribution=(
+            ContributionSummary(
+                id=my_contrib.id,
+                amount=my_contrib.amount,
+                status=my_contrib.status,
+                created_at=my_contrib.created_at,
+            )
+            if my_contrib
+            else None
+        ),
+        organizer_display_name=organizer_display_name,
+        created_at=gift.created_at,
+    )
 
 
 async def create_group_gift(
@@ -47,10 +123,27 @@ async def create_group_gift(
     if wish.wishlist.owner_user_id != current_user.id and wish.wishlist.visibility != "public":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
 
+    if wish.wishlist.owner_user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Wish owner cannot organize a group gift on their own wish",
+        )
+
     if wish.status != "active":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Wish is not available for a group gift",
+        )
+
+    result = await db.execute(
+        select(Reservation)
+        .where(Reservation.wish_id == wish_id, Reservation.status == "active")
+        .with_for_update()
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is already reserved",
         )
 
     result = await db.execute(
@@ -139,77 +232,118 @@ async def get_group_gift(
     if not gift:
         return None
 
-    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
-    collected_amount = sum(
-        (c.amount for c in non_cancelled if c.status in _CONFIRMED_STATUSES),
-        Decimal("0"),
-    )
-    total_amount = wish.price
-    percent_complete = (
-        min(100, int(collected_amount / total_amount * 100))
-        if total_amount and total_amount > 0
-        else 0
-    )
-
-    is_organizer = current_user.id == gift.organizer_user_id
-    my_contrib = next(
-        (c for c in non_cancelled if c.contributor_user_id == current_user.id),
-        None,
-    )
-    is_contributor = my_contrib is not None
-
-    display_status = "cancelled" if gift.organizer and gift.organizer.is_blocked else gift.status
-
-    show_payment = display_status != "cancelled" and (
-        is_organizer or (
-            is_contributor and my_contrib.status in _CONFIRMED_STATUSES
-        )
-    )
-
-    organizer_display_name: str | None = None
-    if is_contributor and my_contrib.status in _CONFIRMED_STATUSES:
-        organizer_display_name = _organizer_display_name(gift.organizer)
-
     is_owner = wish.wishlist.owner_user_id == current_user.id
-    if is_owner and not is_organizer:
+    is_organizer = current_user.id == gift.organizer_user_id
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
+    if is_owner and not is_organizer and not is_contributor:
         visibility = getattr(current_user, "group_gift_visibility", "hide")
         if visibility == "hide":
             return None
-        show_payment = False
-        if visibility == "names":
-            organizer_display_name = _organizer_display_name(gift.organizer)
-        else:
-            organizer_display_name = None
 
-    if display_status == "cancelled":
-        show_payment = False
+    return _build_group_gift_response(wish, gift, current_user, non_cancelled)
 
-    return GroupGiftResponse(
-        id=gift.id,
-        wish_id=gift.wish_id,
-        collection_type=gift.collection_type,
-        status=display_status,
-        payment_method=gift.payment_method if show_payment else None,
-        payment_phone=gift.payment_phone if show_payment else None,
-        payment_comment=gift.payment_comment if show_payment else None,
-        total_amount=total_amount,
-        collected_amount=collected_amount,
-        percent_complete=percent_complete,
-        contributor_count=len(non_cancelled),
-        is_organizer=is_organizer,
-        is_contributor=is_contributor,
-        my_contribution=(
-            ContributionSummary(
-                id=my_contrib.id,
-                amount=my_contrib.amount,
-                status=my_contrib.status,
-                created_at=my_contrib.created_at,
-            )
-            if my_contrib
-            else None
-        ),
-        organizer_display_name=organizer_display_name,
-        created_at=gift.created_at,
+
+async def update_payment_details(
+    db: AsyncSession,
+    current_user: User,
+    group_gift_id: UUID,
+    payload: GroupGiftPaymentDetailsUpdate,
+) -> GroupGiftResponse:
+    result = await db.execute(
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.organizer),
+        )
+        .where(GroupGift.id == group_gift_id)
+        .with_for_update()
+    )
+    gift = result.scalar_one_or_none()
+    if not gift:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
+    if gift.organizer_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
+    if gift.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Group gift is not active",
+        )
+
+    gift.payment_method = payload.payment_method
+    gift.payment_phone = payload.payment_phone
+    gift.payment_comment = payload.payment_comment
+    await db.commit()
+    await db.refresh(gift)
+
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    return _build_group_gift_response(gift.wish, gift, current_user, non_cancelled)
+
+
+async def mark_group_gift_purchased(
+    db: AsyncSession,
+    current_user: User,
+    group_gift_id: UUID,
+    redis: Redis | None = None,
+) -> GroupGiftResponse:
+    result = await db.execute(
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.organizer),
+        )
+        .where(GroupGift.id == group_gift_id)
+        .with_for_update()
+    )
+    gift = result.scalar_one_or_none()
+    if not gift:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
+    if gift.organizer_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
+    if gift.status == "cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Group gift is cancelled",
+        )
+
+    wish = gift.wish
+    if wish.status not in {"active", "completed"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is not active",
+        )
+
+    gift.status = "completed"
+    wish.status = "completed"
+    result = await db.execute(
+        select(Reservation).where(
+            Reservation.wish_id == wish.id,
+            Reservation.status == "active",
+        )
+    )
+    reservation = result.scalar_one_or_none()
+    if reservation is not None:
+        reservation.status = "cancelled"
+    await db.commit()
+    await db.refresh(gift)
+
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
+        await publish_event(redis, "WISH_FULFILLED", {
+            "wish_id": str(wish.id),
+            "wishlist_id": str(wish.wishlist_id),
+            "owner_user_id": str(wish.wishlist.owner_user_id),
+        })
+
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    return _build_group_gift_response(
+        wish,
+        gift,
+        current_user,
+        non_cancelled,
+        status_override="completed",
     )
 
 
@@ -272,12 +406,6 @@ async def join_group_gift(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Organizer cannot contribute to their own gift",
-        )
-
-    if current_user.id == gift.wish.wishlist.owner_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Wish owner cannot join a group gift on their own wish",
         )
 
     result = await db.execute(

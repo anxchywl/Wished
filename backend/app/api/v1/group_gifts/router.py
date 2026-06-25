@@ -18,7 +18,9 @@ from app.modules.group_gifts import (
     get_group_gift,
     join_group_gift,
     leave_group_gift,
+    mark_group_gift_purchased,
     report_transfer,
+    update_payment_details,
 )
 from app.modules.group_gifts.rate_limit import (
     check_contribution_create_limit,
@@ -28,6 +30,7 @@ from app.modules.group_gifts.schemas import (
     ContributionCreateRequest,
     ContributionSummary,
     GroupGiftCreateRequest,
+    GroupGiftPaymentDetailsUpdate,
     GroupGiftResponse,
     TransferConfirmRequest,
 )
@@ -73,6 +76,32 @@ async def delete_group_gift(
 ) -> Response:
     await cancel_group_gift(db, current_user, group_gift_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch(
+    "/group-gifts/{group_gift_id}/payment-details",
+    response_model=GroupGiftResponse,
+)
+async def patch_group_gift_payment_details(
+    group_gift_id: UUID,
+    payload: GroupGiftPaymentDetailsUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> GroupGiftResponse:
+    return await update_payment_details(db, current_user, group_gift_id, payload)
+
+
+@router.post(
+    "/group-gifts/{group_gift_id}/purchase",
+    response_model=GroupGiftResponse,
+)
+async def post_group_gift_purchase(
+    group_gift_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> GroupGiftResponse:
+    return await mark_group_gift_purchased(db, current_user, group_gift_id, redis=redis)
 
 
 @router.post(

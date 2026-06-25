@@ -9,7 +9,11 @@ import {
   useJoinGroupGiftMutation,
   useReportTransferMutation,
   useLeaveGroupGiftMutation,
+  useUpdateGroupGiftPaymentDetailsMutation,
+  useMarkGroupGiftPurchasedMutation,
 } from "@/features/group-gifts/hooks";
+
+const PHONE_RE = /^\+?[\d\s-]{7,30}$/;
 
 type Props = {
   wishId: string;
@@ -25,6 +29,8 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const gift = giftQuery.data ?? null;
 
   const cancelMutation = useCancelGroupGiftMutation(wishId, gift?.id ?? "");
+  const updatePaymentMutation = useUpdateGroupGiftPaymentDetailsMutation(wishId, gift?.id ?? "");
+  const purchaseMutation = useMarkGroupGiftPurchasedMutation(wishId, gift?.id ?? "");
   const joinMutation = useJoinGroupGiftMutation(wishId, gift?.id ?? "");
   const reportMutation = useReportTransferMutation(wishId, gift?.my_contribution?.id ?? "");
   const leaveMutation = useLeaveGroupGiftMutation(wishId, gift?.my_contribution?.id ?? "");
@@ -32,7 +38,13 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [joinAmount, setJoinAmount] = useState("");
   const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [purchaseConfirming, setPurchaseConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
+  const [editingPayment, setEditingPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentPhone, setPaymentPhone] = useState("");
+  const [paymentComment, setPaymentComment] = useState("");
+  const [paymentPhoneError, setPaymentPhoneError] = useState("");
 
   const prevPercent = useRef(gift?.percent_complete ?? 0);
   const [percentOpacity, setPercentOpacity] = useState(1);
@@ -50,6 +62,14 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
       return () => window.clearTimeout(timer);
     }
   }, [gift?.percent_complete]);
+
+  useEffect(() => {
+    if (!gift || editingPayment) return;
+    setPaymentMethod(gift.payment_method ?? "");
+    setPaymentPhone(gift.payment_phone ?? "");
+    setPaymentComment(gift.payment_comment ?? "");
+    setPaymentPhoneError("");
+  }, [editingPayment, gift]);
 
   function handleClose() {
     setActive(false);
@@ -70,6 +90,40 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
       return;
     }
     cancelMutation.mutate(undefined, { onSuccess: () => handleClose() });
+  }
+
+  function handleSavePaymentDetails() {
+    if (!gift) return;
+    const trimmedMethod = paymentMethod.trim();
+    const trimmedPhone = paymentPhone.trim();
+    const trimmedComment = paymentComment.trim();
+    if (!PHONE_RE.test(trimmedPhone)) {
+      setPaymentPhoneError(t("invalidPhoneNumber"));
+      return;
+    }
+    updatePaymentMutation.mutate(
+      {
+        payment_method: trimmedMethod,
+        payment_phone: trimmedPhone,
+        payment_comment: trimmedComment || undefined,
+      },
+      {
+        onSuccess: () => {
+          setEditingPayment(false);
+          setPaymentPhoneError("");
+        },
+      },
+    );
+  }
+
+  function handleMarkPurchased() {
+    if (!purchaseConfirming) {
+      setPurchaseConfirming(true);
+      return;
+    }
+    purchaseMutation.mutate(undefined, {
+      onSuccess: () => setPurchaseConfirming(false),
+    });
   }
 
   function handleLeave() {
@@ -188,6 +242,84 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
     );
   }
 
+  function renderPaymentDetailsForm() {
+    return (
+      <div className="flex flex-col gap-3 bg-muted/5 rounded-2xl p-4 border border-border">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+            {t("paymentMethodLabel")}
+          </label>
+          <input
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            maxLength={100}
+            placeholder={t("paymentMethodPlaceholder")}
+            value={paymentMethod}
+            onChange={(e) => setPaymentMethod(e.currentTarget.value)}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+            {t("paymentPhoneLabel")}
+          </label>
+          <input
+            type="tel"
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            placeholder={t("paymentPhonePlaceholder")}
+            value={paymentPhone}
+            onBlur={() => {
+              setPaymentPhoneError(PHONE_RE.test(paymentPhone.trim()) ? "" : t("invalidPhoneNumber"));
+            }}
+            onChange={(e) => {
+              setPaymentPhone(e.currentTarget.value);
+              setPaymentPhoneError("");
+            }}
+          />
+          {paymentPhoneError ? (
+            <p className="text-xs text-red-500">{paymentPhoneError}</p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+            {t("paymentCommentLabel")} {t("paymentCommentOptional")}
+          </label>
+          <textarea
+            className="min-h-20 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            maxLength={500}
+            placeholder={t("paymentCommentPlaceholder")}
+            value={paymentComment}
+            onChange={(e) => setPaymentComment(e.currentTarget.value)}
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+            onClick={() => {
+              setEditingPayment(false);
+              setPaymentMethod(gift?.payment_method ?? "");
+              setPaymentPhone(gift?.payment_phone ?? "");
+              setPaymentComment(gift?.payment_comment ?? "");
+              setPaymentPhoneError("");
+            }}
+          >
+            {t("cancelButton")}
+          </button>
+          <button
+            type="button"
+            className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+            disabled={updatePaymentMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
+            onClick={handleSavePaymentDetails}
+          >
+            {updatePaymentMutation.isPending ? t("saving") : t("savePaymentDetails")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderActionPanel() {
     if (!gift) return null;
 
@@ -207,7 +339,49 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
     if (gift.is_organizer) {
       return (
         <div className="flex flex-col gap-3">
-          {renderPaymentDetails()}
+          {editingPayment ? renderPaymentDetailsForm() : renderPaymentDetails()}
+
+          {!editingPayment ? (
+            <button
+              type="button"
+              className="w-full h-11 rounded-xl bg-muted/10 text-foreground text-sm font-medium"
+              onClick={() => setEditingPayment(true)}
+            >
+              {t("editPaymentDetails")}
+            </button>
+          ) : null}
+
+          {purchaseConfirming ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+                  onClick={() => setPurchaseConfirming(false)}
+                >
+                  {t("cancelButton")}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+                  disabled={purchaseMutation.isPending}
+                  onClick={handleMarkPurchased}
+                >
+                  {purchaseMutation.isPending ? t("saving") : t("markGiftPurchased")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              disabled={purchaseMutation.isPending}
+              onClick={() => setPurchaseConfirming(true)}
+            >
+              {t("markGiftPurchased")}
+            </button>
+          )}
 
           {cancelConfirming ? (
             <div className="flex flex-col gap-2">
