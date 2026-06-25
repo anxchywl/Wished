@@ -186,7 +186,7 @@ export function UserDiscoveryManager() {
             </div>
             <button
               type="button"
-              className="pressable-action flex items-center justify-center gap-2 py-3 px-4 w-full text-primary font-semibold text-sm cursor-pointer border-t border-border"
+              className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-semibold text-sm cursor-pointer border-t-2 border-border"
               onClick={openTelegramFriendPicker}
             >
               <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">

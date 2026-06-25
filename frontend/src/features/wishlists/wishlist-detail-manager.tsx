@@ -1410,6 +1410,7 @@ const PRODUCT_URL_PLACEHOLDERS = [
   "dns-shop.ru/...",
   "mvideo.ru/products/...",
   "temu.com/...",
+  "olx.kz/d/...",
 ];
 
 function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModalProps) {
