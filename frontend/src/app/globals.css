@@ -1402,6 +1402,21 @@ html[data-theme="dark"] .modal-sheet {
   }
 }
 
+@keyframes action-mode-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.action-mode-animate {
+  animation: action-mode-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .modal-sheet.keyboard-focus-mode {
   max-height: min(82dvh, 660px);
   padding-bottom: calc(10px + min(env(safe-area-inset-bottom), 34px));

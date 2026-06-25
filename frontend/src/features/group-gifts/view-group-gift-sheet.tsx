@@ -25,6 +25,8 @@ type Props = {
 
 type ContentProps = Props & {
   showTitle?: boolean;
+  onActionModeChange?: (mode: ActionMode) => void;
+  resetTrigger?: number;
 };
 
 type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
@@ -54,7 +56,7 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   );
 }
 
-export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true }: ContentProps) {
+export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = true, onActionModeChange, resetTrigger }: ContentProps) {
   const { t } = useTranslation();
 
   const giftQuery = useGroupGiftQuery(wishId, shareToken);
@@ -73,6 +75,17 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [actionMode, setActionMode] = useState<ActionMode>("overview");
+
+  function changeActionMode(mode: ActionMode) {
+    setActionMode(mode);
+    onActionModeChange?.(mode);
+  }
+
+  useEffect(() => {
+    if (resetTrigger) changeActionMode("overview");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetTrigger]);
+
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
   const [paymentComment, setPaymentComment] = useState("");
@@ -128,7 +141,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       },
       {
         onSuccess: () => {
-          setActionMode("overview");
+          changeActionMode("overview");
           setPaymentPhoneError("");
         },
       },
@@ -137,7 +150,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
 
   function handleMarkPurchased() {
     purchaseMutation.mutate(undefined, {
-      onSuccess: () => setActionMode("overview"),
+      onSuccess: () => changeActionMode("overview"),
     });
   }
 
@@ -155,7 +168,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     joinMutation.mutate(amount, {
       onSuccess: () => {
         setJoinAmount("");
-        setActionMode("overview");
+        changeActionMode("overview");
       },
     });
   }
@@ -173,11 +186,11 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         ) : !gift ? (
           <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
         ) : actionMode !== "overview" ? (
-          <div className="transition-all duration-200">
+          <div key={actionMode} className="action-mode-animate">
             {renderActionPanel()}
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div key="overview" className="action-mode-animate flex flex-col gap-4">
             <div className="flex flex-col gap-2.5">
               <div className="flex justify-between text-sm leading-tight">
                 <span className="text-muted">{t("collected")}</span>
@@ -231,7 +244,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             <button
               type="button"
               className="w-7 h-7 inline-flex items-center justify-center text-primary"
-              onClick={() => setActionMode("editPayment")}
+              onClick={() => changeActionMode("editPayment")}
               aria-label={t("editPaymentDetails")}
               title={t("editPaymentDetails")}
             >
@@ -320,7 +333,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             type="button"
             className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
             onClick={() => {
-              setActionMode("overview");
+              changeActionMode("overview");
               setPaymentMethod(gift?.payment_method ?? "");
               setPaymentPhone(gift?.payment_phone ?? "");
               setPaymentComment(gift?.payment_comment ?? "");
@@ -415,7 +428,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <button
             type="button"
             className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold"
-            onClick={() => setActionMode("contribute")}
+            onClick={() => changeActionMode("contribute")}
           >
             {t("makeContribution")}
           </button>
@@ -424,7 +437,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <button
             type="button"
             className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-center text-primary"
-            onClick={() => setActionMode("purchase")}
+            onClick={() => changeActionMode("purchase")}
             aria-label={t("markGiftPurchased")}
             title={t("markGiftPurchased")}
           >
@@ -433,7 +446,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <button
             type="button"
             className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-center text-primary"
-            onClick={() => setActionMode("editPayment")}
+            onClick={() => changeActionMode("editPayment")}
             aria-label={t("editPaymentDetails")}
             title={t("editPaymentDetails")}
           >
@@ -442,7 +455,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <button
             type="button"
             className="h-11 rounded-xl bg-red-500/10 px-2 inline-flex items-center justify-center text-red-500"
-            onClick={() => setActionMode("cancel")}
+            onClick={() => changeActionMode("cancel")}
             aria-label={t("cancelGiftButton")}
             title={t("cancelGiftButton")}
           >
@@ -455,21 +468,8 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
 
   function renderActionState(title: string, children: ReactNode, danger = false) {
     return (
-      <div className={`rounded-xl border p-3 transition-all duration-200 ${danger ? "border-red-500/20 bg-red-500/5" : "border-border bg-muted/5"}`}>
-        <div className="flex items-center justify-between gap-2 mb-2.5">
-          <p className={`text-sm font-bold ${danger ? "text-red-500" : "text-foreground"}`}>{title}</p>
-          <button
-            type="button"
-            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-muted"
-            onClick={() => setActionMode("overview")}
-            aria-label={t("back")}
-            title={t("back")}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-            </svg>
-          </button>
-        </div>
+      <div className="flex flex-col gap-3">
+        <p className={`text-sm font-bold ${danger ? "text-red-500" : "text-foreground"}`}>{title}</p>
         {children}
       </div>
     );
@@ -504,7 +504,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             <button
               type="button"
               className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-              onClick={() => setActionMode("overview")}
+              onClick={() => changeActionMode("overview")}
             >
               {t("cancelButton")}
             </button>
@@ -529,7 +529,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             <button
               type="button"
               className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-              onClick={() => setActionMode("overview")}
+              onClick={() => changeActionMode("overview")}
             >
               {t("cancelButton")}
             </button>
@@ -680,7 +680,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         <button
           type="button"
           className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold"
-          onClick={() => setActionMode("contribute")}
+          onClick={() => changeActionMode("contribute")}
         >
           {t("makeContribution")}
         </button>

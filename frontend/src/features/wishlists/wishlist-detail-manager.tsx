@@ -705,6 +705,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
   const [createGroupGiftOpen, setCreateGroupGiftOpen] = useState(false);
   const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
+  const [groupGiftActionMode, setGroupGiftActionMode] = useState("overview");
+  const [groupGiftResetTrigger, setGroupGiftResetTrigger] = useState(0);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
@@ -723,6 +725,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       setRemoveBookingConfirming(false);
       setCreateGroupGiftOpen(false);
       setViewGroupGiftSheetOpen(false);
+      setGroupGiftActionMode("overview");
     }
   }, [open]);
 
@@ -796,8 +799,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
               onClick={() => {
-                setCreateGroupGiftOpen(false);
-                setViewGroupGiftSheetOpen(false);
+                if (viewGroupGiftSheetOpen && groupGiftActionMode !== "overview") {
+                  setGroupGiftResetTrigger((n) => n + 1);
+                } else {
+                  setCreateGroupGiftOpen(false);
+                  setViewGroupGiftSheetOpen(false);
+                  setGroupGiftActionMode("overview");
+                }
               }}
               aria-label={t("back")}
             >
@@ -874,6 +882,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               wishId={wish.id}
               showTitle={false}
               onClose={() => setViewGroupGiftSheetOpen(false)}
+              onActionModeChange={setGroupGiftActionMode}
+              resetTrigger={groupGiftResetTrigger}
             />
           </div>
         ) : (
