@@ -166,7 +166,7 @@ export function UserDiscoveryManager() {
         ) : followedUsers.length > 0 ? (
           <>
           <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-            <div className="px-4 py-3 border-b border-border">
+            <div className="px-4 py-3 border-b-2 border-border">
               <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
             </div>
             <div className="discover-following">
@@ -252,7 +252,7 @@ function BookedWishesPanel({
   return (
     <>
       <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-        <div className="px-4 py-3 border-b border-border">
+        <div className="px-4 py-3 border-b-2 border-border">
           <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
         <div className="flex flex-col divide-y divide-border">
@@ -331,66 +331,82 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     window.setTimeout(onClose, 340);
   }
 
+  const unbookLabel = item.wish_price
+    ? `${t("unbookWish")} · ${item.wish_price.replace(".", ",")} ${item.wish_currency ?? ""}`.trim()
+    : t("unbookWish");
+
   return (
     <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div className={`modal-sheet ${active ? "visible" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-handle" />
-        <h3 className="modal-title font-bold text-lg mb-4 text-center">{item.wish_title}</h3>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-full max-w-[210px] aspect-square rounded-3xl overflow-hidden border border-border shadow-lg">
-              <WishImageThumb
-                id={item.wish_id}
-                title={item.wish_title}
-                imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.thumbnail_url}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            {item.images.length > 1 ? (
-              <div className="grid grid-cols-4 gap-2 w-full">
-                {item.images.slice(0, 4).map((image) => (
-                  <div key={image.id} className="aspect-square rounded-xl overflow-hidden border border-border">
-                    <WishImageThumb
-                      id={item.wish_id}
-                      title={item.wish_title}
-                      imageUrl={image.thumbnail_url ?? image.medium_url}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : null}
-            {item.wish_price ? (
-              <p className="text-lg font-extrabold text-primary">
-                {item.wish_price.replace(".", ",")} {item.wish_currency ?? ""}
-              </p>
-            ) : null}
-            <p className="text-xs text-muted text-center">
-              {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
-            </p>
-            <div className="w-full flex flex-col gap-2">
-              <button
-                type="button"
-                className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold"
-                disabled={cancelMutation.isPending}
-                onClick={() =>
-                  cancelMutation.mutate(
-                    { reservationId: item.reservation_id, wishId: item.wish_id },
-                    { onSuccess: handleClose },
-                  )
-                }
-              >
-                {cancelMutation.isPending ? t("cancellingReservation") : t("unbookWish")}
-              </button>
-            </div>
-            {item.wish_description ? (
-              <div className="w-full rounded-2xl border border-border bg-muted/10 px-4 py-3">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted">{t("descriptionLabel")}</p>
-                <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
-                  {item.wish_description}
-                </p>
-              </div>
-            ) : null}
+        <h3 className="modal-title font-bold text-lg mb-3 text-center">{item.wish_title}</h3>
+
+        <section className="flex flex-col items-center gap-3">
+          <div className="public-wish-gallery relative">
+            <WishImageThumb
+              id={item.wish_id}
+              title={item.wish_title}
+              imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.thumbnail_url}
+              className="w-full h-full object-cover"
+            />
           </div>
+          {item.images.length > 1 ? (
+            <div className="grid grid-cols-4 gap-2 w-full">
+              {item.images.slice(0, 4).map((image) => (
+                <div key={image.id} className="aspect-square rounded-xl overflow-hidden border border-border">
+                  <WishImageThumb
+                    id={item.wish_id}
+                    title={item.wish_title}
+                    imageUrl={image.thumbnail_url ?? image.medium_url}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="flex flex-col gap-2 w-full mt-3 px-4">
+          <p className="text-xs text-muted text-center mb-1">
+            {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
+          </p>
+          <button
+            type="button"
+            className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold"
+            disabled={cancelMutation.isPending}
+            onClick={() =>
+              cancelMutation.mutate(
+                { reservationId: item.reservation_id, wishId: item.wish_id },
+                { onSuccess: handleClose },
+              )
+            }
+          >
+            {cancelMutation.isPending ? t("cancellingReservation") : unbookLabel}
+          </button>
+          {item.wish_url ? (
+            <a
+              href={item.wish_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 h-9 w-full rounded-xl text-xs font-semibold text-muted hover:text-foreground transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              {t("openProductPage") ?? "Open wish's page"}
+            </a>
+          ) : null}
+        </section>
+
+        {item.wish_description ? (
+          <section className="flex flex-col items-center px-4 mt-2">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
+              {item.wish_description}
+            </p>
+          </section>
+        ) : null}
       </div>
     </div>
   );
