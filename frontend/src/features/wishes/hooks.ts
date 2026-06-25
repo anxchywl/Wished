@@ -126,6 +126,10 @@ function preserveWishImageUrls(
 
 /**
  * create wish mutation
+ *
+ * Accepts an optional `_previewUrl` (client-only, stripped before the API call) so
+ * the optimistic wish can show an image placeholder immediately — before the separate
+ * image-upload mutation fires.
  */
 export function useCreateWishMutation(wishlistId: string) {
   const queryClient = useQueryClient();
@@ -133,14 +137,19 @@ export function useCreateWishMutation(wishlistId: string) {
   const tgUserId = useAuthStore((state) => state.tgUserId);
 
   return useMutation({
-    mutationFn: (input: WishCreateInput) => createWish(accessToken ?? "", wishlistId, input),
-    onMutate: async (input) => {
+    mutationFn: ({ _previewUrl: _, ...input }: WishCreateInput & { _previewUrl?: string }) =>
+      createWish(accessToken ?? "", wishlistId, input),
+    onMutate: async ({ _previewUrl, ...input }) => {
       await queryClient.cancelQueries({ queryKey: wishQueryKeys.list(wishlistId) });
 
       const previousWishes = queryClient.getQueryData<WishListResponse>(wishQueryKeys.list(wishlistId));
       const timestamp = new Date().toISOString();
+      // _stableKey is used as the React key for the row so React reuses the DOM element
+      // when onSuccess swaps the optimistic id for the real server-assigned id.
+      const stableKey = `optimistic-${timestamp}`;
       const optimisticWish: Wish = {
-        id: `optimistic-${timestamp}`,
+        id: stableKey,
+        _stableKey: stableKey,
         wishlist_id: wishlistId,
         title: input.title,
         description: input.description ?? null,
@@ -152,7 +161,22 @@ export function useCreateWishMutation(wishlistId: string) {
         status: "active",
         original_product_url: input.original_product_url ?? null,
         source_marketplace: input.source_marketplace ?? null,
-        images: [],
+        images: _previewUrl
+          ? [
+              {
+                id: `preview-${timestamp}`,
+                wish_id: stableKey,
+                url: _previewUrl,
+                thumbnail_url: _previewUrl,
+                medium_url: _previewUrl,
+                file_name: "preview",
+                content_type: "image/jpeg",
+                size_bytes: 0,
+                status: "ready",
+                created_at: timestamp,
+              },
+            ]
+          : [],
         created_at: timestamp,
         updated_at: timestamp,
       };
@@ -161,21 +185,32 @@ export function useCreateWishMutation(wishlistId: string) {
         items: [optimisticWish, ...(current?.items ?? [])],
       }));
 
-      return { optimisticWishId: optimisticWish.id, previousWishes };
+      return { optimisticWishId: stableKey, previousWishes };
     },
     onError: (_error, _input, context) => {
       if (context?.previousWishes) {
         queryClient.setQueryData(wishQueryKeys.list(wishlistId), context.previousWishes);
       }
     },
-    onSuccess: async (wish, _input, context) => {
-      await queryClient.cancelQueries({ queryKey: wishQueryKeys.list(wishlistId) });
-      queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => ({
-        items: [
-          wish,
-          ...(current?.items.filter((item) => item.id !== wish.id && item.id !== context?.optimisticWishId) ?? []),
-        ],
-      }));
+    onSuccess: (wish, _input, context) => {
+      queryClient.setQueryData<WishListResponse>(wishQueryKeys.list(wishlistId), (current) => {
+        if (!current) return current;
+        const optimistic = current.items.find((item) => item.id === context?.optimisticWishId);
+        return {
+          items: current.items.map((item) =>
+            item.id === context?.optimisticWishId
+              ? {
+                  ...wish,
+                  // preserve the stable key so the React node isn't remounted
+                  _stableKey: optimistic?._stableKey,
+                  // keep the optimistic preview image visible while a separate
+                  // image-upload mutation is still in-flight (real wish has images:[])
+                  images: wish.images.length > 0 ? wish.images : (optimistic?.images ?? []),
+                }
+              : item
+          ),
+        };
+      });
       // only invalidate wishlist metadata (e.g. count), not the wishes list itself
       queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
     },

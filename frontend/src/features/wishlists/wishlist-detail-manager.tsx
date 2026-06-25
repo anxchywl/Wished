@@ -213,7 +213,17 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
 
   const orderedWishes = useMemo(() => {
     const byId = new Map(wishes.map((wish) => [wish.id, wish]));
-    return wishOrderIds.map((id) => byId.get(id)).filter((wish): wish is Wish => Boolean(wish));
+    // Also index by _stableKey so a freshly-created wish stays visible during the
+    // one-render window where wishOrderIds still holds the optimistic id but wishes
+    // already has the real server id (the useEffect hasn't fired yet).
+    const byStableKey = new Map(
+      wishes
+        .filter((w) => w._stableKey && w._stableKey !== w.id)
+        .map((w) => [w._stableKey!, w] as const),
+    );
+    return wishOrderIds
+      .map((id) => byId.get(id) ?? byStableKey.get(id))
+      .filter((wish): wish is Wish => Boolean(wish));
   }, [wishes, wishOrderIds]);
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
@@ -329,10 +339,14 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     originalProductUrl?: string | null,
     sourceMarketplace?: string | null,
     pendingMarketplaceImageId?: string | null,
+    imagePreviewUrl?: string | null,
   ) {
     setWishModalOpen(false);
     const normalizedPrice = price.trim();
     const normalizedCurrency = currency.trim();
+    // Use file preview first, then fall back to the URL-extracted preview so the
+    // optimistic wish shows an image immediately instead of the default placeholder.
+    const previewUrl = imageFile?.previewUrl ?? imagePreviewUrl ?? undefined;
     createWishMutation.mutate(
       {
         title,
@@ -342,6 +356,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         original_product_url: originalProductUrl ?? null,
         source_marketplace: sourceMarketplace ?? null,
         pending_marketplace_image_id: pendingMarketplaceImageId ?? null,
+        _previewUrl: previewUrl,
       },
       {
         onSuccess: (wish) => {
@@ -458,7 +473,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
                       const isLast = index === orderedWishes.length - 1;
                       return (
                         <SortableWishRow
-                          key={wish.id}
+                          key={wish._stableKey ?? wish.id}
                           wish={wish}
                           isOwner={isOwner}
                           isLast={isLast}
@@ -508,8 +523,8 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
       <CreateWishModal
         open={wishModalOpen}
         onClose={() => setWishModalOpen(false)}
-        onCreate={(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId) =>
-          handleCreateWish(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId)
+        onCreate={(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId, imgPreviewUrl) =>
+          handleCreateWish(title, desc, price, currency, imageFile, origUrl, marketplace, pendingImgId, imgPreviewUrl)
         }
         isPending={createWishMutation.isPending}
       />
@@ -1376,6 +1391,7 @@ type CreateWishModalProps = {
     originalProductUrl?: string | null,
     sourceMarketplace?: string | null,
     pendingMarketplaceImageId?: string | null,
+    imagePreviewUrl?: string | null,
   ) => void;
   isPending: boolean;
 };
@@ -1505,6 +1521,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
       cleanUrl,
       null,
       pendingImageId,
+      coverPreview || null,
     );
   }
 

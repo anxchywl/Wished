@@ -13,6 +13,7 @@ export type WishImage = {
 
 export type Wish = {
   id: string;
+  _stableKey?: string;
   wishlist_id: string;
   title: string;
   description: string | null;
