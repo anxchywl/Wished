@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api/api-client";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useCreateGroupGiftMutation } from "@/features/group-gifts/hooks";
 import type { GroupGiftCreatePayload } from "@/features/group-gifts/api";
+import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
 
 type Props = {
   wishId: string;
@@ -19,8 +20,6 @@ type CreateGroupGiftContentProps = {
   onCancel?: () => void;
   showTitle?: boolean;
 };
-
-const PHONE_RE = /^\+?[\d\s\-]{7,30}$/;
 
 const ERROR_MAP: Record<string, string> = {
   group_gift_already_exists: "giftAlreadyExists",
@@ -70,25 +69,20 @@ export function CreateGroupGiftContent({
   const createMutation = useCreateGroupGiftMutation(wishId);
 
   function handlePhoneBlur() {
-    if (paymentPhone && !PHONE_RE.test(paymentPhone)) {
+    if (paymentPhone && !validatePhoneOrCredentials(paymentPhone)) {
       setPhoneError(t("invalidPhoneNumber"));
     } else {
       setPhoneError("");
     }
   }
 
-  function validatePhone() {
-    if (!PHONE_RE.test(paymentPhone)) {
-      setPhoneError(t("invalidPhoneNumber"));
-      return false;
-    }
-    setPhoneError("");
-    return true;
-  }
-
   function handleSubmit() {
     if (!collectionType) return;
-    if (!validatePhone()) return;
+    if (!validatePhoneOrCredentials(paymentPhone)) {
+      setPhoneError(t("invalidPhoneNumber"));
+      return;
+    }
+    setPhoneError("");
 
     const payload: GroupGiftCreatePayload = {
       collection_type: collectionType,
@@ -181,24 +175,30 @@ export function CreateGroupGiftContent({
               <input
                 type="text"
                 className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                maxLength={100}
+                maxLength={80}
                 placeholder={t("paymentMethodPlaceholder")}
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.currentTarget.value)}
+                onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
                 required
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-                {t("paymentPhoneLabel")}
+                {isPhoneMode(paymentPhone) ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
               </label>
               <input
-                type="tel"
+                inputMode={isPhoneMode(paymentPhone) ? "tel" : "text"}
+                autoComplete="tel"
                 className={`h-11 rounded-xl border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${phoneError ? "border-destructive" : "border-border"}`}
-                placeholder={t("paymentPhonePlaceholder")}
+                placeholder={t("credentialsOrPhonePlaceholder")}
+                maxLength={isPhoneMode(paymentPhone) ? 20 : 50}
                 value={paymentPhone}
-                onChange={(e) => { setPaymentPhone(e.currentTarget.value); setPhoneError(""); }}
+                onChange={(e) => {
+                  const raw = e.currentTarget.value.replace(/^\s+/, "");
+                  setPaymentPhone(isPhoneMode(paymentPhone) || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
+                  setPhoneError("");
+                }}
                 onBlur={handlePhoneBlur}
                 required
               />
@@ -214,10 +214,10 @@ export function CreateGroupGiftContent({
               </label>
               <textarea
                 className="min-h-16 max-h-24 rounded-xl border border-border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
-                maxLength={500}
+                maxLength={300}
                 placeholder={t("paymentCommentPlaceholder")}
                 value={paymentComment}
-                onChange={(e) => setPaymentComment(e.currentTarget.value)}
+                onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
               />
             </div>
 

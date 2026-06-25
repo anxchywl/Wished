@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/lib/i18n/useTranslation";
+import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
 import {
   useGroupGiftQuery,
   useCancelGroupGiftMutation,
@@ -15,64 +16,6 @@ import {
   useGiftMembersQuery,
 } from "@/features/group-gifts/hooks";
 
-// Strict international phone: + followed by 7–15 digits
-const PHONE_RE = /^\+\d{7,15}$/;
-// Account / credentials: any printable non-whitespace sequence
-const CREDENTIALS_RE = /^[^\s]{4,50}$/;
-
-function isPhoneMode(value: string) {
-  return value.startsWith("+");
-}
-
-function formatPhoneInput(raw: string): string {
-  if (!raw.startsWith("+")) return raw;
-  // strip everything that isn't a digit after the leading +
-  const digits = raw.slice(1).replace(/\D/g, "").slice(0, 15);
-  if (!digits) return "+";
-
-  // +7 (Russia / Kazakhstan): +7 ### ### ## ##
-  if (digits.startsWith("7")) {
-    const d = digits.slice(1, 11);
-    let out = "+7";
-    if (d.length > 0) out += " " + d.slice(0, 3);
-    if (d.length > 3) out += " " + d.slice(3, 6);
-    if (d.length > 6) out += " " + d.slice(6, 8);
-    if (d.length > 8) out += " " + d.slice(8, 10);
-    return out;
-  }
-
-  // +1 (USA / Canada): +1 ### ###-####
-  if (digits.startsWith("1")) {
-    const d = digits.slice(1, 11);
-    let out = "+1";
-    if (d.length > 0) out += " " + d.slice(0, 3);
-    if (d.length > 3) out += " " + d.slice(3, 6);
-    if (d.length > 6) out += "-" + d.slice(6, 10);
-    return out;
-  }
-
-  // +44 (UK): +44 #### ######
-  if (digits.startsWith("44")) {
-    const d = digits.slice(2, 13);
-    let out = "+44";
-    if (d.length > 0) out += " " + d.slice(0, 4);
-    if (d.length > 4) out += " " + d.slice(4, 10);
-    return out;
-  }
-
-  // Generic: keep digits, no formatting (just normalize)
-  return "+" + digits;
-}
-
-function validatePhoneOrCredentials(value: string): boolean {
-  const v = value.trim();
-  if (!v) return false;
-  if (isPhoneMode(v)) {
-    const digits = v.replace(/[\s\-()]/g, "");
-    return PHONE_RE.test(digits);
-  }
-  return CREDENTIALS_RE.test(v);
-}
 
 type Props = {
   wishId: string;
