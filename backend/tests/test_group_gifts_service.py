@@ -279,7 +279,7 @@ async def test_organizer_can_mark_group_gift_purchased_for_existing_active_wish(
 
     assert db.committed is True
     assert gift.status == "completed"
-    assert gift.wish.status == "completed"
+    assert gift.wish.status == "active"  # wish stays active; only owner can mark fulfilled
     assert response.status == "completed"
 
 
