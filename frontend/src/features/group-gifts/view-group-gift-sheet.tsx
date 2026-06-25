@@ -406,25 +406,23 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
                 key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}
                 className="flex items-center justify-between gap-3"
               >
-                <div className="min-w-0 flex items-center gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
-                    {member.username ? (
-                      <button
-                        type="button"
-                        className="truncate text-xs text-muted pressable-link text-left"
-                        onClick={() => {
-                          navigator.clipboard.writeText(`@${member.username}`).catch(() => {});
-                        }}
-                      >
-                        @{member.username}
-                      </button>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {displayName}
+                    {isOrganizer ? (
+                      <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
                     ) : null}
-                  </div>
-                  {isOrganizer ? (
-                    <span className="shrink-0 text-[10px] font-bold text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                      {t("groupGiftCreator")}
-                    </span>
+                  </p>
+                  {member.username ? (
+                    <button
+                      type="button"
+                      className="truncate text-xs text-muted pressable-link text-left"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`@${member.username}`).catch(() => {});
+                      }}
+                    >
+                      @{member.username}
+                    </button>
                   ) : null}
                 </div>
                 {member.amount ? (

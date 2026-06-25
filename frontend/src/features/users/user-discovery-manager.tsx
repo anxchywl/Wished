@@ -211,8 +211,8 @@ export function UserDiscoveryManager() {
         ) : followedUsers.length > 0 ? (
           <>
           <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-            <div className="px-4 py-3 border-b border-border/60">
-              <h3 className="text-sm font-extrabold text-foreground">{t("friends")}</h3>
+            <div className="px-4 py-3 border-b-2 border-border">
+              <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
             </div>
             <div className="discover-following">
               {followedUsers.map((user, index) => (
@@ -231,7 +231,7 @@ export function UserDiscoveryManager() {
                 </div>
               ))}
             </div>
-            <div className="h-px bg-border/60" />
+            <div className="h-0.5 bg-border" />
             <button
               type="button"
               className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"
@@ -300,8 +300,8 @@ function BookedWishesPanel({
   return (
     <>
       <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-        <div className="px-4 py-3 border-b border-border/60">
-          <h3 className="text-sm font-extrabold text-foreground">{t("bookedWishes")}</h3>
+        <div className="px-4 py-3 border-b-2 border-border">
+          <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
         <div className="flex flex-col">
           {items.map((item, index) => (
@@ -417,6 +417,14 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
           ) : null}
         </section>
 
+        {item.wish_description ? (
+          <section className="px-4 mt-3">
+            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
+              {item.wish_description}
+            </p>
+          </section>
+        ) : null}
+
         <section className="flex flex-col gap-2 w-full mt-3 px-4">
           <p className="text-xs text-muted text-center mb-1">
             {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
@@ -450,14 +458,6 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
             </a>
           ) : null}
         </section>
-
-        {item.wish_description ? (
-          <section className="flex flex-col items-center px-4 mt-2">
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
-              {item.wish_description}
-            </p>
-          </section>
-        ) : null}
       </div>
     </div>
   );
