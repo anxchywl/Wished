@@ -28,6 +28,8 @@ _WB_HOSTS = frozenset({
     "wildberries.ru", "www.wildberries.ru",
     "wildberries.kz", "www.wildberries.kz",
     "global.wildberries.ru", "www.global.wildberries.ru",
+    # short-link / mobile share domain
+    "wb.ru", "www.wb.ru",
 })
 _OZON_HOSTS = frozenset({"ozon.ru", "www.ozon.ru", "ozon.kz", "www.ozon.kz"})
 _KASPI_HOSTS = frozenset({"kaspi.kz", "www.kaspi.kz", "l.kaspi.kz"})
@@ -95,6 +97,9 @@ _OLX_HOSTS = frozenset({
     "olx.pt", "www.olx.pt",
     "olx.in", "www.olx.in",
 })
+_LAMODA_HOSTS = frozenset({"lamoda.ru", "www.lamoda.ru", "lamoda.kz", "www.lamoda.kz"})
+_DNS_HOSTS = frozenset({"dns-shop.ru", "www.dns-shop.ru"})
+_MVIDEO_HOSTS = frozenset({"mvideo.ru", "www.mvideo.ru"})
 
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -229,6 +234,15 @@ def _choose_extractor(hostname: str):
     if hostname in _OLX_HOSTS:
         from app.modules.link_preview.extractors.olx import OlxExtractor
         return OlxExtractor()
+    if hostname in _LAMODA_HOSTS:
+        from app.modules.link_preview.extractors.lamoda import LamodaExtractor
+        return LamodaExtractor()
+    if hostname in _DNS_HOSTS:
+        from app.modules.link_preview.extractors.dns import DnsExtractor
+        return DnsExtractor()
+    if hostname in _MVIDEO_HOSTS:
+        from app.modules.link_preview.extractors.mvideo import MVideoExtractor
+        return MVideoExtractor()
     from app.modules.link_preview.extractors.generic import GenericExtractor
     return GenericExtractor()
 

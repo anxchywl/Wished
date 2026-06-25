@@ -147,6 +147,18 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
 class WildberriesExtractor:
     async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
         match = re.search(r"/catalog/(\d+)/", url)
+        # short links (wb.ru/s/...) don't contain the catalog ID — follow the redirect
+        # to discover the canonical wildberries.ru/catalog/... URL first
+        if not match:
+            try:
+                resp = await client.get(url)
+                canonical = str(resp.url)
+                match = re.search(r"/catalog/(\d+)/", canonical)
+                if match:
+                    url = canonical
+                    hostname = "wildberries.ru"
+            except Exception as exc:
+                logger.debug("WB short-link redirect failed for %s: %s", url, exc)
         if not match:
             return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="wildberries")
 

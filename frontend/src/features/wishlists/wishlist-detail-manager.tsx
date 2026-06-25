@@ -1399,11 +1399,27 @@ type CreateWishModalProps = {
 /**
  * create wish modal
  */
+const PRODUCT_URL_PLACEHOLDERS = [
+  "ozon.ru/t/lwPE6ZK",
+  "wb.ru/s/xR9mK2",
+  "kaspi.kz/t/abc123",
+  "aliexpress.ru/item/...",
+  "amazon.com/dp/B0C...",
+  "ikea.com/ru/ru/p/...",
+  "lamoda.ru/p/...",
+  "dns-shop.ru/...",
+  "mvideo.ru/products/...",
+  "temu.com/...",
+];
+
 function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModalProps) {
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
   const [step, setStep] = useState<1 | 2>(1);
   const [productUrl, setProductUrl] = useState("");
+  const [urlPlaceholder] = useState(
+    () => PRODUCT_URL_PLACEHOLDERS[Math.floor(Math.random() * PRODUCT_URL_PLACEHOLDERS.length)]
+  );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -1561,7 +1577,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                     <input
                       type="url"
                       className="flex-1 h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-0"
-                      placeholder={t("productUrlPlaceholder") ?? "https://kaspi.kz/..."}
+                      placeholder={urlPlaceholder}
                       value={productUrl}
                       onChange={(e) => handleProductUrlChange(e.currentTarget.value)}
                       {...focusMode.fieldFocusProps("productUrl")}
@@ -1579,6 +1595,9 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                       {linkPreviewStatus === "loading" ? "..." : (t("extractButton") ?? "Extract")}
                     </button>
                   </div>
+                  {linkPreviewStatus === "idle" && !productUrl && (
+                    <p className="text-[11px] text-muted">{t("productUrlHint")}</p>
+                  )}
                   {linkPreviewStatus === "found" && (
                     <p className="text-[11px] text-primary">{t("linkPreviewFound") ?? "Product information found"}</p>
                   )}

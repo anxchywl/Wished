@@ -285,6 +285,92 @@ class OzonParser:
         return result
 
 
+class LamodaParser:
+    def parse(self, html: str, url: str, hostname: str) -> ProductData:
+        result = ProductData(marketplace="lamoda")
+
+        ld = _extract_json_ld(html)
+        if ld:
+            _parse_json_ld_into(ld, result, "RUB")
+            if result.title:
+                return result
+
+        if _parse_og_into(html, result, "RUB"):
+            return result
+
+        # site-specific fallbacks
+        result.title = (
+            _element_text_by_class(html, "x-atomo-pdp-header-title__brand-and-name")
+            or _element_text_by_class(html, "product-title")
+            or _h1_text(html)
+        )
+        price_text = (
+            _element_text_by_class(html, "x-atomo-pdp-price__price-current")
+            or _element_text_by_class(html, "price-block__price")
+        )
+        if price_text:
+            result.price = _parse_price(price_text)
+            if result.price is not None:
+                result.currency = "RUB"
+        return result
+
+
+class DnsParser:
+    def parse(self, html: str, url: str, hostname: str) -> ProductData:
+        result = ProductData(marketplace="dns")
+
+        ld = _extract_json_ld(html)
+        if ld:
+            _parse_json_ld_into(ld, result, "RUB")
+            if result.title:
+                return result
+
+        if _parse_og_into(html, result, "RUB"):
+            return result
+
+        # site-specific fallbacks — DNS uses microdata itemprop attributes
+        result.title = (
+            _element_text_by_class(html, "product-card-top__title")
+            or _h1_text(html)
+        )
+        # DNS price: <span class="product-buy__price">12 990 ₽</span>
+        price_text = _element_text_by_class(html, "product-buy__price")
+        if price_text:
+            result.price = _parse_price(price_text)
+            if result.price is not None:
+                result.currency = "RUB"
+        return result
+
+
+class MVideoParser:
+    def parse(self, html: str, url: str, hostname: str) -> ProductData:
+        result = ProductData(marketplace="mvideo")
+
+        ld = _extract_json_ld(html)
+        if ld:
+            _parse_json_ld_into(ld, result, "RUB")
+            if result.title:
+                return result
+
+        if _parse_og_into(html, result, "RUB"):
+            return result
+
+        # site-specific fallbacks
+        result.title = (
+            _element_text_by_class(html, "product-page-title__title")
+            or _h1_text(html)
+        )
+        price_text = (
+            _element_text_by_class(html, "price__main-value")
+            or _element_text_by_class(html, "price-block__price")
+        )
+        if price_text:
+            result.price = _parse_price(price_text)
+            if result.price is not None:
+                result.currency = "RUB"
+        return result
+
+
 _PARSER_BY_HOST: dict[str, type] = {
     "kaspi.kz": KaspiParser,
     "www.kaspi.kz": KaspiParser,
@@ -296,10 +382,18 @@ _PARSER_BY_HOST: dict[str, type] = {
     "www.ozon.ru": OzonParser,
     "ozon.kz": OzonParser,
     "www.ozon.kz": OzonParser,
+    "lamoda.ru": LamodaParser,
+    "www.lamoda.ru": LamodaParser,
+    "lamoda.kz": LamodaParser,
+    "www.lamoda.kz": LamodaParser,
+    "dns-shop.ru": DnsParser,
+    "www.dns-shop.ru": DnsParser,
+    "mvideo.ru": MVideoParser,
+    "www.mvideo.ru": MVideoParser,
 }
 
 
-def get_parser(hostname: str) -> KaspiParser | WildberriesParser | OzonParser | None:
+def get_parser(hostname: str) -> KaspiParser | WildberriesParser | OzonParser | LamodaParser | DnsParser | MVideoParser | None:
     """return the appropriate HTML parser for the given hostname, or None"""
     cls = _PARSER_BY_HOST.get(hostname)
     return cls() if cls else None
