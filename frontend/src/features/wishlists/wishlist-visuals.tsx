@@ -24,12 +24,6 @@ type WishlistCoverStyleInput = {
   };
 };
 
-const WISH_PLACEHOLDER_EMOJIS = [
-  "🎁", "⭐", "💝", "🎀", "🛍️", "✨", "🌟", "💫",
-  "🎯", "🌈", "🍀", "🦋", "🌸", "🎵", "🏆", "💎",
-  "🎪", "🎨", "🌙", "☀️", "🍭", "🎠", "🪄", "🎶",
-  "🦄", "🌺", "🎸", "🍓", "🎃", "🌊", "🔮", "🎲",
-];
 
 const imageObjectUrlCache = new Map<string, string>();
 const imageObjectUrlRequests = new Map<string, Promise<string>>();
@@ -134,19 +128,25 @@ export function getWishlistCoverStyle({ coverStyle, fallback }: WishlistCoverSty
  */
 export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVisualProps, "imageUrl">) {
   const hash = hashString(`${id}-${title}`);
-  const h1 = (hash * 137 + 60) % 360;
-  const h2 = (h1 + 40 + (hash % 40)) % 360;
-  const s1 = 70 + (hash % 20);
-  const l1 = 78 + (hash % 10);
-  const s2 = 65 + ((hash >> 4) % 20);
-  const l2 = 70 + ((hash >> 4) % 10);
-  const angle = 120 + (hash % 80);
+  // golden-angle hue steps so adjacent wishes never share the same hue
+  const h1 = (hash * 137) % 360;
+  const h2 = (h1 + 50 + (hash % 60)) % 360;
+  const s1 = 75 + (hash % 15);
+  const l1 = 72 + (hash % 12);
+  const s2 = 70 + ((hash >> 5) % 15);
+  const l2 = 62 + ((hash >> 5) % 12);
+  const angle = 110 + (hash % 100);
   const bg = `linear-gradient(${angle}deg, hsl(${h1},${s1}%,${l1}%) 0%, hsl(${h2},${s2}%,${l2}%) 100%)`;
-  const emoji = WISH_PLACEHOLDER_EMOJIS[hash % WISH_PLACEHOLDER_EMOJIS.length];
 
   return (
     <div className={`wish-image-placeholder ${className}`} style={{ background: bg }} aria-hidden="true">
-      <span style={{ fontSize: "38%", lineHeight: 1 }}>{emoji}</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M20 12v8.5H4V12" />
+        <path d="M3.5 8h17v4h-17z" />
+        <path d="M12 8v12.5" />
+        <path d="M12 8H8.5a2.5 2.5 0 1 1 2.35-3.35L12 8Z" />
+        <path d="M12 8h3.5a2.5 2.5 0 1 0-2.35-3.35L12 8Z" />
+      </svg>
     </div>
   );
 }
