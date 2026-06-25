@@ -21,7 +21,7 @@ def test_list_wishlists_returns_current_user_wishlists(monkeypatch) -> None:
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    async def fake_list_current_user_wishlists(db, current_user):
+    async def fake_list_current_user_wishlists(db, current_user, redis=None):
         assert current_user is user
         return {"items": [_wishlist(owner_user_id=user.id)]}
 
@@ -90,7 +90,7 @@ def test_patch_wishlist_reorder_uses_payload(monkeypatch) -> None:
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    async def fake_reorder_wishlists(db, current_user, payload):
+    async def fake_reorder_wishlists(db, current_user, payload, redis=None):
         assert current_user is user
         assert payload.wishlist_ids == wishlist_ids
         return {"items": [_wishlist(owner_user_id=user.id, wishlist_id=wishlist_id, position=index) for index, wishlist_id in enumerate(wishlist_ids)]}
@@ -139,7 +139,7 @@ def test_delete_wishlist_returns_no_content(monkeypatch) -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
     app.dependency_overrides[get_redis] = _rate_limit_redis
 
-    async def fake_delete_wishlist(db, current_user, requested_wishlist_id):
+    async def fake_delete_wishlist(db, current_user, requested_wishlist_id, redis=None):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
 

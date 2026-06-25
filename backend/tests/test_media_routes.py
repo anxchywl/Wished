@@ -127,7 +127,7 @@ def test_delete_wish_image_returns_no_content(monkeypatch) -> None:
     wish_id = uuid4()
     image_id = uuid4()
 
-    async def fake_delete(db, current_user, wid, iid):
+    async def fake_delete(db, current_user, wid, iid, redis=None):
         assert wid == wish_id
         assert iid == image_id
 
