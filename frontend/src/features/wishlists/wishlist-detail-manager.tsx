@@ -79,6 +79,32 @@ import {
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
 
+function MarqueeText({ text, className }: { text: string; className?: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [dist, setDist] = useState(0);
+
+  useEffect(() => {
+    const c = containerRef.current;
+    const s = textRef.current;
+    if (!c || !s) return;
+    const overflow = s.scrollWidth - c.clientWidth;
+    setDist(overflow > 6 ? overflow + 16 : 0);
+  }, [text]);
+
+  return (
+    <div ref={containerRef} className={`marquee-container ${className ?? ""}`}>
+      <span
+        ref={textRef}
+        className={`marquee-text${dist > 0 ? " is-animating" : ""}`}
+        style={dist > 0 ? { "--marquee-dist": `-${dist}px` } as React.CSSProperties : undefined}
+      >
+        {text}
+      </span>
+    </div>
+  );
+}
+
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
   const formatted = price.replace(".", ",");
@@ -650,7 +676,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
           )}
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="font-semibold text-sm text-foreground line-clamp-2">{wish.title}</span>
+          <MarqueeText text={wish.title ?? ""} className="font-semibold text-sm text-foreground" />
           {wish.price && !isCompleted && (
             <span className="text-xs text-muted mt-0.5">
               {formatPrice(wish.price, wish.currency)}
@@ -791,9 +817,9 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : (
             <span className="w-10" />
           )}
-          <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-1">
-            {wish.title}
-          </h3>
+          <div className="modal-title flex-1 min-w-0 px-1">
+            <MarqueeText text={wish.title ?? ""} className="font-bold text-lg text-foreground" />
+          </div>
           {isOwner && !removeBookingConfirming ? (
             <button
               type="button"
@@ -945,9 +971,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {wish.description ? (
-            <div className="w-full rounded-2xl border border-border bg-muted/10 px-4 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wider text-muted">{t("descriptionLabel") ?? "Description"}</p>
-              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+            <div className="w-full">
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
                 {wish.description}
               </p>
             </div>
@@ -1558,7 +1583,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                       type="button"
                       disabled={!productUrl.trim().startsWith("http") || linkPreviewStatus === "loading"}
                       onClick={handleExtract}
-                      className="h-11 px-3 text-sm font-semibold text-primary border border-primary/30 rounded-xl bg-transparent hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                      className="h-11 px-3 text-sm font-semibold text-primary rounded-xl bg-transparent hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
                     >
                       {linkPreviewStatus === "loading" ? "..." : (t("extractButton") ?? "Extract")}
                     </button>
