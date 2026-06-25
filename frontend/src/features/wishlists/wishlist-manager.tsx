@@ -132,13 +132,11 @@ export function WishlistManager() {
   }, [wishlists, resolvedOrderIds]);
 
   const hasWishlists = wishlists.length > 0;
-  // show skeleton until the query has settled (success or error); this closes
-  // the brief gap where isPending/isFetching flip between states and the panel
-  // would momentarily disappear
   const querySettled = wishlistsQuery.isSuccess || wishlistsQuery.isError;
-  const showWishlistsLoading = !querySettled && !hasWishlists;
   const showWishlistsEmpty = querySettled && !wishlistsQuery.isError && !hasWishlists;
-  const guardDecision = isAuthPending(authStatus)
+  // hold in startup until auth AND initial wishlist fetch are both done so the
+  // panel and its content appear together rather than popping in after the shell
+  const guardDecision = isAuthPending(authStatus) || (!querySettled && !wishlistsQuery.isError)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
@@ -208,14 +206,6 @@ export function WishlistManager() {
             {wishlistsQuery.isError && (
               <p className="text-sm text-destructive text-center py-4">{t("unableToLoadWishlists")}</p>
             )}
-
-            {showWishlistsLoading ? (
-              <div className="panel flex flex-col gap-3 p-4">
-                <div className="public-skeleton h-16 w-full rounded-xl" />
-                <div className="public-skeleton h-16 w-full rounded-xl" />
-                <div className="public-skeleton h-16 w-full rounded-xl" />
-              </div>
-            ) : null}
 
             {showWishlistsEmpty ? (
               <div className="panel empty-state-panel flex flex-col items-center justify-center text-center p-6 gap-4">
