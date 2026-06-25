@@ -82,6 +82,8 @@ function PersistentLayout({ children }: { children: ReactNode }) {
 
   const loginMutationRef = useRef(loginMutation);
   loginMutationRef.current = loginMutation;
+  const isWishlistsRoute = pathname === "/" || pathname === "/wishlists";
+  const initialWishlistsSettled = wishlistsQuery.isSuccess || wishlistsQuery.isError;
 
   // Safety valve: never block the app forever if auth hangs
   useEffect(() => {
@@ -171,12 +173,12 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }, [isReady, initDataRaw, accessToken, tgUserId, telegramError, authStatus]);
 
   useEffect(() => {
-    if (accessToken && !wishlistsQuery.isLoading) {
+    if (accessToken && initialWishlistsSettled) {
       setAppReady(true);
     } else if (!accessToken) {
       setAppReady(false);
     }
-  }, [accessToken, wishlistsQuery.isLoading, setAppReady]);
+  }, [accessToken, initialWishlistsSettled, setAppReady]);
 
   // Background-prefetch wish counts + following list so both tabs are instant on first visit
   useEffect(() => {
@@ -205,9 +207,10 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   // warm sessions initialize synchronously and do not wait for telegram sdk startup
   const isLoading =
     !gateExpired &&
-    authStatus !== "authenticated" &&
-    ((!isReady && !accessToken) ||
-      (isAuthPending(authStatus) && !accessToken));
+    (authStatus !== "authenticated"
+      ? ((!isReady && !accessToken) ||
+        (isAuthPending(authStatus) && !accessToken))
+      : Boolean(accessToken) && isWishlistsRoute && !initialWishlistsSettled);
 
   if (isLoading) {
     return (
@@ -222,8 +225,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }
 
   const isMainRoute =
-    pathname === "/" ||
-    pathname === "/wishlists" ||
+    isWishlistsRoute ||
     pathname === "/users" ||
     (pathname.startsWith("/users/") && pathname.split("/").length === 3);
 
