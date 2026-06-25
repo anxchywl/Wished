@@ -1,4 +1,8 @@
+"use client";
+
 // user avatar
+import { useState } from "react";
+
 type AvatarUser = {
   first_name?: string | null;
   last_name?: string | null;
@@ -7,7 +11,7 @@ type AvatarUser = {
 };
 
 /**
- * render user avatar
+ * render user avatar — initials show immediately, photo fades in on load
  */
 export function UserAvatar({ user }: { user: AvatarUser }) {
   const displayName = user.first_name
@@ -20,28 +24,24 @@ export function UserAvatar({ user }: { user: AvatarUser }) {
     .slice(0, 2)
     .toUpperCase();
 
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+
   return (
     <div className="relative w-9 h-9 rounded-full bg-primary/10 border border-border/80 flex-shrink-0 overflow-hidden flex items-center justify-center">
-      {user.photo_url ? (
-        <>
-          <img
-            src={user.photo_url}
-            alt={displayName}
-            className="absolute inset-0 w-full h-full object-cover rounded-full"
-            onError={(event) => {
-              (event.currentTarget as HTMLImageElement).style.display = "none";
-              const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
-              if (fallback) fallback.style.display = "flex";
-            }}
-          />
-          <span className="text-xs font-bold text-primary flex items-center justify-center w-full h-full" style={{ display: "none" }}>
-            {initials}
-          </span>
-        </>
-      ) : (
-        <span className="text-xs font-bold text-primary">{initials}</span>
-      )}
+      {/* initials always present as base layer */}
+      <span className="text-xs font-bold text-primary">{initials}</span>
+      {/* photo overlays on top and fades in once loaded */}
+      {user.photo_url && !imgFailed ? (
+        <img
+          src={user.photo_url}
+          alt={displayName}
+          className="absolute inset-0 w-full h-full object-cover rounded-full transition-opacity duration-200"
+          style={{ opacity: imgLoaded ? 1 : 0 }}
+          onLoad={() => setImgLoaded(true)}
+          onError={() => setImgFailed(true)}
+        />
+      ) : null}
     </div>
   );
 }
-
