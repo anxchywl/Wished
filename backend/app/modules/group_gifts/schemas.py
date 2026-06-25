@@ -75,6 +75,17 @@ class ContributionSummary(BaseModel):
     created_at: datetime
 
 
+class GroupGiftMemberSummary(BaseModel):
+    user_id: UUID
+    contribution_id: UUID | None = None
+    role: Literal["organizer", "contributor"]
+    first_name: str | None = None
+    username: str | None = None
+    amount: Decimal | None = None
+    status: str | None = None
+    created_at: datetime | None = None
+
+
 class GroupGiftResponse(BaseModel):
     id: UUID
     wish_id: UUID

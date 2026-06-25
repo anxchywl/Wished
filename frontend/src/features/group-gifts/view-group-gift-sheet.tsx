@@ -11,6 +11,7 @@ import {
   useLeaveGroupGiftMutation,
   useUpdateGroupGiftPaymentDetailsMutation,
   useMarkGroupGiftPurchasedMutation,
+  useGiftMembersQuery,
 } from "@/features/group-gifts/hooks";
 
 const PHONE_RE = /^\+?[\d\s-]{7,30}$/;
@@ -24,6 +25,8 @@ type Props = {
 type ContentProps = Props & {
   showTitle?: boolean;
 };
+
+type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
 
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [active, setActive] = useState(false);
@@ -62,13 +65,13 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   const joinMutation = useJoinGroupGiftMutation(wishId, gift?.id ?? "");
   const reportMutation = useReportTransferMutation(wishId, gift?.my_contribution?.id ?? "");
   const leaveMutation = useLeaveGroupGiftMutation(wishId, gift?.my_contribution?.id ?? "");
+  const canLoadMembers = Boolean(gift && (gift.is_organizer || gift.is_contributor || gift.organizer_display_name));
+  const membersQuery = useGiftMembersQuery(gift?.id, canLoadMembers);
 
   const [joinAmount, setJoinAmount] = useState("");
   const [leaveConfirming, setLeaveConfirming] = useState(false);
-  const [cancelConfirming, setCancelConfirming] = useState(false);
-  const [purchaseConfirming, setPurchaseConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
-  const [editingPayment, setEditingPayment] = useState(false);
+  const [actionMode, setActionMode] = useState<ActionMode>("overview");
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
   const [paymentComment, setPaymentComment] = useState("");
@@ -88,12 +91,12 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   }, [gift?.percent_complete]);
 
   useEffect(() => {
-    if (!gift || editingPayment) return;
+    if (!gift || actionMode === "editPayment") return;
     setPaymentMethod(gift.payment_method ?? "");
     setPaymentPhone(gift.payment_phone ?? "");
     setPaymentComment(gift.payment_comment ?? "");
     setPaymentPhoneError("");
-  }, [editingPayment, gift]);
+  }, [actionMode, gift]);
 
   function handleCopyPhone() {
     if (!gift?.payment_phone) return;
@@ -104,10 +107,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   }
 
   function handleCancelGift() {
-    if (!cancelConfirming) {
-      setCancelConfirming(true);
-      return;
-    }
     cancelMutation.mutate(undefined, { onSuccess: () => onClose() });
   }
 
@@ -128,7 +127,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       },
       {
         onSuccess: () => {
-          setEditingPayment(false);
+          setActionMode("overview");
           setPaymentPhoneError("");
         },
       },
@@ -136,12 +135,8 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   }
 
   function handleMarkPurchased() {
-    if (!purchaseConfirming) {
-      setPurchaseConfirming(true);
-      return;
-    }
     purchaseMutation.mutate(undefined, {
-      onSuccess: () => setPurchaseConfirming(false),
+      onSuccess: () => setActionMode("overview"),
     });
   }
 
@@ -157,7 +152,10 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     const amount = parseFloat(joinAmount);
     if (!amount || amount < 1) return;
     joinMutation.mutate(amount, {
-      onSuccess: () => setJoinAmount(""),
+      onSuccess: () => {
+        setJoinAmount("");
+        setActionMode("overview");
+      },
     });
   }
 
@@ -210,7 +208,8 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               </div>
             </div>
 
-            {/* state-dependent action panel */}
+            {renderMembers()}
+
             <div className="border-t border-border pt-4">
               {renderActionPanel()}
             </div>
@@ -231,7 +230,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             <button
               type="button"
               className="w-7 h-7 inline-flex items-center justify-center text-primary"
-              onClick={() => setEditingPayment(true)}
+              onClick={() => setActionMode("editPayment")}
               aria-label={t("editPaymentDetails")}
               title={t("editPaymentDetails")}
             >
@@ -320,7 +319,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             type="button"
             className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
             onClick={() => {
-              setEditingPayment(false);
+              setActionMode("overview");
               setPaymentMethod(gift?.payment_method ?? "");
               setPaymentPhone(gift?.payment_phone ?? "");
               setPaymentComment(gift?.payment_comment ?? "");
@@ -342,10 +341,134 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     );
   }
 
+  function renderMembers() {
+    const members = membersQuery.data ?? [];
+    if (!members.length) return null;
+    return (
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+          {t("contributors")}
+        </p>
+        <div className="flex flex-col gap-2">
+          {members.map((member) => {
+            const displayName = member.first_name || (member.username ? `@${member.username}` : t("unknownUser"));
+            return (
+              <div
+                key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {displayName}
+                    {member.role === "organizer" ? (
+                      <span className="ml-2 text-xs font-medium text-muted">{t("groupGiftCreator")}</span>
+                    ) : null}
+                  </p>
+                  {member.username ? (
+                    <p className="truncate text-xs text-muted">@{member.username}</p>
+                  ) : null}
+                </div>
+                {member.amount ? (
+                  <p className="shrink-0 text-sm font-semibold text-foreground">{member.amount}</p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function renderContributionForm() {
+    return (
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          className="self-start text-sm font-semibold text-muted"
+          onClick={() => setActionMode("overview")}
+        >
+          {t("back")}
+        </button>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
+            {t("amountLabel")}
+          </label>
+          <input
+            type="number"
+            min={1}
+            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            placeholder={t("amountPlaceholder")}
+            value={joinAmount}
+            onChange={(e) => setJoinAmount(e.currentTarget.value)}
+          />
+        </div>
+        <button
+          type="button"
+          className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+          disabled={joinMutation.isPending || !joinAmount || parseFloat(joinAmount) < 1}
+          onClick={handleJoin}
+        >
+          {joinMutation.isPending ? t("saving") : t("confirmJoin")}
+        </button>
+      </div>
+    );
+  }
+
+  function renderOrganizerActions() {
+    return (
+      <div className="flex flex-col gap-3">
+        {!gift?.is_contributor ? (
+          <button
+            type="button"
+            className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold"
+            onClick={() => setActionMode("contribute")}
+          >
+            {t("makeContribution")}
+          </button>
+        ) : null}
+        <div className="flex items-center justify-center gap-7">
+          <button
+            type="button"
+            className="w-10 h-10 inline-flex items-center justify-center text-primary"
+            onClick={() => setActionMode("purchase")}
+            aria-label={t("markGiftPurchased")}
+            title={t("markGiftPurchased")}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="w-10 h-10 inline-flex items-center justify-center text-primary"
+            onClick={() => setActionMode("editPayment")}
+            aria-label={t("editPaymentDetails")}
+            title={t("editPaymentDetails")}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.875 4.5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="w-10 h-10 inline-flex items-center justify-center text-red-500"
+            onClick={() => setActionMode("cancel")}
+            aria-label={t("cancelGiftButton")}
+            title={t("cancelGiftButton")}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   function renderActionPanel() {
     if (!gift) return null;
 
-    // CASE H — gift finished
     if (gift.status === "completed") {
       return (
         <p className="text-sm font-semibold text-muted text-center py-2">{t("giftComplete")}</p>
@@ -357,81 +480,67 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE A — organizer
-    if (gift.is_organizer) {
+    if (actionMode === "contribute") {
+      return renderContributionForm();
+    }
+    if (actionMode === "editPayment") {
+      return renderPaymentDetailsForm();
+    }
+    if (actionMode === "purchase") {
       return (
-        <div className="flex flex-col gap-3">
-          {editingPayment ? renderPaymentDetailsForm() : renderPaymentDetails()}
-
-          {purchaseConfirming ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-                  onClick={() => setPurchaseConfirming(false)}
-                >
-                  {t("cancelButton")}
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-                  disabled={purchaseMutation.isPending}
-                  onClick={handleMarkPurchased}
-                >
-                  {purchaseMutation.isPending ? t("saving") : t("markGiftPurchased")}
-                </button>
-              </div>
-            </div>
-          ) : (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
+          <div className="flex gap-2">
             <button
               type="button"
-              className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              onClick={() => setActionMode("overview")}
+            >
+              {t("cancelButton")}
+            </button>
+            <button
+              type="button"
+              className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
               disabled={purchaseMutation.isPending}
-              onClick={() => setPurchaseConfirming(true)}
+              onClick={handleMarkPurchased}
             >
-              {t("markGiftPurchased")}
+              {purchaseMutation.isPending ? t("saving") : t("markGiftPurchased")}
             </button>
-          )}
-
-          {cancelConfirming ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-                  onClick={() => setCancelConfirming(false)}
-                >
-                  {t("cancelButton")}
-                </button>
-                <button
-                  type="button"
-                  className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold disabled:opacity-60"
-                  disabled={cancelMutation.isPending}
-                  onClick={handleCancelGift}
-                >
-                  {cancelMutation.isPending ? t("deleting") : t("cancelGiftButton")}
-                </button>
-              </div>
-            </div>
-          ) : (
+          </div>
+        </div>
+      );
+    }
+    if (actionMode === "cancel") {
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
+          <div className="flex gap-2">
             <button
               type="button"
-              className="theme-press-danger w-full h-11 rounded-xl text-sm font-medium"
-              onClick={() => setCancelConfirming(true)}
+              className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              onClick={() => setActionMode("overview")}
             >
-              {t("cancelGiftButton")}
+              {t("cancelButton")}
             </button>
-          )}
+            <button
+              type="button"
+              className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold disabled:opacity-60"
+              disabled={cancelMutation.isPending}
+              onClick={handleCancelGift}
+            >
+              {cancelMutation.isPending ? t("deleting") : t("cancelGiftButton")}
+            </button>
+          </div>
         </div>
       );
     }
 
+    if (gift.is_organizer) {
+      return renderOrganizerActions();
+    }
+
     const contrib = gift.my_contribution;
 
-    // CASE B — contributor, waiting_transfer (immediate)
     if (gift.is_contributor && contrib?.status === "waiting_transfer") {
       return (
         <div className="flex flex-col gap-3">
@@ -481,7 +590,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE C — contributor, waiting_confirmation (immediate)
     if (gift.is_contributor && contrib?.status === "waiting_confirmation") {
       return (
         <div className="flex flex-col items-center gap-3 py-2">
@@ -491,7 +599,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE D — contributor, confirmed (immediate)
     if (gift.is_contributor && contrib?.status === "confirmed") {
       return (
         <p className="text-sm font-semibold text-center" style={{ color: "var(--color-success, #22c55e)" }}>
@@ -500,7 +607,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE E — contributor, pledged (commit)
     if (gift.is_contributor && contrib?.status === "pledged") {
       return (
         <div className="flex flex-col gap-3">
@@ -544,7 +650,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE F — contributor, notified (commit, goal reached)
     if (gift.is_contributor && contrib?.status === "notified") {
       return (
         <div className="flex flex-col gap-3">
@@ -558,32 +663,15 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
       );
     }
 
-    // CASE G — not organizer, not contributor, gift active
     if (!gift.is_organizer && !gift.is_contributor && gift.status === "active") {
       return (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-              {t("amountLabel")}
-            </label>
-            <input
-              type="number"
-              min={1}
-              className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              placeholder={t("amountPlaceholder")}
-              value={joinAmount}
-              onChange={(e) => setJoinAmount(e.currentTarget.value)}
-            />
-          </div>
-          <button
-            type="button"
-            className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-            disabled={joinMutation.isPending || !joinAmount || parseFloat(joinAmount) < 1}
-            onClick={handleJoin}
-          >
-            {joinMutation.isPending ? t("saving") : t("confirmJoin")}
-          </button>
-        </div>
+        <button
+          type="button"
+          className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold"
+          onClick={() => setActionMode("contribute")}
+        >
+          {t("makeContribution")}
+        </button>
       );
     }
 

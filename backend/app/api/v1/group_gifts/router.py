@@ -30,6 +30,7 @@ from app.modules.group_gifts.schemas import (
     ContributionCreateRequest,
     ContributionSummary,
     GroupGiftCreateRequest,
+    GroupGiftMemberSummary,
     GroupGiftPaymentDetailsUpdate,
     GroupGiftResponse,
     TransferConfirmRequest,
@@ -158,10 +159,10 @@ async def delete_contribution(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/group-gifts/{group_gift_id}/members", response_model=list[ContributionSummary])
+@router.get("/group-gifts/{group_gift_id}/members", response_model=list[GroupGiftMemberSummary])
 async def get_group_gift_members(
     group_gift_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-) -> list[ContributionSummary]:
+) -> list[GroupGiftMemberSummary]:
     return await get_gift_members(db, current_user, group_gift_id)

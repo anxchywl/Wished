@@ -8,6 +8,17 @@ export interface ContributionSummary {
   created_at: string;
 }
 
+export interface GroupGiftMemberSummary {
+  user_id: string;
+  contribution_id: string | null;
+  role: "organizer" | "contributor";
+  first_name: string | null;
+  username: string | null;
+  amount: string | null;
+  status: string | null;
+  created_at: string | null;
+}
+
 export interface GroupGiftSummary {
   id: string;
   status: string;
@@ -151,6 +162,6 @@ export function leaveGroupGift(
 export function getGiftMembers(
   accessToken: string | null,
   groupGiftId: string,
-): Promise<ContributionSummary[]> {
-  return apiClient<ContributionSummary[]>(`/group-gifts/${groupGiftId}/members`, { accessToken });
+): Promise<GroupGiftMemberSummary[]> {
+  return apiClient<GroupGiftMemberSummary[]>(`/group-gifts/${groupGiftId}/members`, { accessToken });
 }

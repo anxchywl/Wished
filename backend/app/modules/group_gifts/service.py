@@ -16,6 +16,7 @@ from app.modules.group_gifts.schemas import (
     ContributionCreateRequest,
     ContributionSummary,
     GroupGiftCreateRequest,
+    GroupGiftMemberSummary,
     GroupGiftPaymentDetailsUpdate,
     GroupGiftResponse,
 )
@@ -402,12 +403,6 @@ async def join_group_gift(
     if gift.status != "active":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Gift is not active")
 
-    if current_user.id == gift.organizer_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Organizer cannot contribute to their own gift",
-        )
-
     result = await db.execute(
         select(GroupGiftContribution)
         .where(
@@ -631,18 +626,30 @@ async def get_gift_members(
     db: AsyncSession,
     current_user: User,
     group_gift_id: UUID,
-) -> list[ContributionSummary]:
+) -> list[GroupGiftMemberSummary]:
     result = await db.execute(
-        select(GroupGift).where(GroupGift.id == group_gift_id)
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+            selectinload(GroupGift.organizer),
+        )
+        .where(GroupGift.id == group_gift_id)
     )
     gift = result.scalar_one_or_none()
     if not gift:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
 
     is_organizer = gift.organizer_user_id == current_user.id
+    is_owner_with_names = (
+        gift.wish is not None
+        and gift.wish.wishlist.owner_user_id == current_user.id
+        and getattr(current_user, "group_gift_visibility", "hide") == "names"
+    )
 
     result = await db.execute(
-        select(GroupGiftContribution).where(
+        select(GroupGiftContribution)
+        .options(selectinload(GroupGiftContribution.contributor))
+        .where(
             GroupGiftContribution.group_gift_id == group_gift_id,
             GroupGiftContribution.status != "cancelled",
         )
@@ -651,18 +658,31 @@ async def get_gift_members(
 
     is_contributor = any(c.contributor_user_id == current_user.id for c in contributions)
 
-    if not is_organizer and not is_contributor:
+    if not is_organizer and not is_contributor and not is_owner_with_names:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    return [
-        ContributionSummary(
-            id=c.id,
-            amount=c.amount,
+    members = [
+        GroupGiftMemberSummary(
+            user_id=gift.organizer_user_id,
+            role="organizer",
+            first_name=gift.organizer.first_name if gift.organizer else None,
+            username=gift.organizer.username if gift.organizer else None,
+        )
+    ]
+    members.extend(
+        GroupGiftMemberSummary(
+            user_id=c.contributor_user_id,
+            contribution_id=c.id,
+            role="contributor",
+            first_name=c.contributor.first_name if c.contributor else None,
+            username=c.contributor.username if c.contributor else None,
+            amount=c.amount if is_organizer else None,
             status=c.status,
             created_at=c.created_at,
         )
         for c in contributions
-    ]
+    )
+    return members
 
 
 async def _complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:

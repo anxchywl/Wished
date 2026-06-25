@@ -8,6 +8,7 @@ import pytest
 
 from app.modules.group_gifts.service import (
     create_group_gift,
+    get_gift_members,
     get_group_gift,
     join_group_gift,
     mark_group_gift_purchased,
@@ -137,6 +138,79 @@ async def test_wish_owner_can_join_group_gift_organized_by_someone_else() -> Non
 
 
 @pytest.mark.asyncio
+async def test_organizer_can_join_their_own_group_gift() -> None:
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),
+    ])
+
+    response = await join_group_gift(
+        db,
+        _user(user_id=organizer_id),
+        gift.id,
+        SimpleNamespace(amount=Decimal("35.00")),
+    )
+
+    assert db.added is not None
+    assert db.added.contributor_user_id == organizer_id
+    assert response.amount == Decimal("35.00")
+
+
+@pytest.mark.asyncio
+async def test_members_include_creator_and_hide_amounts_from_owner() -> None:
+    owner_id = uuid4()
+    organizer_id = uuid4()
+    contributor_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(
+        wish_id=wish_id,
+        organizer_user_id=organizer_id,
+        organizer=_user(user_id=organizer_id, username="maker", first_name="Maker"),
+    )
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=owner_id)
+    contribution = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=contributor_id,
+        contributor=_user(user_id=contributor_id, username="friend", first_name="Friend"),
+    )
+    db = FakeDb([FakeResult(gift), FakeResult([contribution])])
+
+    response = await get_gift_members(
+        db,
+        _user(user_id=owner_id, group_gift_visibility="names"),
+        gift.id,
+    )
+
+    assert [member.role for member in response] == ["organizer", "contributor"]
+    assert response[0].username == "maker"
+    assert response[1].username == "friend"
+    assert response[1].amount is None
+
+
+@pytest.mark.asyncio
+async def test_members_show_amounts_to_organizer() -> None:
+    organizer_id = uuid4()
+    contributor_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    contribution = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=contributor_id,
+        contributor=_user(user_id=contributor_id),
+    )
+    db = FakeDb([FakeResult(gift), FakeResult([contribution])])
+
+    response = await get_gift_members(db, _user(user_id=organizer_id), gift.id)
+
+    assert response[1].amount == Decimal("25.00")
+
+
+@pytest.mark.asyncio
 async def test_organizer_can_update_payment_details() -> None:
     owner_id = uuid4()
     organizer_id = uuid4()
@@ -261,16 +335,29 @@ class FakeResult:
     def scalar_one_or_none(self):
         return self.value
 
+    def scalars(self):
+        return FakeScalars(self.value)
+
+
+class FakeScalars:
+    def __init__(self, value) -> None:  # noqa: ANN001
+        self.value = value
+
+    def all(self):
+        return self.value
+
 
 def _user(
     user_id=None,  # noqa: ANN001
+    username: str = "alice",
+    first_name: str = "Alice",
     group_gift_visibility: str = "hide",
     is_blocked: bool = False,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=user_id or uuid4(),
-        username="alice",
-        first_name="Alice",
+        username=username,
+        first_name=first_name,
         group_gift_visibility=group_gift_visibility,
         is_blocked=is_blocked,
     )
@@ -305,4 +392,20 @@ def _gift(
         contributions=[],
         organizer=organizer or _user(user_id=organizer_user_id),
         created_at=datetime(2026, 6, 25, 12, 0, tzinfo=UTC),
+    )
+
+
+def _contribution(
+    group_gift_id,  # noqa: ANN001
+    contributor_user_id,  # noqa: ANN001
+    contributor: SimpleNamespace,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid4(),
+        group_gift_id=group_gift_id,
+        contributor_user_id=contributor_user_id,
+        contributor=contributor,
+        amount=Decimal("25.00"),
+        status="pledged",
+        created_at=datetime(2026, 6, 25, 12, 5, tzinfo=UTC),
     )

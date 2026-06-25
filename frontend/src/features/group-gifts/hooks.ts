@@ -116,6 +116,7 @@ export function useJoinGroupGiftMutation(wishId: string, groupGiftId: string) {
           };
         },
       );
+      queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
       queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
       queryClient.invalidateQueries({ queryKey: ["wishes"] });
     },
@@ -159,18 +160,19 @@ export function useLeaveGroupGiftMutation(wishId: string, contributionId: string
           };
         },
       );
+      queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
       queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
       queryClient.invalidateQueries({ queryKey: ["wishes"] });
     },
   });
 }
 
-export function useGiftMembersQuery(groupGiftId: string | null | undefined) {
+export function useGiftMembersQuery(groupGiftId: string | null | undefined, enabled = true) {
   const accessToken = useAuthStore((state) => state.accessToken);
 
   return useQuery({
     queryKey: groupGiftQueryKeys.members(groupGiftId ?? ""),
     queryFn: () => getGiftMembers(accessToken, groupGiftId!),
-    enabled: !!groupGiftId,
+    enabled: Boolean(groupGiftId && enabled),
   });
 }
