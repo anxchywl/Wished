@@ -1812,30 +1812,6 @@ html[data-theme="dark"] .theme-press-primary:active {
   background: rgba(239, 68, 68, 0.18);
 }
 
-/* ── Marquee / ticker text ─────────────────────────────────────────── */
-@keyframes wish-marquee {
-  0%, 12%   { transform: translateX(0); }
-  78%, 88%  { transform: translateX(var(--marquee-dist, -80px)); }
-  89%       { transform: translateX(0); }          /* instant jump back */
-  100%      { transform: translateX(0); }
-}
-
-.marquee-container {
-  overflow: hidden;
-  white-space: nowrap;
-  position: relative;
-  mask-image: linear-gradient(to right, transparent 0%, black 4%, black 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 4%, black 92%, transparent 100%);
-}
-
-.marquee-text {
-  display: inline-block;
-  will-change: transform;
-}
-
-.marquee-text.is-animating {
-  animation: wish-marquee 7s ease-in-out infinite;
-}
 
 html[data-theme="dark"] .theme-press-danger {
   background: rgba(248, 113, 113, 0.14);

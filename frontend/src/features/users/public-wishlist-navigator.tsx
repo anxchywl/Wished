@@ -1,7 +1,7 @@
 // public wishlist navigator
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
@@ -196,19 +196,15 @@ export function PublicWishlistNavigator({
           ) : (
             <span className="w-10" />
           )}
-          <div className="public-nav-title flex-1 min-w-0">
-            {current.view === "wish" ? (
-              <MarqueeText text={current.wishTitle ?? t("wishes")} />
-            ) : (
-              <span className="truncate block">
-                {current.view === "user"
-                  ? t("profile")
-                  : current.view === "wishlist"
-                  ? (current.wishlistTitle ?? t("wishlists"))
-                  : t("copyToMyWishlist")}
-              </span>
-            )}
-          </div>
+          <h2 className="public-nav-title">
+            {current.view === "user"
+              ? t("profile")
+              : current.view === "wishlist"
+              ? (current.wishlistTitle ?? t("wishlists"))
+              : current.view === "wish"
+              ? (current.wishTitle ?? t("wishes"))
+              : t("copyToMyWishlist")}
+          </h2>
           <span className="w-10" />
         </div>
 
@@ -564,7 +560,7 @@ function PublicWishRow({ wish, shareToken, onOpen, onPrefetch }: PublicWishRowPr
           ) : null}
         </div>
         <div className={`min-w-0 text-left ${!isCompleted && isBooked ? "opacity-50" : ""}`}>
-          <MarqueeText text={wish.title ?? ""} className="font-semibold text-sm text-foreground" />
+          <span className="font-semibold text-sm text-foreground line-clamp-2">{wish.title}</span>
           {wish.description ? <span className="text-xs text-muted line-clamp-1 mt-1">{wish.description}</span> : null}
         </div>
       </div>
@@ -694,31 +690,6 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
   );
 }
 
-function MarqueeText({ text, className }: { text: string; className?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [dist, setDist] = useState(0);
-
-  useEffect(() => {
-    const c = containerRef.current;
-    const s = textRef.current;
-    if (!c || !s) return;
-    const overflow = s.scrollWidth - c.clientWidth;
-    setDist(overflow > 6 ? overflow + 16 : 0);
-  }, [text]);
-
-  return (
-    <div ref={containerRef} className={`marquee-container ${className ?? ""}`}>
-      <span
-        ref={textRef}
-        className={`marquee-text${dist > 0 ? " is-animating" : ""}`}
-        style={dist > 0 ? { "--marquee-dist": `-${dist}px` } as React.CSSProperties : undefined}
-      >
-        {text}
-      </span>
-    </div>
-  );
-}
 
 /**
  * format wish price

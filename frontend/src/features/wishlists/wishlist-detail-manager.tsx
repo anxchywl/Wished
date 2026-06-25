@@ -79,32 +79,6 @@ import {
   useUncompleteWishMutation,
 } from "@/features/wishes/hooks";
 
-function MarqueeText({ text, className }: { text: string; className?: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [dist, setDist] = useState(0);
-
-  useEffect(() => {
-    const c = containerRef.current;
-    const s = textRef.current;
-    if (!c || !s) return;
-    const overflow = s.scrollWidth - c.clientWidth;
-    setDist(overflow > 6 ? overflow + 16 : 0);
-  }, [text]);
-
-  return (
-    <div ref={containerRef} className={`marquee-container ${className ?? ""}`}>
-      <span
-        ref={textRef}
-        className={`marquee-text${dist > 0 ? " is-animating" : ""}`}
-        style={dist > 0 ? { "--marquee-dist": `-${dist}px` } as React.CSSProperties : undefined}
-      >
-        {text}
-      </span>
-    </div>
-  );
-}
-
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
   const formatted = price.replace(".", ",");
@@ -676,7 +650,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
           )}
         </div>
         <div className="flex flex-col min-w-0">
-          <MarqueeText text={wish.title ?? ""} className="font-semibold text-sm text-foreground" />
+          <span className="font-semibold text-sm text-foreground line-clamp-2">{wish.title}</span>
           {wish.price && !isCompleted && (
             <span className="text-xs text-muted mt-0.5">
               {formatPrice(wish.price, wish.currency)}
@@ -817,9 +791,9 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : (
             <span className="w-10" />
           )}
-          <div className="modal-title flex-1 min-w-0 px-1">
-            <MarqueeText text={wish.title ?? ""} className="font-bold text-lg text-foreground" />
-          </div>
+          <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
+            {wish.title}
+          </h3>
           {isOwner && !removeBookingConfirming ? (
             <button
               type="button"
