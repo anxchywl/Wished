@@ -255,13 +255,12 @@ function BookedWishesPanel({
         <div className="px-4 py-3 border-b-2 border-border">
           <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
-        <div className="flex flex-col divide-y divide-border">
-          {items.map((item) => (
-            <BookedWishRow
-              key={item.reservation_id}
-              item={item}
-              onOpen={() => setSelectedWish(item)}
-            />
+        <div className="flex flex-col">
+          {items.map((item, index) => (
+            <div key={item.reservation_id}>
+              <BookedWishRow item={item} onOpen={() => setSelectedWish(item)} />
+              {index < items.length - 1 && <div className="h-px bg-border/60 mx-3" />}
+            </div>
           ))}
         </div>
       </div>
@@ -331,8 +330,12 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     window.setTimeout(onClose, 340);
   }
 
+  function fmtPrice(price: string) {
+    const num = parseFloat(price);
+    return isNaN(num) ? price.replace(".", ",") : (Number.isInteger(num) ? String(num) : num.toFixed(2).replace(".", ","));
+  }
   const unbookLabel = item.wish_price
-    ? `${t("unbookWish")} · ${item.wish_price.replace(".", ",")} ${item.wish_currency ?? ""}`.trim()
+    ? `${t("unbookWish")} · ${fmtPrice(item.wish_price)} ${item.wish_currency ?? ""}`.trim()
     : t("unbookWish");
 
   return (

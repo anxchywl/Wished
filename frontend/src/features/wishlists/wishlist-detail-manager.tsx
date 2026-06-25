@@ -81,7 +81,10 @@ import {
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
-  const formatted = price.replace(".", ",");
+  const num = parseFloat(price);
+  const formatted = isNaN(num)
+    ? price.replace(".", ",")
+    : (Number.isInteger(num) ? String(num) : num.toFixed(2).replace(".", ","));
   const symbol = currency || "$";
   return `${formatted} ${symbol}`;
 }
@@ -613,6 +616,7 @@ function SortableWishRow({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwn
       {...listeners}
     >
       <WishRowBase wish={wish} isOwner={isOwner} isLast={isLast} onClick={onClick} />
+      {!isLast && <div className="h-px bg-border/60 mx-3" />}
     </div>
   );
 }
@@ -638,7 +642,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
       onContextMenu={(event) => {
         if (isOwner) event.preventDefault();
       }}
-      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"} ${isLast ? "" : "border-b border-border/60"}`}
+      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"}`}
     >
       <div className="flex items-center gap-3 pointer-events-none min-w-0">
         <div className="relative w-12 h-12 flex-shrink-0 overflow-hidden rounded-xl">

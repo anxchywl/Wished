@@ -710,7 +710,11 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
  * format wish price
  */
 function formatPrice(price: string, currency: string | null) {
-  return `${price}${currency ? ` ${currency}` : ""}`;
+  const num = parseFloat(price);
+  const formatted = isNaN(num)
+    ? price.replace(".", ",")
+    : (Number.isInteger(num) ? String(num) : num.toFixed(2).replace(".", ","));
+  return `${formatted}${currency ? ` ${currency}` : ""}`;
 }
 
 /**
