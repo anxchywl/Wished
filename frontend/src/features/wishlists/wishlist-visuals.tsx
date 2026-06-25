@@ -127,7 +127,8 @@ export function getWishlistCoverStyle({ coverStyle, fallback }: WishlistCoverSty
  * wish image placeholder
  */
 export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVisualProps, "imageUrl">) {
-  const hash = hashString(`${id}-${title}`);
+  // hash on title only so the gradient is stable during the optimistic→real id transition
+  const hash = hashString(title);
   // golden-angle hue steps so adjacent wishes never share the same hue
   const h1 = (hash * 137) % 360;
   const h2 = (h1 + 50 + (hash % 60)) % 360;

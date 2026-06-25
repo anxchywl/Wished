@@ -132,14 +132,12 @@ export function WishlistManager() {
   }, [wishlists, resolvedOrderIds]);
 
   const hasWishlists = wishlists.length > 0;
-  const showWishlistsLoading =
-    wishlistsQuery.isPending ||
-    (wishlistsQuery.isLoading && !hasWishlists) ||
-    (wishlistsQuery.isFetching && !hasWishlists);
-  const showWishlistsEmpty =
-    !wishlistsQuery.isError &&
-    !showWishlistsLoading &&
-    !hasWishlists;
+  // show skeleton until the query has settled (success or error); this closes
+  // the brief gap where isPending/isFetching flip between states and the panel
+  // would momentarily disappear
+  const querySettled = wishlistsQuery.isSuccess || wishlistsQuery.isError;
+  const showWishlistsLoading = !querySettled && !hasWishlists;
+  const showWishlistsEmpty = querySettled && !wishlistsQuery.isError && !hasWishlists;
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)

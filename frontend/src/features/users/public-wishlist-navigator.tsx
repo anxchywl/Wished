@@ -745,8 +745,6 @@ function ListSkeleton() {
   return (
     <div className="p-4 flex flex-col gap-3">
       <div className="public-skeleton h-12 w-full rounded-xl" />
-      <div className="public-skeleton h-12 w-full rounded-xl" />
-      <div className="public-skeleton h-12 w-full rounded-xl" />
     </div>
   );
 }
