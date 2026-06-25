@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/lib/i18n/useTranslation";
@@ -173,7 +174,6 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
         ) : (
           <div className="flex flex-col gap-4">
-            {/* progress section */}
             <div className="flex flex-col gap-2.5">
               <div className="flex justify-between text-sm leading-tight">
                 <span className="text-muted">{t("collected")}</span>
@@ -265,13 +265,13 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
 
   function renderPaymentDetailsForm() {
     return (
-      <div className="flex flex-col gap-3 bg-muted/5 rounded-2xl p-4 border border-border">
+      <div className="flex flex-col gap-2.5">
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {t("paymentMethodLabel")}
           </label>
           <input
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             maxLength={100}
             placeholder={t("paymentMethodPlaceholder")}
             value={paymentMethod}
@@ -285,7 +285,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </label>
           <input
             type="tel"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             placeholder={t("paymentPhonePlaceholder")}
             value={paymentPhone}
             onBlur={() => {
@@ -306,7 +306,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             {t("paymentCommentLabel")} {t("paymentCommentOptional")}
           </label>
           <textarea
-            className="min-h-20 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="min-h-16 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             maxLength={500}
             placeholder={t("paymentCommentPlaceholder")}
             value={paymentComment}
@@ -317,7 +317,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         <div className="flex gap-2">
           <button
             type="button"
-            className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+            className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
             onClick={() => {
               setActionMode("overview");
               setPaymentMethod(gift?.payment_method ?? "");
@@ -330,7 +330,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </button>
           <button
             type="button"
-            className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+            className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
             disabled={updatePaymentMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
             onClick={handleSavePaymentDetails}
           >
@@ -381,14 +381,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
 
   function renderContributionForm() {
     return (
-      <div className="flex flex-col gap-3">
-        <button
-          type="button"
-          className="self-start text-sm font-semibold text-muted"
-          onClick={() => setActionMode("overview")}
-        >
-          {t("back")}
-        </button>
+      <div className="flex flex-col gap-2.5">
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {t("amountLabel")}
@@ -396,7 +389,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           <input
             type="number"
             min={1}
-            className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             placeholder={t("amountPlaceholder")}
             value={joinAmount}
             onChange={(e) => setJoinAmount(e.currentTarget.value)}
@@ -404,7 +397,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         </div>
         <button
           type="button"
-          className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+          className="w-full h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
           disabled={joinMutation.isPending || !joinAmount || parseFloat(joinAmount) < 1}
           onClick={handleJoin}
         >
@@ -426,42 +419,67 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
             {t("makeContribution")}
           </button>
         ) : null}
-        <div className="flex items-center justify-center gap-7">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
-            className="w-10 h-10 inline-flex items-center justify-center text-primary"
+            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-between gap-1.5 text-primary"
             onClick={() => setActionMode("purchase")}
             aria-label={t("markGiftPurchased")}
             title={t("markGiftPurchased")}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+            <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionPurchased")}</span>
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
             </svg>
           </button>
           <button
             type="button"
-            className="w-10 h-10 inline-flex items-center justify-center text-primary"
+            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-between gap-1.5 text-primary"
             onClick={() => setActionMode("editPayment")}
             aria-label={t("editPaymentDetails")}
             title={t("editPaymentDetails")}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+            <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionEdit")}</span>
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 7.125L16.875 4.5" />
             </svg>
           </button>
           <button
             type="button"
-            className="w-10 h-10 inline-flex items-center justify-center text-red-500"
+            className="h-11 rounded-xl bg-red-500/10 px-2 inline-flex items-center justify-between gap-1.5 text-red-500"
             onClick={() => setActionMode("cancel")}
             aria-label={t("cancelGiftButton")}
             title={t("cancelGiftButton")}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+            <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
+      </div>
+    );
+  }
+
+  function renderActionState(title: string, children: ReactNode, danger = false) {
+    return (
+      <div className={`rounded-xl border p-3 transition-all duration-200 ${danger ? "border-red-500/20 bg-red-500/5" : "border-border bg-muted/5"}`}>
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <p className={`text-sm font-bold ${danger ? "text-red-500" : "text-foreground"}`}>{title}</p>
+          <button
+            type="button"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-muted"
+            onClick={() => setActionMode("overview")}
+            aria-label={t("back")}
+            title={t("back")}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.25">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+          </button>
+        </div>
+        {children}
       </div>
     );
   }
@@ -481,57 +499,60 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     }
 
     if (actionMode === "contribute") {
-      return renderContributionForm();
+      return renderActionState(t("makeContribution"), renderContributionForm());
     }
     if (actionMode === "editPayment") {
-      return renderPaymentDetailsForm();
+      return renderActionState(t("editPaymentDetails"), renderPaymentDetailsForm());
     }
     if (actionMode === "purchase") {
-      return (
+      return renderActionState(
+        t("markGiftPurchased"),
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
           <div className="flex gap-2">
             <button
               type="button"
-              className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
               onClick={() => setActionMode("overview")}
             >
               {t("cancelButton")}
             </button>
             <button
               type="button"
-              className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
               disabled={purchaseMutation.isPending}
               onClick={handleMarkPurchased}
             >
               {purchaseMutation.isPending ? t("saving") : t("markGiftPurchased")}
             </button>
           </div>
-        </div>
+        </div>,
       );
     }
     if (actionMode === "cancel") {
-      return (
+      return renderActionState(
+        t("cancelGiftButton"),
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
           <div className="flex gap-2">
             <button
               type="button"
-              className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
               onClick={() => setActionMode("overview")}
             >
               {t("cancelButton")}
             </button>
             <button
               type="button"
-              className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold disabled:opacity-60"
+              className="theme-confirm-danger flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60"
               disabled={cancelMutation.isPending}
               onClick={handleCancelGift}
             >
               {cancelMutation.isPending ? t("deleting") : t("cancelGiftButton")}
             </button>
           </div>
-        </div>
+        </div>,
+        true,
       );
     }
 
