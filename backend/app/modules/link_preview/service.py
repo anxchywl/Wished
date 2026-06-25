@@ -316,6 +316,10 @@ async def fetch_link_preview(
     ) as client:
         result = await extractor.extract(url, hostname, client)
 
+    # truncate before schema re-validation so oversized extractor output is
+    # trimmed rather than rejected with a 500
+    result = _clamp_result(result)
+
     if result.description:
         result = result.model_copy(update={"description": truncate_to_sentences(result.description, 3)})
 
@@ -323,3 +327,16 @@ async def fetch_link_preview(
     if result.title or result.image_url or result.price:
         await _set_cached(redis, url, result)
     return result
+
+
+def _clamp_result(result: "LinkPreviewResponse") -> "LinkPreviewResponse":
+    """hard-clamp all string fields so schema validators never see oversized input"""
+    from app.modules.link_preview.schemas import LinkPreviewResponse as R
+    return R(
+        title=(result.title or "")[:500] or None,
+        description=(result.description or "")[:5000] or None,
+        image_url=(result.image_url or "")[:2048] or None,
+        price=(result.price or "")[:32] or None,
+        currency=(result.currency or "")[:3] or None,
+        source=(result.source or "")[:32] or None,
+    )

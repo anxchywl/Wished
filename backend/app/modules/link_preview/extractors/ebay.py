@@ -80,9 +80,14 @@ class EbayExtractor:
         # 3. <title> tag fallback
         if not title:
             title = _title_text(html)
-            # strip eBay suffix
             if title:
                 title = re.sub(r"\s*[|\-]\s*eBay.*$", "", title, flags=re.IGNORECASE).strip()
+
+        # cap at 7 words — eBay titles are notoriously long
+        if title:
+            words = title.split()
+            if len(words) > 7:
+                title = " ".join(words[:7])
 
         return LinkPreviewResponse(
             title=title,

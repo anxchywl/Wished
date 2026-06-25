@@ -224,7 +224,8 @@ export const dict = {
     linkPreviewLoading: "Fetching product information...",
     linkPreviewFound: "Product information found",
     linkPreviewImageOnly: "Image found — please fill in the title",
-    linkPreviewFailed: "Could not automatically extract product information",
+    linkPreviewFailed: "Could not extract product information",
+    extractButton: "Extract",
   },
   ru: {
     wished: "Wished",
@@ -450,7 +451,8 @@ export const dict = {
     linkPreviewLoading: "Загрузка информации о товаре...",
     linkPreviewFound: "Информация о товаре найдена",
     linkPreviewImageOnly: "Изображение найдено — введите название вручную",
-    linkPreviewFailed: "Не удалось автоматически загрузить информацию о товаре",
+    linkPreviewFailed: "Не удалось загрузить информацию о товаре",
+    extractButton: "Извлечь",
   },
   kz: {
     wished: "Wished",
@@ -676,7 +678,8 @@ export const dict = {
     linkPreviewLoading: "Тауар ақпараты жүктелуде...",
     linkPreviewFound: "Тауар ақпараты табылды",
     linkPreviewImageOnly: "Сурет табылды — атауын қолмен енгізіңіз",
-    linkPreviewFailed: "Тауар ақпаратын автоматты түрде жүктеу мүмкін болмады",
+    linkPreviewFailed: "Тауар ақпаратын жүктеу мүмкін болмады",
+    extractButton: "Алу",
   }
 };
 

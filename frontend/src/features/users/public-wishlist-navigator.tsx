@@ -601,6 +601,7 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
   function bookButtonLabel() {
     if (createReservation.isPending) return t("reserving");
     if (isReserved) return t("wishReservedByOther");
+    if (wish?.price) return `${t("book")} · ${formatPrice(wish.price, wish.currency)}`;
     return t("book");
   }
 
@@ -614,7 +615,7 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
 
   return (
     <div className="public-nav-content">
-      <section className="flex flex-col items-center gap-4">
+      <section className="flex flex-col items-center gap-3">
         <div className="public-wish-gallery relative">
           <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.medium_url ?? wish.images?.[0]?.thumbnail_url} className={`w-full h-full object-cover ${isCompleted ? "wish-image-fulfilled" : ""}`} />
         </div>
@@ -630,34 +631,53 @@ function PublicWishView({ wishlistId, wishId, shareToken }: PublicWishViewProps)
             ))}
           </div>
         ) : null}
-        <div className="w-full text-center">
-          {wish.price ? <p className="text-lg font-extrabold text-primary mt-1">{formatPrice(wish.price, wish.currency)}</p> : null}
-        </div>
       </section>
 
-      {!isCompleted ? <section className="flex flex-col gap-2 w-full mt-4 px-4">
-        <button
-          type="button"
-          className="public-action-button public-action-primary"
-          onClick={handleBook}
-          disabled={isBusy || isReserved}
-        >
-          {bookButtonLabel()}
-        </button>
-      </section> : null}
-
-      {wish.original_product_url ? (
-        <section className="flex flex-col items-center px-4 mt-2">
-          <a
-            href={wish.original_product_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-primary underline underline-offset-2 text-center"
+      {!isCompleted ? (
+        <section className="flex flex-col gap-2 w-full mt-3 px-4">
+          <button
+            type="button"
+            className="public-action-button public-action-primary"
+            onClick={handleBook}
+            disabled={isBusy || isReserved}
           >
-            {t("openProductPage") ?? "Open wish's page"}
-          </a>
+            {bookButtonLabel()}
+          </button>
+          {wish.original_product_url ? (
+            <a
+              href={wish.original_product_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-1.5 h-9 w-full rounded-xl text-xs font-semibold text-muted hover:text-foreground transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              {t("openProductPage") ?? "Open wish's page"}
+            </a>
+          ) : null}
         </section>
-      ) : null}
+      ) : (
+        wish.original_product_url ? (
+          <section className="flex flex-col items-center px-4 mt-3">
+            <a
+              href={wish.original_product_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground transition-colors"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              {t("openProductPage") ?? "Open wish's page"}
+            </a>
+          </section>
+        ) : null
+      )}
 
       {wish.description ? (
         <section className="flex flex-col px-4 mt-2">

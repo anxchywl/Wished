@@ -625,23 +625,23 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
       }}
       className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"} ${isLast ? "" : "border-b border-border/60"}`}
     >
-      <div className="flex items-center gap-3 pointer-events-none">
-        <div className="relative">
+      <div className="flex items-center gap-3 pointer-events-none min-w-0">
+        <div className="relative w-12 h-12 flex-shrink-0 overflow-hidden rounded-xl">
           <WishImageThumb
             id={wish.id}
             title={wish.title}
             imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url}
-            className="w-12 h-12 rounded-xl object-cover"
+            className="w-full h-full object-cover"
           />
           {isCompleted && (
-            <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-black/30">
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
               <svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 24 24">
                 <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
               </svg>
             </div>
           )}
           {showBooked && (
-            <div className="absolute inset-0 rounded-xl flex items-center justify-center bg-slate-700/35">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-700/35">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                 <rect x="6" y="10" width="12" height="9" rx="2" />
                 <path strokeLinecap="round" d="M9 10V7a3 3 0 0 1 6 0v3" />
@@ -649,8 +649,8 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
             </div>
           )}
         </div>
-        <div className="flex flex-col">
-          <span className="font-semibold text-sm text-foreground">{wish.title}</span>
+        <div className="flex flex-col min-w-0">
+          <span className="font-semibold text-sm text-foreground line-clamp-2">{wish.title}</span>
           {wish.price && !isCompleted && (
             <span className="text-xs text-muted mt-0.5">
               {formatPrice(wish.price, wish.currency)}
@@ -739,6 +739,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     if (cancelReservation.isPending) return t("cancellingReservation");
     if (isMine) return t("cancelReservation");
     if (isReserved) return t("wishReservedByOther");
+    if (wish?.price) return `${t("book")} · ${formatPrice(wish.price, wish.currency)}`;
     return t("book");
   }
 
@@ -848,7 +849,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
           }`}
         >
-        <div className={`flex flex-col items-center gap-4 ${isCompleted ? "opacity-60" : ""}`}>
+        <div className={`flex flex-col items-center gap-3 ${isCompleted ? "opacity-60" : ""}`}>
           <div className="relative w-full max-w-[210px] aspect-square rounded-3xl overflow-hidden border border-border shadow-lg">
             <WishImageThumb
               id={wish.id}
@@ -859,10 +860,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           </div>
           {isCompleted ? (
             <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
-          ) : null}
-
-          {wish.price ? (
-            <p className="text-lg font-extrabold text-primary">{formatPrice(wish.price, wish.currency)}</p>
           ) : null}
 
           {/* owner self-booking controls */}
@@ -896,11 +893,19 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                   onClick={handleOwnerBook}
                   disabled={isBusy}
                 >
-                  {createReservation.isPending ? t("reserving") : t("book")}
+                  {wish.price
+                    ? `${createReservation.isPending ? t("reserving") : t("book")} · ${formatPrice(wish.price, wish.currency)}`
+                    : (createReservation.isPending ? t("reserving") : t("book"))
+                  }
                 </button>
               )}
             </div>
           )}
+
+          {/* owner price when no booking controls visible */}
+          {isOwner && (isCompleted || (!isMine && ownerBookingVisibility === "hide")) && wish.price ? (
+            <p className="text-lg font-extrabold text-primary">{formatPrice(wish.price, wish.currency)}</p>
+          ) : null}
 
           {/* non-owner booking controls */}
           {!isOwner && (
@@ -928,8 +933,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               href={wish.original_product_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary underline underline-offset-2 text-center"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground transition-colors"
             >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
               {t("openProductPage") ?? "Open wish's page"}
             </a>
           ) : null}
@@ -1393,7 +1403,6 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
   const [linkPreviewStatus, setLinkPreviewStatus] = useState<"idle" | "loading" | "found" | "imageOnly" | "failed">("idle");
   const linkPreviewMutation = useLinkPreviewMutation();
   const storeImageMutation = useStoreLinkPreviewImageMutation();
-  const linkPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -1416,54 +1425,48 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
 
   function handleProductUrlChange(url: string) {
     setProductUrl(url);
-
-    if (linkPreviewDebounceRef.current) {
-      clearTimeout(linkPreviewDebounceRef.current);
-    }
-
-    const trimmed = url.trim();
-    if (!trimmed || !trimmed.startsWith("http")) {
+    if (linkPreviewStatus !== "idle") {
       setLinkPreviewStatus("idle");
-      return;
     }
+  }
 
+  async function handleExtract() {
+    const trimmed = productUrl.trim();
+    if (!trimmed || !trimmed.startsWith("http")) return;
     setLinkPreviewStatus("loading");
-    linkPreviewDebounceRef.current = setTimeout(async () => {
-      try {
-        const result = await linkPreviewMutation.mutateAsync({ url: trimmed });
-        // auto-fill only if field is currently empty (never overwrite manually edited values)
-        if (result.title && !title.trim()) {
-          setTitle(normalizeTextInput(result.title, 160));
-        }
-        if (result.description && !description.trim()) {
-          setDescription(normalizeTextInput(result.description, 2000));
-        }
-        if (result.price && !price.trim()) {
-          setPrice(normalizePriceInput(result.price));
-          if (result.currency && !currency.trim()) {
-            setCurrency(normalizeCurrencyInput(result.currency));
-          }
-        }
-        if (result.image_url && !coverPreview) {
-          setCoverPreview(result.image_url);
-          storeImageMutation.mutate(result.image_url, {
-            onSuccess: (stored) => {
-              setPendingImageId(stored.pending_image_id);
-              if (stored.thumbnail_url) {
-                setCoverPreview(stored.thumbnail_url);
-              }
-            },
-          });
-        }
-        setLinkPreviewStatus(
-          result.title || result.description ? "found"
-          : result.image_url ? "imageOnly"
-          : "failed"
-        );
-      } catch {
-        setLinkPreviewStatus("failed");
+    try {
+      const result = await linkPreviewMutation.mutateAsync({ url: trimmed });
+      if (result.title && !title.trim()) {
+        setTitle(normalizeTextInput(result.title, 160));
       }
-    }, 600);
+      if (result.description && !description.trim()) {
+        setDescription(normalizeTextInput(result.description, 2000));
+      }
+      if (result.price && !price.trim()) {
+        setPrice(normalizePriceInput(result.price));
+        if (result.currency && !currency.trim()) {
+          setCurrency(normalizeCurrencyInput(result.currency));
+        }
+      }
+      if (result.image_url && !coverPreview) {
+        setCoverPreview(result.image_url);
+        storeImageMutation.mutate(result.image_url, {
+          onSuccess: (stored) => {
+            setPendingImageId(stored.pending_image_id);
+            if (stored.thumbnail_url) {
+              setCoverPreview(stored.thumbnail_url);
+            }
+          },
+        });
+      }
+      setLinkPreviewStatus(
+        result.title || result.description ? "found"
+        : result.image_url ? "imageOnly"
+        : "failed"
+      );
+    } catch {
+      setLinkPreviewStatus("failed");
+    }
   }
 
   if (!open) return null;
@@ -1538,21 +1541,28 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
               >
                 <div className={`flex flex-col gap-1 ${focusMode.sectionClass("productUrl")}`}>
                   <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("productUrlLabel") ?? "Product URL"}</label>
-                  <input
-                    type="url"
-                    className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder={t("productUrlPlaceholder") ?? "https://kaspi.kz/..."}
-                    value={productUrl}
-                    onChange={(e) => handleProductUrlChange(e.currentTarget.value)}
-                    {...focusMode.fieldFocusProps("productUrl")}
-                    onBlur={() => {
-                      setProductUrl((current) => current.trim());
-                      focusMode.onFieldBlur();
-                    }}
-                  />
-                  {linkPreviewStatus === "loading" && (
-                    <p className="text-[11px] text-muted">{t("linkPreviewLoading") ?? "Fetching product information..."}</p>
-                  )}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="url"
+                      className="flex-1 h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 min-w-0"
+                      placeholder={t("productUrlPlaceholder") ?? "https://kaspi.kz/..."}
+                      value={productUrl}
+                      onChange={(e) => handleProductUrlChange(e.currentTarget.value)}
+                      {...focusMode.fieldFocusProps("productUrl")}
+                      onBlur={() => {
+                        setProductUrl((current) => current.trim());
+                        focusMode.onFieldBlur();
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!productUrl.trim().startsWith("http") || linkPreviewStatus === "loading"}
+                      onClick={handleExtract}
+                      className="h-11 px-3 text-sm font-semibold text-primary border border-primary/30 rounded-xl bg-transparent hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0"
+                    >
+                      {linkPreviewStatus === "loading" ? "..." : (t("extractButton") ?? "Extract")}
+                    </button>
+                  </div>
                   {linkPreviewStatus === "found" && (
                     <p className="text-[11px] text-primary">{t("linkPreviewFound") ?? "Product information found"}</p>
                   )}
@@ -1560,7 +1570,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                     <p className="text-[11px] text-muted">{t("linkPreviewImageOnly") ?? "Image found — please fill in the title"}</p>
                   )}
                   {linkPreviewStatus === "failed" && (
-                    <p className="text-[11px] text-muted">{t("linkPreviewFailed") ?? "Could not automatically extract product information"}</p>
+                    <p className="text-[11px] text-muted">{t("linkPreviewFailed") ?? "Could not extract product information"}</p>
                   )}
                 </div>
 
@@ -1676,22 +1686,6 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                       {compressing ? (t("compressing") ?? "Uploading...") : coverPreview ? (t("changeCover") ?? "Change Cover") : (t("uploadCover") ?? "Upload Cover")}
                     </span>
                   </div>
-                </div>
-
-                <div className={`flex flex-col gap-1 ${focusMode.sectionClass("productUrl")}`}>
-                  <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">{t("productUrlLabel") ?? "Product URL"}</label>
-                  <input
-                    type="url"
-                    className="h-11 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="https://..."
-                    value={productUrl}
-                    onChange={(e) => setProductUrl(e.currentTarget.value)}
-                    {...focusMode.fieldFocusProps("productUrl")}
-                    onBlur={() => {
-                      setProductUrl((current) => current.trim());
-                      focusMode.onFieldBlur();
-                    }}
-                  />
                 </div>
 
                 <div className={`flex flex-col gap-1 ${focusMode.sectionClass("description")}`}>

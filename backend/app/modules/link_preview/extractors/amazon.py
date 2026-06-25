@@ -41,21 +41,35 @@ _CURRENCY_RE = re.compile(r'"currencyCode"\s*:\s*"([A-Z]{3})"')
 _PRODUCT_TITLE_RE = re.compile(r'id="productTitle"[^>]*>(.*?)</span>', re.DOTALL)
 
 
+def _shorten_title(title: str) -> str:
+    """keep only the first meaningful segment — Amazon appends specs, model info, etc after ' - '"""
+    # split on common Amazon title separators and take the first part
+    for sep in (" - ", ", ", " | ", " : "):
+        parts = title.split(sep)
+        if len(parts) > 1 and len(parts[0].strip()) > 8:
+            title = parts[0].strip()
+            break
+    # hard cap: if still too long, take first 7 words
+    words = title.split()
+    if len(words) > 7:
+        title = " ".join(words[:7])
+    return title
+
+
 def _extract_title(html: str) -> str | None:
     m = _PRODUCT_TITLE_RE.search(html)
     if m:
         title = re.sub(r"<[^>]+>", "", m.group(1)).strip()
         if title:
-            return title
+            return _shorten_title(title)
     for pattern in (_META_TITLE_RE, _META_TITLE_RE2):
         m = pattern.search(html)
         if m:
             title = m.group(1).strip()
             title = _TITLE_PREFIX_RE.sub("", title)
-            # strip trailing " - Amazon.com" or ": Electronics" junk
             title = re.sub(r"\s*[-:]?\s*Amazon\.\w+.*$", "", title, flags=re.IGNORECASE).strip()
             if title:
-                return title
+                return _shorten_title(title)
     return None
 
 

@@ -569,3 +569,98 @@ async def test_fetch_link_preview_uses_cache_on_hit() -> None:
 
     assert result.title == "Cached"
     # extractor should not have been called — no HTTP requests needed
+
+
+# ---------------------------------------------------------------------------
+# LinkPreviewResponse field validators
+# ---------------------------------------------------------------------------
+
+def test_link_preview_response_rejects_javascript_image_url() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="T", description=None, image_url="javascript:alert(1)", price=None, currency=None, source=None)
+    assert r.image_url is None
+
+
+def test_link_preview_response_rejects_data_image_url() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="T", description=None, image_url="data:image/png;base64,abc", price=None, currency=None, source=None)
+    assert r.image_url is None
+
+
+def test_link_preview_response_accepts_https_image_url() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    url = "https://example.com/image.jpg"
+    r = LinkPreviewResponse(title="T", description=None, image_url=url, price=None, currency=None, source=None)
+    assert r.image_url == url
+
+
+def test_link_preview_response_rejects_non_numeric_price() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="T", description=None, image_url=None, price="<script>", currency=None, source=None)
+    assert r.price is None
+
+
+def test_link_preview_response_accepts_valid_price() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="T", description=None, image_url=None, price="1299.99", currency="KZT", source=None)
+    assert r.price == "1299.99"
+    assert r.currency == "KZT"
+
+
+def test_link_preview_response_rejects_invalid_currency() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="T", description=None, image_url=None, price=None, currency="BADUSD", source=None)
+    assert r.currency is None
+
+
+def test_link_preview_response_strips_control_chars_from_title() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    r = LinkPreviewResponse(title="Hello\x00World\x1f", description=None, image_url=None, price=None, currency=None, source=None)
+    assert r.title == "HelloWorld"
+
+
+def test_link_preview_response_rejects_oversized_title() -> None:
+    from pydantic import ValidationError
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    with pytest.raises(ValidationError):
+        LinkPreviewResponse(title="A" * 600, description=None, image_url=None, price=None, currency=None, source=None)
+
+
+def test_clamp_result_pre_truncates_for_schema() -> None:
+    from app.modules.link_preview.schemas import LinkPreviewResponse
+    from app.modules.link_preview.service import _clamp_result
+    # build a raw result bypassing pydantic to simulate what an extractor might return
+    raw = object.__new__(LinkPreviewResponse)
+    object.__setattr__(raw, "title", "A" * 600)
+    object.__setattr__(raw, "description", "B" * 6000)
+    object.__setattr__(raw, "image_url", "https://x.com/" + "c" * 2100)
+    object.__setattr__(raw, "price", "1" * 50)
+    object.__setattr__(raw, "currency", "USD")
+    object.__setattr__(raw, "source", "S" * 100)
+    clamped = _clamp_result(raw)
+    assert clamped.title is not None and len(clamped.title) <= 500
+    assert clamped.description is not None and len(clamped.description) <= 5000
+    assert clamped.image_url is not None and len(clamped.image_url) <= 2048
+    assert clamped.price is not None and len(clamped.price) <= 32  # clamped to 32 chars
+    assert clamped.currency == "USD"
+    assert clamped.source is not None and len(clamped.source) <= 32
+
+
+def test_store_image_request_rejects_javascript_url() -> None:
+    from pydantic import ValidationError
+    from app.modules.link_preview.schemas import StoreImageRequest
+    with pytest.raises(ValidationError):
+        StoreImageRequest(image_url="javascript:void(0)")
+
+
+def test_store_image_request_rejects_data_url() -> None:
+    from pydantic import ValidationError
+    from app.modules.link_preview.schemas import StoreImageRequest
+    with pytest.raises(ValidationError):
+        StoreImageRequest(image_url="data:text/html,<script>")
+
+
+def test_store_image_request_accepts_https_url() -> None:
+    from app.modules.link_preview.schemas import StoreImageRequest
+    req = StoreImageRequest(image_url="https://example.com/photo.jpg")
+    assert req.image_url == "https://example.com/photo.jpg"
