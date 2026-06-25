@@ -8,6 +8,7 @@ from minio.commonconfig import CopySource
 from app.core.config import get_settings
 
 _client: Minio | None = None
+_signing_client: Minio | None = None
 
 
 def get_minio_client() -> Minio:
@@ -70,19 +71,27 @@ def copy_object(
     )
 
 
+def _get_signing_client() -> Minio:
+    """return a cached Minio client configured for the public endpoint used to sign URLs"""
+    global _signing_client
+    if _signing_client is None:
+        settings = get_settings()
+        public_endpoint = urlparse(settings.minio_public_endpoint)
+        _signing_client = Minio(
+            endpoint=public_endpoint.netloc,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=public_endpoint.scheme == "https",
+            region="us-east-1",
+        )
+    return _signing_client
+
+
 def get_presigned_url(bucket: str, object_name: str, expires_seconds: int | None = None) -> str:
     """generate a presigned GET URL for the browser-accessible endpoint"""
     settings = get_settings()
     ttl = expires_seconds if expires_seconds is not None else settings.minio_presigned_url_expires_seconds
-    public_endpoint = urlparse(settings.minio_public_endpoint)
-    signing_client = Minio(
-        endpoint=public_endpoint.netloc,
-        access_key=settings.minio_access_key,
-        secret_key=settings.minio_secret_key,
-        secure=public_endpoint.scheme == "https",
-        region="us-east-1",
-    )
-    return signing_client.presigned_get_object(
+    return _get_signing_client().presigned_get_object(
         bucket_name=bucket,
         object_name=object_name,
         expires=timedelta(seconds=ttl),

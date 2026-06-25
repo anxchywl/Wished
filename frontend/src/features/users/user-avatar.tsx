@@ -24,7 +24,12 @@ export function UserAvatar({ user }: { user: AvatarUser }) {
     .slice(0, 2)
     .toUpperCase();
 
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(() => {
+    if (!user.photo_url || typeof window === "undefined") return false;
+    const probe = new window.Image();
+    probe.src = user.photo_url;
+    return probe.complete && probe.naturalWidth > 0;
+  });
   const [imgFailed, setImgFailed] = useState(false);
 
   return (

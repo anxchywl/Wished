@@ -67,6 +67,11 @@ export function useStoreLinkPreviewImageMutation() {
 
 /**
  * load wishes
+ *
+ * Owner views use staleTime of 2 min with no polling — mutations keep the cache
+ * up-to-date via setQueryData/invalidateQueries. Shared-wishlist views (shareToken
+ * present) use a 30 s staleTime and poll every 30 s so the reserver sees others'
+ * bookings update without excessive server load.
  */
 export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -76,6 +81,8 @@ export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: 
     ? ([...wishQueryKeys.list(wishlistId), shareToken] as const)
     : wishQueryKeys.list(wishlistId);
 
+  const isSharedView = Boolean(shareToken);
+
   return useQuery({
     queryKey,
     queryFn: async () => {
@@ -84,10 +91,8 @@ export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: 
       return preserveWishImageUrls(response, cached);
     },
     enabled: Boolean(enabled && authStatus === "authenticated" && accessToken && wishlistId),
-    staleTime: 30 * 1000,
-    refetchInterval: 1_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: "always",
+    staleTime: isSharedView ? 30_000 : 2 * 60 * 1000,
+    refetchInterval: isSharedView ? 30_000 : false,
   });
 }
 
@@ -345,7 +350,7 @@ export function useUploadWishImageMutation(wishlistId: string) {
         queryClient.setQueryData(wishQueryKeys.list(wishlistId), context.previousWishes);
       }
     },
-    onSuccess: async (image, variables, context) => {
+    onSuccess: (image, variables, context) => {
       const displayedImage = context?.previewUrl
         ? {
             ...image,
@@ -367,7 +372,7 @@ export function useUploadWishImageMutation(wishlistId: string) {
             : item
         ),
       }));
-      await queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      // cache is already up-to-date from setQueryData above — no invalidation needed
     },
   });
 }
@@ -386,7 +391,7 @@ export function useCompleteWishMutation(wishlistId: string) {
         if (!current) return current;
         return { items: current.items.map((item) => (item.id === data.id ? data : item)) };
       });
-      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
+      // reservation status and booked-wishes list are cross-resource — invalidate them
       queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(data.id) });
       queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
@@ -407,7 +412,6 @@ export function useUncompleteWishMutation(wishlistId: string) {
         if (!current) return current;
         return { items: current.items.map((item) => (item.id === data.id ? data : item)) };
       });
-      queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(wishlistId) });
       queryClient.invalidateQueries({ queryKey: reservationQueryKeys.status(data.id) });
       queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },

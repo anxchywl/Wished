@@ -21,6 +21,10 @@ export const bookedWishesQueryKey = ["reservations", "booked"] as const;
 
 /**
  * load reservation status for a wish
+ *
+ * Polls every 30 s so viewers of a shared wishlist see others' bookings update
+ * within a reasonable window. Mutations (create/cancel reservation) update the
+ * cache immediately via setQueryData so the reserver sees instant feedback.
  */
 export function useReservationStatusQuery(wishId: string, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -33,10 +37,8 @@ export function useReservationStatusQuery(wishId: string, shareToken?: string | 
     queryKey,
     queryFn: () => getReservationStatus(accessToken ?? "", wishId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
-    staleTime: 0,
-    refetchInterval: 1_000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: "always",
+    staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -76,9 +78,7 @@ export function useBookedWishesQuery() {
       };
     },
     enabled: Boolean(authStatus === "authenticated" && accessToken),
-    staleTime: 30 * 1000,
-    refetchInterval: 5_000,
-    refetchOnWindowFocus: "always",
+    staleTime: 2 * 60 * 1000,
   });
 }
 

@@ -19,8 +19,12 @@ export function useUserProfileQuery(username: string, profileToken?: string | nu
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
 
+  const queryKey = profileToken
+    ? ([...userQueryKeys.profile(username), profileToken] as const)
+    : userQueryKeys.profile(username);
+
   return useQuery({
-    queryKey: [...userQueryKeys.profile(username), accessToken, profileToken] as const,
+    queryKey,
     queryFn: () => getUserProfile(accessToken ?? "", username, profileToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && username),
     staleTime: 5 * 60 * 1000,
@@ -50,8 +54,12 @@ export function useUserProfileByIdQuery(userId: string | null, profileToken?: st
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
 
+  const profileByIdKey = profileToken
+    ? ([...userQueryKeys.profileById(userId ?? ""), profileToken] as const)
+    : userQueryKeys.profileById(userId ?? "");
+
   return useQuery({
-    queryKey: [...userQueryKeys.profileById(userId ?? ""), accessToken, profileToken] as const,
+    queryKey: profileByIdKey,
     queryFn: () => getUserProfileById(accessToken ?? "", userId ?? "", profileToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && userId),
     staleTime: 5 * 60 * 1000,
@@ -65,8 +73,12 @@ export function useUserWishlistsByIdQuery(userId: string | null, profileToken?: 
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
 
+  const wishlistsByIdKey = profileToken
+    ? ([...userQueryKeys.wishlistsById(userId ?? ""), profileToken] as const)
+    : userQueryKeys.wishlistsById(userId ?? "");
+
   return useQuery({
-    queryKey: [...userQueryKeys.wishlistsById(userId ?? ""), accessToken, profileToken] as const,
+    queryKey: wishlistsByIdKey,
     queryFn: () => getUserWishlistsById(accessToken ?? "", userId ?? "", profileToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && userId),
     staleTime: 2 * 60 * 1000,
@@ -87,9 +99,10 @@ export function useFollowByIdMutation(userId: string, profileToken?: string | nu
         ? followUserById(accessToken ?? "", userId, profileToken)
         : unfollowUserById(accessToken ?? "", userId),
     onMutate: async (nextFollowing) => {
-      await queryClient.cancelQueries({ queryKey: userQueryKeys.profileById(userId) });
-      const previous = queryClient.getQueriesData<UserProfileResponse>({ queryKey: userQueryKeys.profileById(userId) });
-      queryClient.setQueriesData<UserProfileResponse>({ queryKey: userQueryKeys.profileById(userId) }, (current) =>
+      const baseKey = userQueryKeys.profileById(userId);
+      await queryClient.cancelQueries({ queryKey: baseKey });
+      const previous = queryClient.getQueriesData<UserProfileResponse>({ queryKey: baseKey });
+      queryClient.setQueriesData<UserProfileResponse>({ queryKey: baseKey }, (current) =>
         current ? { ...current, is_following: nextFollowing } : current,
       );
       return { previous };
@@ -118,9 +131,10 @@ export function useFollowMutation(username: string, profileToken?: string | null
         ? followUser(accessToken ?? "", username, profileToken)
         : unfollowUser(accessToken ?? "", username),
     onMutate: async (nextFollowing) => {
-      await queryClient.cancelQueries({ queryKey: userQueryKeys.profile(username) });
-      const previous = queryClient.getQueriesData<UserProfileResponse>({ queryKey: userQueryKeys.profile(username) });
-      queryClient.setQueriesData<UserProfileResponse>({ queryKey: userQueryKeys.profile(username) }, (current) =>
+      const baseKey = userQueryKeys.profile(username);
+      await queryClient.cancelQueries({ queryKey: baseKey });
+      const previous = queryClient.getQueriesData<UserProfileResponse>({ queryKey: baseKey });
+      queryClient.setQueriesData<UserProfileResponse>({ queryKey: baseKey }, (current) =>
         current ? { ...current, is_following: nextFollowing } : current,
       );
       return { previous };

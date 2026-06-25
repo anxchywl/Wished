@@ -13,6 +13,7 @@ from app.modules.media.processing import process_image
 from app.modules.media.rate_limit import check_upload_rate_limit
 from app.modules.media.schemas import WishImageListResponse, WishImageResponse
 from app.modules.media.validation import validate_image_upload
+from app.modules.cache import cache_delete, wishes_cache_key
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,11 @@ async def upload_wish_image(
     db.add(image)
     await db.commit()
     await db.refresh(image)
+
+    # wish list responses embed images — invalidate after upload
+    wish = await _get_owned_wish(db, current_user, wish_id)
+    await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
+
     return _to_response(image)
 
 
@@ -126,9 +132,10 @@ async def delete_wish_image(
     current_user: User,
     wish_id: UUID,
     image_id: UUID,
+    redis: Redis | None = None,
 ) -> None:
     """delete wish image and all stored variants"""
-    await _get_owned_wish(db, current_user, wish_id)
+    wish = await _get_owned_wish(db, current_user, wish_id)
     result = await db.execute(
         select(WishImage).where(WishImage.id == image_id, WishImage.wish_id == wish_id)
     )
@@ -143,6 +150,8 @@ async def delete_wish_image(
             logger.error("failed to delete minio object %s/%s: %s", image.bucket, obj, exc)
     await db.delete(image)
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
 
 
 async def _get_owned_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> Wish:

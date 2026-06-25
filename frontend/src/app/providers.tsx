@@ -190,11 +190,13 @@ function PersistentLayout({ children }: { children: ReactNode }) {
         queryClient.prefetchQuery({
           queryKey: wishQueryKeys.list(wl.id),
           queryFn: () => listWishes(accessToken, wl.id),
+          staleTime: 2 * 60 * 1000,
         })
       );
       const followingPrefetch = queryClient.prefetchQuery({
         queryKey: userQueryKeys.following(tgUserId),
         queryFn: () => listFollowing(accessToken),
+        staleTime: 3 * 60 * 1000,
       });
       Promise.all([...wishPrefetches, followingPrefetch]).finally(() => {
         setInitialWishesLoaded(true);

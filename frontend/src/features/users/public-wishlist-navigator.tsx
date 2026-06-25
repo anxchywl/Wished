@@ -278,24 +278,38 @@ function PublicUserView({ username, userId, profileToken, initialUser, onOpenWis
   useEffect(() => {
     if (!accessToken) return;
     if (userId) {
+      const profileKey = profileToken
+        ? ([...userQueryKeys.profileById(userId), profileToken] as const)
+        : userQueryKeys.profileById(userId);
+      const wishlistsKey = profileToken
+        ? ([...userQueryKeys.wishlistsById(userId), profileToken] as const)
+        : userQueryKeys.wishlistsById(userId);
       queryClient.prefetchQuery({
-        queryKey: [...userQueryKeys.profileById(userId), accessToken, profileToken] as const,
+        queryKey: profileKey,
         queryFn: () => getUserProfileById(accessToken, userId, profileToken),
-        staleTime: 30 * 1000,
+        staleTime: 5 * 60 * 1000,
       });
       queryClient.prefetchQuery({
-        queryKey: [...userQueryKeys.wishlistsById(userId), accessToken, profileToken] as const,
+        queryKey: wishlistsKey,
         queryFn: () => getUserWishlistsById(accessToken, userId, profileToken),
+        staleTime: 2 * 60 * 1000,
       });
     } else if (username) {
+      const profileKey = profileToken
+        ? ([...userQueryKeys.profile(username), profileToken] as const)
+        : userQueryKeys.profile(username);
+      const wishlistsKey = profileToken
+        ? ([...wishlistQueryKeys.user(username), profileToken] as const)
+        : wishlistQueryKeys.user(username);
       queryClient.prefetchQuery({
-        queryKey: [...userQueryKeys.profile(username), accessToken, profileToken] as const,
+        queryKey: profileKey,
         queryFn: () => getUserProfile(accessToken, username, profileToken),
-        staleTime: 30 * 1000,
+        staleTime: 5 * 60 * 1000,
       });
       queryClient.prefetchQuery({
-        queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
+        queryKey: wishlistsKey,
         queryFn: () => listUserWishlists(accessToken, username, profileToken),
+        staleTime: 2 * 60 * 1000,
       });
     }
   }, [accessToken, profileToken, queryClient, username, userId]);
@@ -303,8 +317,9 @@ function PublicUserView({ username, userId, profileToken, initialUser, onOpenWis
   function handleWishlistHover(wishlistId: string) {
     if (!accessToken) return;
     queryClient.prefetchQuery({
-      queryKey: [...wishlistQueryKeys.detail(wishlistId), accessToken] as const,
+      queryKey: wishlistQueryKeys.detail(wishlistId),
       queryFn: () => getWishlist(accessToken, wishlistId),
+      staleTime: 2 * 60 * 1000,
     });
     queryClient.prefetchQuery({
       queryKey: wishQueryKeys.list(wishlistId),

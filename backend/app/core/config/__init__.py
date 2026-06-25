@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = "wished-password"
     minio_secure: bool = False
     minio_media_bucket: str = "wished-media"
-    minio_presigned_url_expires_seconds: int = 3600
+    minio_presigned_url_expires_seconds: int = 86400
 
     max_images_per_wish: int = 1
     upload_rate_per_minute: int = 20

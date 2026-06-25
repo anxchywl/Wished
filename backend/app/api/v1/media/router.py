@@ -53,9 +53,10 @@ async def remove_wish_image(
     image_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> Response:
     """delete wish image and all stored variants"""
-    await delete_wish_image(db, current_user, wish_id, image_id)
+    await delete_wish_image(db, current_user, wish_id, image_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

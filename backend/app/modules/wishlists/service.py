@@ -23,12 +23,34 @@ from app.modules.wishlists.schemas import (
     WishlistResponse,
     WishlistUpdateRequest,
 )
+from app.modules.cache import (
+    cache_delete,
+    cache_get_or_fetch,
+    wishlists_cache_key,
+    WISHLISTS_TTL,
+)
 
 logger = logging.getLogger(__name__)
 
 
-async def list_current_user_wishlists(db: AsyncSession, current_user: User) -> WishlistListResponse:
-    """list current wishlists"""
+async def list_current_user_wishlists(
+    db: AsyncSession,
+    current_user: User,
+    redis: Redis | None = None,
+) -> WishlistListResponse:
+    """list current wishlists — served from Redis cache when available"""
+    if redis is not None:
+        return await cache_get_or_fetch(
+            redis,
+            wishlists_cache_key(current_user.id),
+            WISHLISTS_TTL,
+            WishlistListResponse,
+            lambda: _fetch_current_user_wishlists(db, current_user),
+        )
+    return await _fetch_current_user_wishlists(db, current_user)
+
+
+async def _fetch_current_user_wishlists(db: AsyncSession, current_user: User) -> WishlistListResponse:
     result = await db.execute(
         select(Wishlist)
         .where(Wishlist.owner_user_id == current_user.id)
@@ -72,10 +94,15 @@ async def list_user_wishlists_by_id(
     current_user: User,
     target_user_id: UUID,
     allow_profile_access: bool = False,
+    owner: User | None = None,
 ) -> WishlistListResponse:
-    """list visible wishlists for a user looked up by internal UUID"""
-    result = await db.execute(select(User).where(User.id == target_user_id))
-    owner = result.scalar_one_or_none()
+    """list visible wishlists for a user looked up by internal UUID
+
+    Pass `owner` to avoid a redundant SELECT when the caller already has the User.
+    """
+    if owner is None:
+        result = await db.execute(select(User).where(User.id == target_user_id))
+        owner = result.scalar_one_or_none()
     if owner is None or (owner.is_blocked and owner.id != current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if (
@@ -129,6 +156,7 @@ async def create_wishlist(
     await db.refresh(wishlist)
 
     if redis is not None:
+        await cache_delete(redis, wishlists_cache_key(current_user.id))
         await publish_event(redis, "WISHLIST_CREATED", {
             "wishlist_id": wishlist.id,
             "owner_user_id": current_user.id,
@@ -141,6 +169,7 @@ async def reorder_wishlists(
     db: AsyncSession,
     current_user: User,
     payload: WishlistReorderRequest,
+    redis: Redis | None = None,
 ) -> WishlistListResponse:
     """reorder wishlists"""
     result = await db.execute(
@@ -158,6 +187,8 @@ async def reorder_wishlists(
     ordered = [wishlists_by_id[wishlist_id] for wishlist_id in payload.wishlist_ids]
     response = WishlistListResponse(items=[_to_response(wishlist) for wishlist in ordered])
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, wishlists_cache_key(current_user.id))
     return response
 
 
@@ -166,6 +197,7 @@ async def update_wishlist(
     current_user: User,
     wishlist_id: UUID,
     payload: WishlistUpdateRequest,
+    redis: Redis | None = None,
 ) -> WishlistResponse:
     """update wishlist"""
     wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
@@ -180,10 +212,17 @@ async def update_wishlist(
 
     await db.commit()
     await db.refresh(wishlist)
+    if redis is not None:
+        await cache_delete(redis, wishlists_cache_key(current_user.id))
     return _to_response(wishlist)
 
 
-async def delete_wishlist(db: AsyncSession, current_user: User, wishlist_id: UUID) -> None:
+async def delete_wishlist(
+    db: AsyncSession,
+    current_user: User,
+    wishlist_id: UUID,
+    redis: Redis | None = None,
+) -> None:
     """delete wishlist"""
     wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
     # find wishes and images
@@ -206,6 +245,8 @@ async def delete_wishlist(db: AsyncSession, current_user: User, wishlist_id: UUI
             objects_to_delete.append((wishlist.cover_image_bucket, obj_name))
     await db.delete(wishlist)
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, wishlists_cache_key(current_user.id))
     # clean minio files
     for bucket, object_name in objects_to_delete:
         try:
@@ -277,6 +318,7 @@ async def upload_wishlist_cover(
     wishlist.cover_image_medium_object_name = medium_name
     await db.commit()
     await db.refresh(wishlist)
+    await cache_delete(redis, wishlists_cache_key(current_user.id))
     for b, obj in old_objects:
         try:
             delete_object(b, obj)
@@ -298,6 +340,7 @@ async def delete_wishlist_cover(
     db: AsyncSession,
     current_user: User,
     wishlist_id: UUID,
+    redis: Redis | None = None,
 ) -> WishlistResponse:
     """remove wishlist cover image"""
     wishlist = await _get_owned_wishlist(db, current_user, wishlist_id)
@@ -315,6 +358,8 @@ async def delete_wishlist_cover(
     wishlist.cover_image_medium_object_name = None
     await db.commit()
     await db.refresh(wishlist)
+    if redis is not None:
+        await cache_delete(redis, wishlists_cache_key(current_user.id))
     for b, obj in objects_to_delete:
         try:
             delete_object(b, obj)

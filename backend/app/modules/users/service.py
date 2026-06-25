@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Follow, User
 from app.modules.events import publish_event
 from app.modules.users.schemas import FollowedUserListResponse, FollowedUserResponse, UserProfileResponse
+from app.modules.cache import cache_delete, cache_get_or_fetch, following_cache_key, FOLLOWING_TTL
 
 
 async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User:
@@ -36,8 +37,24 @@ def _normalize_username(username: str) -> str:
     return username.strip().removeprefix("@")
 
 
-async def list_followed_users(db: AsyncSession, current_user: User) -> FollowedUserListResponse:
-    """list followed users"""
+async def list_followed_users(
+    db: AsyncSession,
+    current_user: User,
+    redis: Redis | None = None,
+) -> FollowedUserListResponse:
+    """list followed users — Redis-cached per user"""
+    if redis is not None:
+        return await cache_get_or_fetch(
+            redis,
+            following_cache_key(current_user.id),
+            FOLLOWING_TTL,
+            FollowedUserListResponse,
+            lambda: _fetch_followed_users(db, current_user),
+        )
+    return await _fetch_followed_users(db, current_user)
+
+
+async def _fetch_followed_users(db: AsyncSession, current_user: User) -> FollowedUserListResponse:
     result = await db.execute(
         select(Follow, User)
         .join(User, User.id == Follow.followed_user_id)
@@ -78,6 +95,7 @@ async def follow_user(
         already_following = True
 
     if not already_following and redis is not None:
+        await cache_delete(redis, following_cache_key(current_user.id))
         await publish_event(redis, "FOLLOWED", {
             "follower_user_id": current_user.id,
             "followed_user_id": target.id,
@@ -86,7 +104,7 @@ async def follow_user(
     return build_user_profile_response(target, current_user, is_following=True)
 
 
-async def unfollow_user(db: AsyncSession, current_user: User, username: str) -> UserProfileResponse:
+async def unfollow_user(db: AsyncSession, current_user: User, username: str, redis: Redis | None = None) -> UserProfileResponse:
     """unfollow user"""
     target = await get_user_by_username(db, username)
     if target.id == current_user.id:
@@ -99,6 +117,8 @@ async def unfollow_user(db: AsyncSession, current_user: User, username: str) -> 
         )
     )
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, following_cache_key(current_user.id))
     return build_user_profile_response(target, current_user, is_following=False)
 
 
@@ -125,6 +145,7 @@ async def follow_user_by_id(
         already_following = True
 
     if not already_following and redis is not None:
+        await cache_delete(redis, following_cache_key(current_user.id))
         await publish_event(redis, "FOLLOWED", {
             "follower_user_id": current_user.id,
             "followed_user_id": target.id,
@@ -133,7 +154,7 @@ async def follow_user_by_id(
     return build_user_profile_response(target, current_user, is_following=True)
 
 
-async def unfollow_user_by_id(db: AsyncSession, current_user: User, target_id: UUID) -> UserProfileResponse:
+async def unfollow_user_by_id(db: AsyncSession, current_user: User, target_id: UUID, redis: Redis | None = None) -> UserProfileResponse:
     """unfollow user by internal UUID"""
     target = await get_user_by_id(db, target_id)
     if target.id == current_user.id:
@@ -146,6 +167,8 @@ async def unfollow_user_by_id(db: AsyncSession, current_user: User, target_id: U
         )
     )
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, following_cache_key(current_user.id))
     return build_user_profile_response(target, current_user, is_following=False)
 
 

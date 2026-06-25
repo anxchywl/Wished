@@ -5,7 +5,7 @@ import { dehydrate, hydrate } from "@tanstack/react-query";
 
 // Bump CACHE_BUSTER to invalidate persisted snapshots after breaking changes.
 const STORAGE_KEY_PREFIX = "wished/query-cache/v1";
-const CACHE_BUSTER = "2";
+const CACHE_BUSTER = "3";
 // gcTime in query-client.ts must be >= MAX_AGE_MS so restored data isn't GC'd.
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const SAVE_DEBOUNCE_MS = 1_000;

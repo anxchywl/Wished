@@ -78,9 +78,10 @@ async def patch_wish_order(
     payload: WishReorderRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishListResponse:
     """reorder wishes"""
-    return await reorder_wishes(db, current_user, wishlist_id, payload)
+    return await reorder_wishes(db, current_user, wishlist_id, payload, redis=redis)
 
 
 @router.patch("/wishes/{wish_id}", response_model=WishResponse)
@@ -94,7 +95,7 @@ async def patch_wish(
 ) -> WishResponse:
     """update wish"""
     await check_wish_edit_limit(redis, current_user.id, settings.wish_edit_per_hour)
-    return await update_wish(db, current_user, wish_id, payload)
+    return await update_wish(db, current_user, wish_id, payload, redis=redis)
 
 
 @router.post("/wishes/{wish_id}/copy", response_model=WishResponse, status_code=status.HTTP_201_CREATED)
@@ -103,9 +104,10 @@ async def post_wish_copy(
     payload: WishCopyRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishResponse:
     """copy wish"""
-    return await copy_wish(db, current_user, wish_id, payload)
+    return await copy_wish(db, current_user, wish_id, payload, redis=redis)
 
 
 @router.delete("/wishes/{wish_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -118,7 +120,7 @@ async def remove_wish(
 ) -> Response:
     """delete wish"""
     await check_wish_delete_limit(redis, current_user.id, settings.wish_delete_per_hour)
-    await delete_wish(db, current_user, wish_id)
+    await delete_wish(db, current_user, wish_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -143,4 +145,4 @@ async def delete_wish_complete(
 ) -> WishResponse:
     """restore fulfilled wish to active"""
     await check_wish_complete_limit(redis, current_user.id)
-    return await uncomplete_wish(db, current_user, wish_id)
+    return await uncomplete_wish(db, current_user, wish_id, redis=redis)

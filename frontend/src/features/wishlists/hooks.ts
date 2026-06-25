@@ -13,6 +13,7 @@ import {
   uploadWishlistCover,
 } from "@/features/wishlists/api";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
+import { wishQueryKeys } from "@/features/wishes/query-keys";
 import type {
   WishlistCreateInput,
   WishlistListResponse,
@@ -46,8 +47,12 @@ export function useWishlistQuery(wishlistId: string, shareToken?: string | null)
   const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
 
+  const queryKey = shareToken
+    ? ([...wishlistQueryKeys.detail(wishlistId), shareToken] as const)
+    : wishlistQueryKeys.detail(wishlistId);
+
   return useQuery({
-    queryKey: [...wishlistQueryKeys.detail(wishlistId), accessToken, shareToken] as const,
+    queryKey,
     queryFn: () => getWishlist(accessToken ?? "", wishlistId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishlistId),
     initialData: () =>
@@ -67,8 +72,12 @@ export function useUserWishlistsQuery(username: string, profileToken?: string | 
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
 
+  const queryKey = profileToken
+    ? ([...wishlistQueryKeys.user(username), profileToken] as const)
+    : wishlistQueryKeys.user(username);
+
   return useQuery({
-    queryKey: [...wishlistQueryKeys.user(username), accessToken, profileToken] as const,
+    queryKey,
     queryFn: () => listUserWishlists(accessToken ?? "", username, profileToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && username),
     staleTime: 2 * 60 * 1000,
@@ -87,7 +96,7 @@ export function useCreateWishlistMutation() {
     mutationFn: (input: WishlistCreateInput) => createWishlist(accessToken ?? "", input),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
-      queryClient.setQueryData(["wishes", data.id], { items: [] });
+      queryClient.setQueryData(wishQueryKeys.list(data.id), { items: [] });
     },
   });
 }

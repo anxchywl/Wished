@@ -21,6 +21,12 @@ from app.modules.wishes.schemas import (
     WishUpdateRequest,
 )
 from app.modules.wishlists import get_accessible_wishlist
+from app.modules.cache import (
+    cache_delete,
+    cache_get_or_fetch,
+    wishes_cache_key,
+    WISHES_TTL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +38,30 @@ async def list_wishlist_wishes(
     share_token: str | None = None,
     redis: Redis | None = None,
 ) -> WishListResponse:
-    """list wishlist wishes"""
+    """list wishlist wishes — owner views are Redis-cached; shared views bypass cache"""
     await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
-    query = (
-        select(Wish)
-        .options(selectinload(Wish.images))
-        .where(Wish.wishlist_id == wishlist_id)
-    )
-    query = query.order_by(Wish.position.asc())
-    result = await db.execute(query)
-    return WishListResponse(items=[_to_response(wish) for wish in result.scalars().all()])
+
+    async def _fetch() -> WishListResponse:
+        query = (
+            select(Wish)
+            .options(selectinload(Wish.images))
+            .where(Wish.wishlist_id == wishlist_id)
+            .order_by(Wish.position.asc())
+        )
+        result = await db.execute(query)
+        return WishListResponse(items=[_to_response(wish) for wish in result.scalars().all()])
+
+    # only cache for the authenticated owner; shared-token views skip the cache
+    # to avoid leaking stale data across share-token holders
+    if redis is not None and not share_token:
+        return await cache_get_or_fetch(
+            redis,
+            wishes_cache_key(wishlist_id),
+            WISHES_TTL,
+            WishListResponse,
+            _fetch,
+        )
+    return await _fetch()
 
 
 async def copy_wish(
@@ -49,6 +69,7 @@ async def copy_wish(
     current_user: User,
     wish_id: UUID,
     payload: WishCopyRequest,
+    redis: Redis | None = None,
 ) -> WishResponse:
     """copy wish and duplicate all image variants"""
     source = await _get_accessible_wish(db, current_user, wish_id)
@@ -97,6 +118,10 @@ async def copy_wish(
 
     await db.commit()
     copied = await _get_owned_wish(db, current_user, copied.id)
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(payload.wishlist_id))
+        if source.wishlist_id != payload.wishlist_id:
+            await cache_delete(redis, wishes_cache_key(source.wishlist_id))
     return _to_response(copied)
 
 
@@ -133,6 +158,7 @@ async def create_wish(
     wish = await _get_owned_wish(db, current_user, wish.id)
 
     if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
         await publish_event(redis, "WISH_CREATED", {
             "wish_id": wish.id,
             "wishlist_id": wish.wishlist_id,
@@ -180,6 +206,7 @@ async def reorder_wishes(
     current_user: User,
     wishlist_id: UUID,
     payload: WishReorderRequest,
+    redis: Redis | None = None,
 ) -> WishListResponse:
     """reorder wishes"""
     await _get_owned_wishlist(db, current_user, wishlist_id)
@@ -200,6 +227,8 @@ async def reorder_wishes(
     ordered = [wishes_by_id[wish_id] for wish_id in payload.wish_ids]
     response = WishListResponse(items=[_to_response(wish) for wish in ordered])
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
     return response
 
 
@@ -208,9 +237,11 @@ async def update_wish(
     current_user: User,
     wish_id: UUID,
     payload: WishUpdateRequest,
+    redis: Redis | None = None,
 ) -> WishResponse:
     """update wish"""
     wish = await _get_owned_wish(db, current_user, wish_id)
+    wishlist_id = wish.wishlist_id
     update_data = payload.model_dump(exclude_unset=True)
 
     if payload.wishlist_id is not None:
@@ -234,15 +265,23 @@ async def update_wish(
 
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish.id)
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
+        # if moved to another wishlist, invalidate that wishlist's cache too
+        if payload.wishlist_id and payload.wishlist_id != wishlist_id:
+            await cache_delete(redis, wishes_cache_key(payload.wishlist_id))
     return _to_response(wish)
 
 
-async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> None:
+async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> None:
     """delete wish and all associated image variants from storage"""
     wish = await _get_owned_wish(db, current_user, wish_id)
+    wishlist_id = wish.wishlist_id
     objects_to_delete = _collect_image_objects(wish.images)
     await db.delete(wish)
     await db.commit()
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
     for bucket, obj in objects_to_delete:
         try:
             delete_object(bucket, obj)
@@ -280,6 +319,7 @@ async def complete_wish(
     wish = await _get_owned_wish(db, current_user, wish_id)
 
     if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
         await publish_event(redis, "WISH_FULFILLED", {
             "wish_id": wish.id,
             "wishlist_id": wishlist_id,
@@ -289,7 +329,7 @@ async def complete_wish(
     return _to_response(wish)
 
 
-async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -> WishResponse:
+async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> WishResponse:
     """restore a completed wish to active"""
     wish = await _get_owned_wish(db, current_user, wish_id)
     if wish.status == "active":
@@ -299,9 +339,12 @@ async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID) -
             status_code=status.HTTP_409_CONFLICT,
             detail="Only completed wishes can be restored to active",
         )
+    wishlist_id = wish.wishlist_id
     wish.status = "active"
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish_id)
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
     return _to_response(wish)
 
 

@@ -49,9 +49,10 @@ router = APIRouter(prefix="/wishlists", tags=["wishlists"])
 async def list_wishlists(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishlistListResponse:
     """list wishlists"""
-    return await list_current_user_wishlists(db, current_user)
+    return await list_current_user_wishlists(db, current_user, redis=redis)
 
 
 @router.get("/{wishlist_id}", response_model=WishlistResponse)
@@ -88,9 +89,10 @@ async def patch_wishlist_order(
     payload: WishlistReorderRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishlistListResponse:
     """reorder wishlists"""
-    return await reorder_wishlists(db, current_user, payload)
+    return await reorder_wishlists(db, current_user, payload, redis=redis)
 
 
 @router.patch("/{wishlist_id}", response_model=WishlistResponse)
@@ -104,7 +106,7 @@ async def patch_wishlist(
 ) -> WishlistResponse:
     """update wishlist"""
     await check_wishlist_edit_limit(redis, current_user.id, settings.wishlist_edit_per_hour)
-    return await update_wishlist(db, current_user, wishlist_id, payload)
+    return await update_wishlist(db, current_user, wishlist_id, payload, redis=redis)
 
 
 @router.delete("/{wishlist_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -117,7 +119,7 @@ async def remove_wishlist(
 ) -> Response:
     """delete wishlist"""
     await check_wishlist_delete_limit(redis, current_user.id, settings.wishlist_delete_per_hour)
-    await delete_wishlist(db, current_user, wishlist_id)
+    await delete_wishlist(db, current_user, wishlist_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -146,9 +148,10 @@ async def remove_wishlist_cover(
     wishlist_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> WishlistResponse:
     """remove wishlist cover image"""
-    return await delete_wishlist_cover(db, current_user, wishlist_id)
+    return await delete_wishlist_cover(db, current_user, wishlist_id, redis=redis)
 
 
 @router.post("/{wishlist_id}/share-token", status_code=status.HTTP_200_OK)

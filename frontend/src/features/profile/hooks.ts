@@ -29,7 +29,6 @@ export function useUpdateBirthdayMutation() {
       patchProfile(accessToken, birthday),
     onSuccess: (profile) => {
       queryClient.setQueryData(["profile", tgUserId], profile);
-      queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
     },
   });
 }

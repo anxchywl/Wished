@@ -35,9 +35,10 @@ router = APIRouter(tags=["users"])
 async def get_following(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> FollowedUserListResponse:
     """list followed users"""
-    return await list_followed_users(db, current_user)
+    return await list_followed_users(db, current_user, redis=redis)
 
 
 @router.get("/users/id/{user_id}", response_model=UserProfileResponse)
@@ -100,7 +101,7 @@ async def delete_user_follow_by_id(
 ) -> Response:
     """unfollow user by internal UUID"""
     await check_unfollow_limit(redis, current_user.id, settings.unfollow_per_hour)
-    await unfollow_user_by_id(db, current_user, user_id)
+    await unfollow_user_by_id(db, current_user, user_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -127,6 +128,7 @@ async def get_user_wishlists_by_id(
         current_user,
         user_id,
         allow_profile_access=has_discovery_access or is_following,
+        owner=target_user,
     )
 
 
@@ -191,7 +193,7 @@ async def delete_user_follow(
 ) -> Response:
     """unfollow user"""
     await check_unfollow_limit(redis, current_user.id, settings.unfollow_per_hour)
-    await unfollow_user(db, current_user, username)
+    await unfollow_user(db, current_user, username, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
