@@ -310,33 +310,19 @@ async def mark_group_gift_purchased(
         )
 
     wish = gift.wish
-    if wish.status not in {"active", "completed"}:
+    if wish.status != "active":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Wish is not active",
         )
 
     gift.status = "completed"
-    wish.status = "completed"
-    result = await db.execute(
-        select(Reservation).where(
-            Reservation.wish_id == wish.id,
-            Reservation.status == "active",
-        )
-    )
-    reservation = result.scalar_one_or_none()
-    if reservation is not None:
-        reservation.status = "cancelled"
+    # Wish stays active — only the wish owner can mark it fulfilled.
     await db.commit()
     await db.refresh(gift)
 
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
-        await publish_event(redis, "WISH_FULFILLED", {
-            "wish_id": str(wish.id),
-            "wishlist_id": str(wish.wishlist_id),
-            "owner_user_id": str(wish.wishlist.owner_user_id),
-        })
 
     non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
     return _build_group_gift_response(

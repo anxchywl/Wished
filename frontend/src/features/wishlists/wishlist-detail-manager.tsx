@@ -794,18 +794,14 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {createGroupGiftOpen || viewGroupGiftSheetOpen ? (
+          {(createGroupGiftOpen || viewGroupGiftSheetOpen) && groupGiftActionMode === "overview" ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
               onClick={() => {
-                if (viewGroupGiftSheetOpen && groupGiftActionMode !== "overview") {
-                  setGroupGiftResetTrigger((n) => n + 1);
-                } else {
-                  setCreateGroupGiftOpen(false);
-                  setViewGroupGiftSheetOpen(false);
-                  setGroupGiftActionMode("overview");
-                }
+                setCreateGroupGiftOpen(false);
+                setViewGroupGiftSheetOpen(false);
+                setGroupGiftActionMode("overview");
               }}
               aria-label={t("back")}
             >
@@ -813,6 +809,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
+          ) : (createGroupGiftOpen || viewGroupGiftSheetOpen) && groupGiftActionMode !== "overview" ? (
+            <span className="w-10" />
           ) : isOwner && !removeBookingConfirming ? (
             <button
               type="button"
@@ -845,6 +843,14 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
             {createGroupGiftOpen
               ? t("createGroupGift")
+              : viewGroupGiftSheetOpen && groupGiftActionMode === "purchase"
+              ? t("markGiftPurchased")
+              : viewGroupGiftSheetOpen && groupGiftActionMode === "contribute"
+              ? t("makeContribution")
+              : viewGroupGiftSheetOpen && groupGiftActionMode === "editPayment"
+              ? t("editPaymentDetails")
+              : viewGroupGiftSheetOpen && groupGiftActionMode === "cancel"
+              ? t("cancelGiftButton")
               : viewGroupGiftSheetOpen
               ? t("groupGift")
               : wish.title}

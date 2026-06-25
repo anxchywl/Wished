@@ -15,7 +15,64 @@ import {
   useGiftMembersQuery,
 } from "@/features/group-gifts/hooks";
 
-const PHONE_RE = /^\+?[\d\s-]{7,30}$/;
+// Strict international phone: + followed by 7–15 digits
+const PHONE_RE = /^\+\d{7,15}$/;
+// Account / credentials: any printable non-whitespace sequence
+const CREDENTIALS_RE = /^[^\s]{4,50}$/;
+
+function isPhoneMode(value: string) {
+  return value.startsWith("+");
+}
+
+function formatPhoneInput(raw: string): string {
+  if (!raw.startsWith("+")) return raw;
+  // strip everything that isn't a digit after the leading +
+  const digits = raw.slice(1).replace(/\D/g, "").slice(0, 15);
+  if (!digits) return "+";
+
+  // +7 (Russia / Kazakhstan): +7 ### ### ## ##
+  if (digits.startsWith("7")) {
+    const d = digits.slice(1, 11);
+    let out = "+7";
+    if (d.length > 0) out += " " + d.slice(0, 3);
+    if (d.length > 3) out += " " + d.slice(3, 6);
+    if (d.length > 6) out += " " + d.slice(6, 8);
+    if (d.length > 8) out += " " + d.slice(8, 10);
+    return out;
+  }
+
+  // +1 (USA / Canada): +1 ### ###-####
+  if (digits.startsWith("1")) {
+    const d = digits.slice(1, 11);
+    let out = "+1";
+    if (d.length > 0) out += " " + d.slice(0, 3);
+    if (d.length > 3) out += " " + d.slice(3, 6);
+    if (d.length > 6) out += "-" + d.slice(6, 10);
+    return out;
+  }
+
+  // +44 (UK): +44 #### ######
+  if (digits.startsWith("44")) {
+    const d = digits.slice(2, 13);
+    let out = "+44";
+    if (d.length > 0) out += " " + d.slice(0, 4);
+    if (d.length > 4) out += " " + d.slice(4, 10);
+    return out;
+  }
+
+  // Generic: keep digits, no formatting (just normalize)
+  return "+" + digits;
+}
+
+function validatePhoneOrCredentials(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (isPhoneMode(v)) {
+    const digits = v.replace(/[\s\-()]/g, "");
+    return PHONE_RE.test(digits);
+  }
+  return CREDENTIALS_RE.test(v);
+}
 
 type Props = {
   wishId: string;
@@ -129,7 +186,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     const trimmedMethod = paymentMethod.trim();
     const trimmedPhone = paymentPhone.trim();
     const trimmedComment = paymentComment.trim();
-    if (!PHONE_RE.test(trimmedPhone)) {
+    if (!validatePhoneOrCredentials(trimmedPhone)) {
       setPaymentPhoneError(t("invalidPhoneNumber"));
       return;
     }
@@ -191,35 +248,35 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </div>
         ) : (
           <div key="overview" className="action-mode-animate flex flex-col gap-4">
-            <div className="flex flex-col gap-2.5">
-              <div className="flex justify-between text-sm leading-tight">
-                <span className="text-muted">{t("collected")}</span>
-                <span className="font-semibold text-foreground">{gift.collected_amount}</span>
-              </div>
-              {gift.total_amount ? (
-                <div className="flex justify-between text-sm leading-tight">
-                  <span className="text-muted">{t("target")}</span>
-                  <span className="font-semibold text-foreground">{gift.total_amount}</span>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("collected")}</span>
+                  <span className="text-2xl font-bold text-foreground leading-none">{gift.collected_amount}</span>
                 </div>
-              ) : null}
+                {gift.total_amount ? (
+                  <div className="flex flex-col gap-0.5 items-end">
+                    <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("target")}</span>
+                    <span className="text-lg font-semibold text-muted leading-none">{gift.total_amount}</span>
+                  </div>
+                ) : null}
+              </div>
 
-              <div className="w-full h-2 rounded-full bg-muted/30 overflow-hidden mt-1">
+              <div className="w-full h-2.5 rounded-full bg-muted/20 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
                   style={{ width: `${Math.min(100, gift.percent_complete)}%` }}
                 />
               </div>
 
-              <div className="flex flex-col gap-1 text-xs">
-                <span
-                  className="text-muted transition-opacity duration-300"
-                  style={{ opacity: percentOpacity }}
-                >
-                  {gift.percent_complete >= 100
-                    ? t("giftComplete")
-                    : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
-                </span>
-              </div>
+              <span
+                className="text-xs text-muted transition-opacity duration-300"
+                style={{ opacity: percentOpacity }}
+              >
+                {gift.percent_complete >= 100
+                  ? t("giftComplete")
+                  : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
+              </span>
             </div>
 
             <div className="border-t border-border pt-4">
@@ -278,6 +335,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   }
 
   function renderPaymentDetailsForm() {
+    const phoneMode = isPhoneMode(paymentPhone);
     return (
       <div className="flex flex-col gap-2.5">
         <div className="flex flex-col gap-1.5">
@@ -286,27 +344,32 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </label>
           <input
             className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            maxLength={100}
+            maxLength={80}
             placeholder={t("paymentMethodPlaceholder")}
             value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.currentTarget.value)}
+            onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-            {t("paymentPhoneLabel")}
+            {phoneMode ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
           </label>
           <input
-            type="tel"
+            inputMode={phoneMode ? "tel" : "text"}
+            autoComplete="tel"
             className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            placeholder={t("paymentPhonePlaceholder")}
+            placeholder={t("credentialsOrPhonePlaceholder")}
+            maxLength={phoneMode ? 20 : 50}
             value={paymentPhone}
             onBlur={() => {
-              setPaymentPhoneError(PHONE_RE.test(paymentPhone.trim()) ? "" : t("invalidPhoneNumber"));
+              if (paymentPhone.trim()) {
+                setPaymentPhoneError(validatePhoneOrCredentials(paymentPhone) ? "" : t("invalidPhoneNumber"));
+              }
             }}
             onChange={(e) => {
-              setPaymentPhone(e.currentTarget.value);
+              const raw = e.currentTarget.value.replace(/^\s+/, "");
+              setPaymentPhone(phoneMode || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
               setPaymentPhoneError("");
             }}
           />
@@ -321,10 +384,10 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </label>
           <textarea
             className="min-h-16 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            maxLength={500}
+            maxLength={300}
             placeholder={t("paymentCommentPlaceholder")}
             value={paymentComment}
-            onChange={(e) => setPaymentComment(e.currentTarget.value)}
+            onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
           />
         </div>
 
