@@ -796,21 +796,18 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {(createGroupGiftOpen || (viewGroupGiftSheetOpen && groupGiftActionMode === "overview")) ? (
+          {createGroupGiftOpen ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
-              onClick={() => {
-                setCreateGroupGiftOpen(false);
-                setViewGroupGiftSheetOpen(false);
-              }}
+              onClick={() => setCreateGroupGiftOpen(false)}
               aria-label={t("back")}
             >
               <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-          ) : (viewGroupGiftSheetOpen && groupGiftActionMode !== "overview") ? (
+          ) : viewGroupGiftSheetOpen ? (
             <span className="w-10" />
           ) : isOwner && !removeBookingConfirming ? (
             <button

@@ -254,7 +254,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
               </div>
             </div>
 
-            {/* Non-overview action panel — smoothly reveals when entering action mode */}
+            {/* Non-overview action panel — smoothly reveals/collapses; always mounted so the collapse has content to animate */}
             <div
               className={`modal-footer-transition ${
                 isNonOverview
@@ -262,11 +262,9 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
                   : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
               }`}
             >
-              {isNonOverview ? (
-                <div key={actionMode} className="action-mode-animate">
-                  {renderActionPanel()}
-                </div>
-              ) : null}
+              <div key={actionMode} className="action-mode-animate">
+                {renderActionPanel()}
+              </div>
             </div>
           </>
         )}
@@ -481,8 +479,8 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
                     {displayAmount ? (
                       <p className="text-sm font-semibold text-foreground">{stripTrailingZeros(displayAmount)}</p>
                     ) : null}
-                    {/* Cancel button shown to organizer for each contributor with a contribution */}
-                    {gift?.is_organizer && contributionId && !isOrganizer ? (
+                    {/* Cancel button: organizer sees it on every row that has a contribution (including their own) */}
+                    {gift?.is_organizer && contributionId ? (
                       <button
                         type="button"
                         className="w-6 h-6 inline-flex items-center justify-center rounded-full text-muted hover:text-red-500 transition-colors"
@@ -517,15 +515,21 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
                       <button
                         type="button"
                         className="theme-confirm-danger flex-1 h-8 rounded-xl text-xs font-bold disabled:opacity-60"
-                        disabled={removeContribMutation.isPending}
+                        disabled={isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending}
                         onClick={() => {
                           if (!contributionId) return;
-                          removeContribMutation.mutate(contributionId, {
-                            onSuccess: () => setConfirmCancelContribId(null),
-                          });
+                          if (isOrganizer) {
+                            leaveMutation.mutate(undefined, {
+                              onSuccess: () => setConfirmCancelContribId(null),
+                            });
+                          } else {
+                            removeContribMutation.mutate(contributionId, {
+                              onSuccess: () => setConfirmCancelContribId(null),
+                            });
+                          }
                         }}
                       >
-                        {removeContribMutation.isPending ? t("deleting") : t("removeContribution")}
+                        {(isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending) ? t("deleting") : t("removeContribution")}
                       </button>
                     </div>
                   </div>
