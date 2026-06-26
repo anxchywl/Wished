@@ -78,7 +78,9 @@ export function useBookedWishesQuery() {
       };
     },
     enabled: Boolean(authStatus === "authenticated" && accessToken),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchOnMount: "always",
   });
 }
 
