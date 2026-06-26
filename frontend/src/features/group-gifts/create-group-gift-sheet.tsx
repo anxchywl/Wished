@@ -30,6 +30,7 @@ const ERROR_MAP: Record<string, string> = {
 
 export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
   const [active, setActive] = useState(false);
+  const [focusModeActive, setFocusModeActive] = useState(false);
 
   useEffect(() => {
     requestAnimationFrame(() => setActive(true));
@@ -43,11 +44,11 @@ export function CreateGroupGiftSheet({ wishId, onClose }: Props) {
   return (
     <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div
-        className={`modal-sheet ${active ? "visible" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusModeActive ? "keyboard-focus-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />
-        <CreateGroupGiftContent wishId={wishId} onClose={handleClose} />
+        <CreateGroupGiftContent wishId={wishId} onClose={handleClose} onFocusModeChange={setFocusModeActive} />
       </div>
     </div>
   );
@@ -118,7 +119,7 @@ export function CreateGroupGiftContent({
   return (
     <>
       {showTitle ? (
-        <h3 className="modal-title font-bold text-base mb-4 text-center">
+        <h3 className={`modal-title font-bold text-base mb-4 text-center ${focusMode.sectionClass("titleText")}`}>
           {t("createGroupGift")}
         </h3>
       ) : null}

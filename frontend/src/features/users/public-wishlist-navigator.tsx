@@ -70,6 +70,7 @@ export function PublicWishlistNavigator({
   const [direction, setDirection] = useState<NavigationDirection>("forward");
   const [previousFrame, setPreviousFrame] = useState<NavigationFrame | null>(null);
   const [groupGiftActionMode, setGroupGiftActionMode] = useState<ActionMode>("overview");
+  const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const current = stack[stack.length - 1];
   const { t } = useTranslation();
 
@@ -93,6 +94,7 @@ export function PublicWishlistNavigator({
       setDirection("forward");
       setPreviousFrame(null);
       setGroupGiftActionMode("overview");
+      setGroupGiftFocusMode(false);
     }
   }, [initialWishlistId, initialWishId, open, username, userId]);
 
@@ -166,10 +168,10 @@ export function PublicWishlistNavigator({
   }
 
   function groupGiftTitle() {
-    if (groupGiftActionMode === "purchase") return t("markGiftPurchased");
+    if (groupGiftActionMode === "purchase") return t("groupGift");
     if (groupGiftActionMode === "contribute") return t("makeContribution");
     if (groupGiftActionMode === "editPayment") return t("editPaymentDetails");
-    if (groupGiftActionMode === "cancel") return t("actionCancel");
+    if (groupGiftActionMode === "cancel") return t("groupGift");
     if (groupGiftActionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
@@ -213,6 +215,7 @@ export function PublicWishlistNavigator({
         <PublicCreateGroupGiftView
           wishId={frame.wishId}
           onDone={handleBack}
+          onFocusModeChange={setGroupGiftFocusMode}
         />
       );
     }
@@ -225,6 +228,7 @@ export function PublicWishlistNavigator({
           onDone={handleBack}
           actionMode={groupGiftActionMode}
           onActionModeChange={setGroupGiftActionMode}
+          onFocusModeChange={setGroupGiftFocusMode}
         />
       );
     }
@@ -235,11 +239,11 @@ export function PublicWishlistNavigator({
   return (
     <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div
-        className={`modal-sheet public-nav-sheet ${active ? "visible" : ""}`}
+        className={`modal-sheet public-nav-sheet ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className="public-nav-header">
+        <div className={`public-nav-header ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
           {stack.length > 1 && !(current.view === "viewGroupGift" && groupGiftActionMode !== "overview") ? (
             <button
               type="button"
@@ -837,9 +841,10 @@ function PublicWishView({
 type PublicCreateGroupGiftViewProps = {
   wishId: string;
   onDone: () => void;
+  onFocusModeChange: (isFocus: boolean) => void;
 };
 
-function PublicCreateGroupGiftView({ wishId, onDone }: PublicCreateGroupGiftViewProps) {
+function PublicCreateGroupGiftView({ wishId, onDone, onFocusModeChange }: PublicCreateGroupGiftViewProps) {
   return (
     <div className="public-nav-content px-4">
       <CreateGroupGiftContent
@@ -847,6 +852,7 @@ function PublicCreateGroupGiftView({ wishId, onDone }: PublicCreateGroupGiftView
         showTitle={false}
         onCancel={onDone}
         onClose={onDone}
+        onFocusModeChange={onFocusModeChange}
       />
     </div>
   );
@@ -858,6 +864,7 @@ type PublicViewGroupGiftViewProps = {
   onDone: () => void;
   actionMode: ActionMode;
   onActionModeChange: (mode: ActionMode) => void;
+  onFocusModeChange: (isFocus: boolean) => void;
 };
 
 function PublicViewGroupGiftView({
@@ -866,6 +873,7 @@ function PublicViewGroupGiftView({
   onDone,
   actionMode,
   onActionModeChange,
+  onFocusModeChange,
 }: PublicViewGroupGiftViewProps) {
   return (
     <div className="public-nav-content px-4">
@@ -876,6 +884,7 @@ function PublicViewGroupGiftView({
         onClose={onDone}
         actionMode={actionMode}
         onActionModeChange={onActionModeChange}
+        onFocusModeChange={onFocusModeChange}
       />
     </div>
   );

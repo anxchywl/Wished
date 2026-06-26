@@ -51,6 +51,7 @@ function formatAmount(amount: string | null | undefined): string {
 
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [active, setActive] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
     requestAnimationFrame(() => setActive(true));
@@ -64,11 +65,11 @@ export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   return (
     <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div
-        className={`modal-sheet ${active ? "visible" : ""}`}
+        className={`modal-sheet ${active ? "visible" : ""} ${focusMode ? "keyboard-focus-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />
-        <ViewGroupGiftContent wishId={wishId} shareToken={shareToken} onClose={handleClose} />
+        <ViewGroupGiftContent wishId={wishId} shareToken={shareToken} onClose={handleClose} onFocusModeChange={setFocusMode} />
       </div>
     </div>
   );
@@ -214,8 +215,8 @@ export function ViewGroupGiftContent({
   function getActionTitle(): string {
     if (actionMode === "contribute") return t("makeContribution");
     if (actionMode === "editPayment") return t("editPaymentDetails");
-    if (actionMode === "purchase") return t("markGiftPurchased");
-    if (actionMode === "cancel") return t("actionCancel");
+    if (actionMode === "purchase") return t("groupGift");
+    if (actionMode === "cancel") return t("groupGift");
     if (actionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
@@ -286,7 +287,7 @@ export function ViewGroupGiftContent({
   return (
     <>
       {showTitle ? (
-        <h3 className="modal-title font-bold text-base mb-4 text-center">{getActionTitle()}</h3>
+        <h3 className={`modal-title font-bold text-base mb-4 text-center ${focusMode.sectionClass("titleText")}`}>{getActionTitle()}</h3>
       ) : null}
 
       {giftQuery.isPending ? (
@@ -528,7 +529,6 @@ export function ViewGroupGiftContent({
     if (mode === "purchase") {
       return (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
           <div className="flex gap-2">
             <button
               type="button"

@@ -787,13 +787,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
 
   const isCompletePending = completeWishMutation.isPending || uncompleteWishMutation.isPending;
   const groupGiftTitle = groupGiftActionMode === "purchase"
-    ? t("markGiftPurchased")
+    ? t("groupGift")
     : groupGiftActionMode === "contribute"
     ? t("makeContribution")
     : groupGiftActionMode === "editPayment"
     ? t("editPaymentDetails")
     : groupGiftActionMode === "cancel"
-    ? t("actionCancel")
+    ? t("groupGift")
     : groupGiftActionMode === "removeContribution"
     ? t("removeContribution")
     : t("groupGift");
@@ -1050,7 +1050,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
+        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"} ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
           {activeView === "viewGroupGift" ? (
             <span className="w-10 h-10" />
           ) : activeView === "createGroupGift" ? (
