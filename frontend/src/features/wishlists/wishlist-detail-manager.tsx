@@ -784,6 +784,15 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   }
 
   const isCompletePending = completeWishMutation.isPending || uncompleteWishMutation.isPending;
+  const groupGiftTitle = groupGiftActionMode === "purchase"
+    ? t("markGiftPurchased")
+    : groupGiftActionMode === "contribute"
+    ? t("makeContribution")
+    : groupGiftActionMode === "editPayment"
+    ? t("editPaymentDetails")
+    : groupGiftActionMode === "cancel"
+    ? t("cancelGiftButton")
+    : t("groupGift");
 
   return (
     <div
@@ -796,7 +805,9 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {createGroupGiftOpen ? (
+          {viewGroupGiftSheetOpen ? (
+            <span className="w-10 h-10" />
+          ) : createGroupGiftOpen ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
@@ -807,8 +818,6 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-          ) : viewGroupGiftSheetOpen ? (
-            <span className="w-10" />
           ) : isOwner && !removeBookingConfirming ? (
             <button
               type="button"
@@ -841,16 +850,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
             {createGroupGiftOpen
               ? t("createGroupGift")
-              : viewGroupGiftSheetOpen && groupGiftActionMode === "purchase"
-              ? t("markGiftPurchased")
-              : viewGroupGiftSheetOpen && groupGiftActionMode === "contribute"
-              ? t("makeContribution")
-              : viewGroupGiftSheetOpen && groupGiftActionMode === "editPayment"
-              ? t("editPaymentDetails")
-              : viewGroupGiftSheetOpen && groupGiftActionMode === "cancel"
-              ? t("cancelGiftButton")
               : viewGroupGiftSheetOpen
-              ? t("groupGift")
+              ? groupGiftTitle
               : wish.title}
           </h3>
           {createGroupGiftOpen || viewGroupGiftSheetOpen ? (
@@ -882,7 +883,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             />
           </div>
         ) : viewGroupGiftSheetOpen ? (
-          <div className="modal-footer-transition opacity-100 max-h-[760px] scale-100">
+          <div>
             <ViewGroupGiftContent
               wishId={wish.id}
               showTitle={false}

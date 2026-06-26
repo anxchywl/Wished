@@ -109,6 +109,12 @@ export function ViewGroupGiftContent({
   }, [resetTrigger]);
 
   useEffect(() => {
+    if (!gift?.is_contributor) {
+      setJoinAmount("");
+    }
+  }, [gift?.is_contributor]);
+
+  useEffect(() => {
     onFocusModeChange?.(focusMode.isFocusMode);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMode.isFocusMode]);
@@ -210,12 +216,11 @@ export function ViewGroupGiftContent({
       ) : !gift ? (
         <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
       ) : (
-        <>
-          {/* Overview section — mirrors the delete-wishlist pattern: always mounted, CSS-only transition */}
+        <div className="flex flex-col gap-2">
           <div
             className={`modal-footer-transition ${
               !isNonOverview
-                ? "opacity-100 max-h-[700px] scale-100"
+                ? "opacity-100 max-h-[640px] scale-100"
                 : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
             }`}
           >
@@ -259,17 +264,16 @@ export function ViewGroupGiftContent({
             </div>
           </div>
 
-          {/* Action mode section — always mounted, no key/animation, pure CSS transition */}
           <div
             className={`modal-footer-transition ${
               isNonOverview
-                ? "opacity-100 max-h-[500px] scale-100"
+                ? "opacity-100 max-h-[640px] scale-100"
                 : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
             }`}
           >
             {renderNonOverviewPanel()}
           </div>
-        </>
+        </div>
       )}
     </>
   );
