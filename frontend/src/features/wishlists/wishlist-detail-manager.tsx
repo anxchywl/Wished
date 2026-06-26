@@ -768,12 +768,16 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const ownerBookingVisibility = reservStatus?.owner_booking_visibility ?? "hide";
   const reserverDisplayName = reservStatus?.reserver_display_name ?? null;
   const isCompleted = wish.status === "completed";
-  const hasActiveGroupGift =
-    wish.group_gift?.status === "active" || reservStatus?.has_active_group_gift === true;
   const ownerGroupGiftVisibility = profileQuery.data?.privacy?.group_gift_visibility ?? "hide";
+  const resolvedGroupGift = liveGroupGift.isFetched
+    ? (liveGroupGift.data ?? null)
+    : wish.group_gift;
   const visibleGroupGift = isOwner && ownerGroupGiftVisibility === "hide"
     ? null
-    : (liveGroupGift.data ?? wish.group_gift);
+    : resolvedGroupGift;
+  const hasActiveGroupGift = visibleGroupGift?.status === "active" || (
+    !liveGroupGift.isFetched && reservStatus?.has_active_group_gift === true
+  );
 
   // booking actions available to non-owner viewer
   function handleBookToggle() {
@@ -971,7 +975,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           {!isOwner && !isCompleted && (
             <div className="w-full flex flex-col gap-2">
               {hasActiveGroupGift ? (
-                wish!.group_gift?.is_contributor || wish!.group_gift?.is_organizer ? null : (
+                visibleGroupGift?.is_contributor || visibleGroupGift?.is_organizer ? null : (
                   <button
                     type="button"
                     className="w-full h-12 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center justify-center"

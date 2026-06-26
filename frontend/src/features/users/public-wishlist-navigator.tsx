@@ -694,8 +694,12 @@ function PublicWishView({
   const isReserved = status?.is_reserved ?? false;
   const isBusy = createReservation.isPending;
   const isCompleted = wish?.status === "completed";
-  const hasActiveGroupGift =
-    wish?.group_gift?.status === "active" || status?.has_active_group_gift === true;
+  const visibleGroupGift = liveGroupGift.isFetched
+    ? (liveGroupGift.data ?? null)
+    : (wish?.group_gift ?? null);
+  const hasActiveGroupGift = visibleGroupGift?.status === "active" || (
+    !liveGroupGift.isFetched && status?.has_active_group_gift === true
+  );
   const canCreateGroupGift = status?.owner_group_gift_visibility !== "hide";
 
   function handleBook() {
@@ -743,7 +747,7 @@ function PublicWishView({
         <section className="flex flex-col gap-2 w-full mt-3 px-4">
           {/* Slot 1 — primary action button */}
           {hasActiveGroupGift ? (
-            wish.group_gift?.is_organizer || wish.group_gift?.is_contributor ? null : (
+            visibleGroupGift?.is_organizer || visibleGroupGift?.is_contributor ? null : (
               <button
                 type="button"
                 className="public-action-button public-action-primary"
@@ -775,8 +779,8 @@ function PublicWishView({
           )}
 
           {/* Slot 2 — group gift progress row (use live polled data for real-time updates) */}
-          {(liveGroupGift.data ?? wish.group_gift) ? (() => {
-            const gg = liveGroupGift.data ?? wish.group_gift!;
+          {visibleGroupGift ? (() => {
+            const gg = visibleGroupGift;
             return (
               <button
                 type="button"

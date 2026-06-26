@@ -21,6 +21,29 @@ import {
 import { bookedWishesQueryKey } from "@/features/reservations/hooks";
 import { groupGiftQueryKeys } from "@/features/group-gifts/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
+import type { WishListResponse } from "@/features/wishes/types";
+
+function clearCancelledGroupGift(
+  queryClient: ReturnType<typeof useQueryClient>,
+  wishId: string,
+) {
+  queryClient.setQueriesData({ queryKey: groupGiftQueryKeys.gift(wishId) }, null);
+  queryClient.removeQueries({ queryKey: ["group-gifts", "members"] });
+  queryClient.setQueriesData<WishListResponse>(
+    { queryKey: ["wishes"] },
+    (current) => {
+      if (!current) return current;
+      return {
+        items: current.items.map((wish) =>
+          wish.id === wishId ? { ...wish, group_gift: null } : wish,
+        ),
+      };
+    },
+  );
+  queryClient.invalidateQueries({ queryKey: ["wishes"] });
+  queryClient.invalidateQueries({ queryKey: ["reservations"] });
+  queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+}
 
 export function useGroupGiftQuery(wishId: string, shareToken?: string | null) {
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -59,11 +82,7 @@ export function useCancelGroupGiftMutation(wishId: string, groupGiftId: string) 
     mutationFn: () => toggleGroupGiftApproval(accessToken, groupGiftId, "cancel"),
     onSuccess: (result) => {
       if (result === null) {
-        // unanimous — gift deleted
-        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
-        queryClient.invalidateQueries({ queryKey: ["wishes"] });
-        queryClient.invalidateQueries({ queryKey: ["reservations"] });
-        queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+        clearCancelledGroupGift(queryClient, wishId);
       } else {
         queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
         queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
@@ -99,13 +118,11 @@ export function useToggleGroupGiftApprovalMutation(wishId: string, groupGiftId: 
     },
     onSuccess: (result) => {
       if (result === null) {
-        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
-        queryClient.invalidateQueries({ queryKey: ["wishes"] });
-        queryClient.invalidateQueries({ queryKey: ["reservations"] });
+        clearCancelledGroupGift(queryClient, wishId);
       } else {
         queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
+        queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
       }
-      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }
