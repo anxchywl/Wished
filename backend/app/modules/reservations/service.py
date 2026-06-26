@@ -163,7 +163,20 @@ async def get_wish_reservation_status(
             GroupGift.status == "active",
         )
     )
-    has_active_group_gift = (gift_count or 0) > 0
+    active_gift_exists = (gift_count or 0) > 0
+
+    # load owner once; used for visibility checks and group_gift_visibility throughout
+    wish_owner: User | None = None
+    if not is_owner:
+        wish_owner = await db.get(User, wish.wishlist.owner_user_id)
+    owner_gg_visibility: str = (
+        getattr(wish_owner, "group_gift_visibility", "hide")
+        if wish_owner else
+        getattr(current_user, "group_gift_visibility", "hide")
+    )
+
+    # non-owners only learn a group gift exists when the owner hasn't hidden it
+    has_active_group_gift = active_gift_exists and (is_owner or owner_gg_visibility != "hide")
 
     result = await db.execute(
         select(Reservation).where(
@@ -174,12 +187,22 @@ async def get_wish_reservation_status(
     reservation = result.scalar_one_or_none()
 
     if not reservation:
+        if is_owner:
+            return WishReservationStatusResponse(
+                wish_id=wish_id,
+                is_reserved=False,
+                is_mine=False,
+                reservation_id=None,
+                owner_booking_visibility=current_user.booking_visibility,
+                owner_group_gift_visibility=getattr(current_user, "group_gift_visibility", "hide"),
+                has_active_group_gift=has_active_group_gift,
+            )
         return WishReservationStatusResponse(
             wish_id=wish_id,
             is_reserved=False,
             is_mine=False,
             reservation_id=None,
-            owner_booking_visibility=current_user.booking_visibility if is_owner else None,
+            owner_group_gift_visibility=owner_gg_visibility,
             has_active_group_gift=has_active_group_gift,
         )
 
@@ -202,6 +225,7 @@ async def get_wish_reservation_status(
             is_mine=False,
             reservation_id=None,
             owner_booking_visibility=visibility,
+            owner_group_gift_visibility=getattr(current_user, "group_gift_visibility", "hide"),
             reserver_display_name=reserver_display_name,
             has_active_group_gift=has_active_group_gift,
         )
@@ -212,6 +236,7 @@ async def get_wish_reservation_status(
         is_mine=is_mine,
         # only expose reservation id to the reserver
         reservation_id=reservation.id if is_mine else None,
+        owner_group_gift_visibility=owner_gg_visibility if not is_owner else None,
         has_active_group_gift=has_active_group_gift,
     )
 

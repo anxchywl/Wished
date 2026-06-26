@@ -72,6 +72,10 @@ export function useUpdatePrivacyMutation() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", tgUserId] });
+      // refresh all screens that depend on visibility settings
+      queryClient.invalidateQueries({ queryKey: ["reservations"] });
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
+      queryClient.invalidateQueries({ queryKey: ["group-gifts"] });
     },
   });
 }

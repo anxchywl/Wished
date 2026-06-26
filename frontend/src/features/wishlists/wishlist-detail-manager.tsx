@@ -80,6 +80,7 @@ import {
 } from "@/features/wishes/hooks";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
+import { useGroupGiftQuery } from "@/features/group-gifts/hooks";
 
 function formatPrice(price: string | null, currency: string | null) {
   if (!price) return "";
@@ -632,17 +633,20 @@ function WishRowOverlay({ wish }: { wish: Wish }) {
 }
 
 function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: boolean; isLast: boolean; onClick: () => void }) {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const profileQuery = useProfileQuery(accessToken);
   const isCompleted = wish.status === "completed";
   const reservationStatus = useReservationStatusQuery(wish.id);
   const isBooked = reservationStatus.data?.is_reserved ?? false;
   const isMine = reservationStatus.data?.is_mine ?? false;
   const ownerBookingVisibility = reservationStatus.data?.owner_booking_visibility ?? "hide";
+  const ownerGroupGiftVisibility = profileQuery.data?.privacy?.group_gift_visibility ?? "hide";
   const hasActiveGroupGift = wish.group_gift?.status === "active";
-  // owner sees group gift as crowd icon unless visibility is hidden, then falls back to lock
-  const showGroupGift = !isCompleted && hasActiveGroupGift && ownerBookingVisibility !== "hide";
+  // owner sees crowd icon when group_gift_visibility != "hide"; falls back to lock when hidden
+  const showGroupGift = !isCompleted && isOwner && hasActiveGroupGift && ownerGroupGiftVisibility !== "hide";
   const showBooked = !isCompleted && !showGroupGift && (
     (isBooked && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed")) ||
-    (hasActiveGroupGift && ownerBookingVisibility === "hide")
+    (isOwner && hasActiveGroupGift && ownerGroupGiftVisibility === "hide")
   );
   return (
     <div
@@ -724,6 +728,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [groupGiftResetTrigger, setGroupGiftResetTrigger] = useState(0);
   const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
+  const liveGroupGift = useGroupGiftQuery(wish?.id ?? "");
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
   const removeReservation = useRemoveWishReservationMutation(wishlistId);
@@ -997,31 +1002,34 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             </div>
           )}
 
-          {/* Slot 2 — group gift progress row */}
-          {wish!.group_gift ? (
-            <button
-              type="button"
-              className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
-              onClick={() => openView("viewGroupGift")}
-            >
-              <div className="flex justify-between items-center text-xs text-muted">
-                <span>{t("groupGift")}</span>
-                <span>
-                  {wish!.group_gift.status === "cancelled"
-                    ? t("giftCancelled")
-                    : wish!.group_gift.status === "completed" || wish!.group_gift.percent_complete >= 100
-                    ? t("giftComplete")
-                    : t("giftProgress").replace("{percent}", String(wish!.group_gift.percent_complete))}
-                </span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.min(100, wish!.group_gift.percent_complete)}%` }}
-                />
-              </div>
-            </button>
-          ) : null}
+          {/* Slot 2 — group gift progress row (use live polled data for real-time updates) */}
+          {(liveGroupGift.data ?? wish!.group_gift) ? (() => {
+            const gg = liveGroupGift.data ?? wish!.group_gift!;
+            return (
+              <button
+                type="button"
+                className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
+                onClick={() => openView("viewGroupGift")}
+              >
+                <div className="flex justify-between items-center text-xs text-muted">
+                  <span>{t("groupGift")}</span>
+                  <span>
+                    {gg.status === "cancelled"
+                      ? t("giftCancelled")
+                      : gg.status === "completed" || gg.percent_complete >= 100
+                      ? t("giftComplete")
+                      : t("giftProgress").replace("{percent}", String(gg.percent_complete))}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                    style={{ width: `${Math.min(100, gg.percent_complete)}%` }}
+                  />
+                </div>
+              </button>
+            );
+          })() : null}
 
           {wish!.original_product_url ? (
             <a

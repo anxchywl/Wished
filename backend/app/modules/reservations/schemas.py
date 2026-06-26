@@ -24,6 +24,7 @@ class WishReservationStatusResponse(BaseModel):
     is_mine: bool
     reservation_id: UUID | None
     owner_booking_visibility: str | None = None
+    owner_group_gift_visibility: str | None = None
     reserver_display_name: str | None = None
     has_active_group_gift: bool = False
 

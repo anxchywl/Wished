@@ -17,6 +17,7 @@ export type WishReservationStatusResponse = {
   is_mine: boolean;
   reservation_id: string | null;
   owner_booking_visibility: "hide" | "anonymous" | "names" | null;
+  owner_group_gift_visibility: "hide" | "anonymous" | "names" | null;
   reserver_display_name: string | null;
   has_active_group_gift: boolean;
 };

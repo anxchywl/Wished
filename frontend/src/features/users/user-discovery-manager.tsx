@@ -42,27 +42,16 @@ export function BookingVisibilityHeaderButton() {
     (profileQuery.data?.privacy?.group_gift_visibility as BookingVisibility | undefined) ?? "hide";
 
   function handleChange(value: BookingVisibility) {
-    updatePrivacy.mutate(
-      { booking_visibility: value },
-      {
-        onSuccess: () => {
-          setActive(false);
-          window.setTimeout(() => setOpen(false), 340);
-        },
-      },
-    );
+    // close optimistically — onMutate already updates the profile cache
+    setActive(false);
+    window.setTimeout(() => setOpen(false), 340);
+    updatePrivacy.mutate({ booking_visibility: value });
   }
 
   function handleGroupGiftChange(value: BookingVisibility) {
-    updatePrivacy.mutate(
-      { group_gift_visibility: value },
-      {
-        onSuccess: () => {
-          setActive(false);
-          window.setTimeout(() => setOpen(false), 340);
-        },
-      },
-    );
+    setActive(false);
+    window.setTimeout(() => setOpen(false), 340);
+    updatePrivacy.mutate({ group_gift_visibility: value });
   }
 
   return (

@@ -164,6 +164,13 @@ async def create_group_gift(
             detail="Wish owner cannot organize a group gift on their own wish",
         )
 
+    wish_owner = await db.get(User, wish.wishlist.owner_user_id)
+    if wish_owner and getattr(wish_owner, "group_gift_visibility", "hide") == "hide":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Group gifts are disabled for this wish",
+        )
+
     if wish.status != "active":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
