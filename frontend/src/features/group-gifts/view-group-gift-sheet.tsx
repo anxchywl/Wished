@@ -33,7 +33,7 @@ type ContentProps = Props & {
   resetTrigger?: number;
 };
 
-export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
+export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel" | "removeContribution";
 
 function stripTrailingZeros(amount: string): string {
   return amount.replace(/\.00$/, "");
@@ -94,7 +94,13 @@ export function ViewGroupGiftContent({
   const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [internalActionMode, setInternalActionMode] = useState<ActionMode>("overview");
-  const [confirmCancelContribId, setConfirmCancelContribId] = useState<string | null>(null);
+  const [removeContribution, setRemoveContribution] = useState<{
+    id: string;
+    isOrganizer: boolean;
+    amount: string | null;
+    displayName: string;
+  } | null>(null);
+  const [renderedActionMode, setRenderedActionMode] = useState<ActionMode>("overview");
   const actionMode = controlledActionMode ?? internalActionMode;
   const isNonOverview = actionMode !== "overview";
 
@@ -107,6 +113,16 @@ export function ViewGroupGiftContent({
     if (resetTrigger) changeActionMode("overview");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetTrigger]);
+
+  useEffect(() => {
+    if (actionMode !== "overview") {
+      setRenderedActionMode(actionMode);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setRenderedActionMode("overview"), 280);
+    return () => window.clearTimeout(timer);
+  }, [actionMode]);
 
   useEffect(() => {
     if (!gift?.is_contributor) {
@@ -151,6 +167,7 @@ export function ViewGroupGiftContent({
     if (actionMode === "editPayment") return t("editPaymentDetails");
     if (actionMode === "purchase") return t("markGiftPurchased");
     if (actionMode === "cancel") return t("cancelGiftButton");
+    if (actionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
 
@@ -201,6 +218,19 @@ export function ViewGroupGiftContent({
     joinMutation.mutate(amount, {
       onSuccess: () => { setJoinAmount(""); changeActionMode("overview"); },
     });
+  }
+
+  function handleRemoveContribution() {
+    if (!removeContribution) return;
+    const onSuccess = () => {
+      setRemoveContribution(null);
+      changeActionMode("overview");
+    };
+    if (removeContribution.isOrganizer) {
+      leaveMutation.mutate(undefined, { onSuccess });
+      return;
+    }
+    removeContribMutation.mutate(removeContribution.id, { onSuccess });
   }
 
   return (
@@ -364,7 +394,8 @@ export function ViewGroupGiftContent({
 
   function renderNonOverviewPanel(): ReactNode {
     if (!gift) return null;
-    if (actionMode === "contribute") {
+    const mode = isNonOverview ? actionMode : renderedActionMode;
+    if (mode === "contribute") {
       return (
         <div className="flex flex-col gap-2.5">
           <div className="flex flex-col gap-1.5">
@@ -400,10 +431,10 @@ export function ViewGroupGiftContent({
         </div>
       );
     }
-    if (actionMode === "editPayment") {
+    if (mode === "editPayment") {
       return renderPaymentDetailsForm();
     }
-    if (actionMode === "purchase") {
+    if (mode === "purchase") {
       return (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmMarkGiftPurchased")}</p>
@@ -427,7 +458,7 @@ export function ViewGroupGiftContent({
         </div>
       );
     }
-    if (actionMode === "cancel") {
+    if (mode === "cancel") {
       return (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
@@ -446,6 +477,40 @@ export function ViewGroupGiftContent({
               onClick={handleCancelGift}
             >
               {cancelMutation.isPending ? t("deleting") : t("actionCancel")}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (mode === "removeContribution") {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1 text-center">
+            <p className="text-xs text-muted">{removeContribution?.displayName ?? t("unknownUser")}</p>
+            {removeContribution?.amount ? (
+              <p className="text-sm font-semibold text-foreground">{stripTrailingZeros(removeContribution.amount)}</p>
+            ) : null}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              onClick={() => {
+                changeActionMode("overview");
+                window.setTimeout(() => setRemoveContribution(null), 280);
+              }}
+            >
+              {t("cancelButton")}
+            </button>
+            <button
+              type="button"
+              className="theme-confirm-danger flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60"
+              disabled={removeContribution?.isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending}
+              onClick={handleRemoveContribution}
+            >
+              {(removeContribution?.isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending)
+                ? t("deleting")
+                : t("removeButton")}
             </button>
           </div>
         </div>
@@ -717,8 +782,6 @@ export function ViewGroupGiftContent({
             const contributionId = isOrganizer
               ? organizerContribAsContributor?.contribution_id
               : member.contribution_id;
-            const isConfirming = confirmCancelContribId === contributionId;
-
             return (
               <div key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}>
                 <div className="flex items-center justify-between gap-3">
@@ -747,7 +810,15 @@ export function ViewGroupGiftContent({
                       <button
                         type="button"
                         className="w-6 h-6 inline-flex items-center justify-center rounded-full text-muted hover:text-red-500 transition-colors"
-                        onClick={() => setConfirmCancelContribId(isConfirming ? null : contributionId)}
+                        onClick={() => {
+                          setRemoveContribution({
+                            id: contributionId,
+                            isOrganizer,
+                            amount: displayAmount ?? null,
+                            displayName,
+                          });
+                          changeActionMode("removeContribution");
+                        }}
                         aria-label={t("removeContribution")}
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
@@ -755,48 +826,6 @@ export function ViewGroupGiftContent({
                         </svg>
                       </button>
                     ) : null}
-                  </div>
-                </div>
-
-                <div
-                  className={`modal-footer-transition ${
-                    isConfirming
-                      ? "opacity-100 max-h-24 scale-100 mt-2"
-                      : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden mt-0"
-                  }`}
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-xs text-muted text-center">{t("removeContribution")}</p>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="flex-1 h-8 rounded-xl bg-muted/10 text-muted text-xs font-medium"
-                        onClick={() => setConfirmCancelContribId(null)}
-                      >
-                        {t("cancelButton")}
-                      </button>
-                      <button
-                        type="button"
-                        className="theme-confirm-danger flex-1 h-8 rounded-xl text-xs font-bold disabled:opacity-60"
-                        disabled={isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending}
-                        onClick={() => {
-                          if (!contributionId) return;
-                          if (isOrganizer) {
-                            leaveMutation.mutate(undefined, {
-                              onSuccess: () => setConfirmCancelContribId(null),
-                            });
-                          } else {
-                            removeContribMutation.mutate(contributionId, {
-                              onSuccess: () => setConfirmCancelContribId(null),
-                            });
-                          }
-                        }}
-                      >
-                        {(isOrganizer ? leaveMutation.isPending : removeContribMutation.isPending)
-                          ? t("deleting")
-                          : t("removeContribution")}
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

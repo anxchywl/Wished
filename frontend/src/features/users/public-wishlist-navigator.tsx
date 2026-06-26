@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { useReservationStatusQuery, useCreateReservationMutation } from "@/features/reservations/hooks";
-import { ViewGroupGiftContent } from "@/features/group-gifts/view-group-gift-sheet";
+import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
 import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
@@ -69,6 +69,7 @@ export function PublicWishlistNavigator({
   const [stack, setStack] = useState<NavigationFrame[]>([{ view: "user" }]);
   const [direction, setDirection] = useState<NavigationDirection>("forward");
   const [previousFrame, setPreviousFrame] = useState<NavigationFrame | null>(null);
+  const [groupGiftActionMode, setGroupGiftActionMode] = useState<ActionMode>("overview");
   const current = stack[stack.length - 1];
   const { t } = useTranslation();
 
@@ -91,6 +92,7 @@ export function PublicWishlistNavigator({
       );
       setDirection("forward");
       setPreviousFrame(null);
+      setGroupGiftActionMode("overview");
     }
   }, [initialWishlistId, initialWishId, open, username, userId]);
 
@@ -116,6 +118,9 @@ export function PublicWishlistNavigator({
   }
 
   function handleBack() {
+    if (current.view === "viewGroupGift" && groupGiftActionMode !== "overview") {
+      return;
+    }
     if (stack.length === 1) {
       handleClose();
       return;
@@ -154,9 +159,19 @@ export function PublicWishlistNavigator({
   }
 
   function handleViewGroupGiftOpen(wishlistId: string, wishId: string) {
+    setGroupGiftActionMode("overview");
     setDirection("forward");
     setPreviousFrame(current);
     setStack((currentStack) => [...currentStack, { view: "viewGroupGift", wishlistId, wishId }]);
+  }
+
+  function groupGiftTitle() {
+    if (groupGiftActionMode === "purchase") return t("markGiftPurchased");
+    if (groupGiftActionMode === "contribute") return t("makeContribution");
+    if (groupGiftActionMode === "editPayment") return t("editPaymentDetails");
+    if (groupGiftActionMode === "cancel") return t("cancelGiftButton");
+    if (groupGiftActionMode === "removeContribution") return t("removeContribution");
+    return t("groupGift");
   }
 
   function renderFrame(frame: NavigationFrame) {
@@ -208,6 +223,8 @@ export function PublicWishlistNavigator({
           wishId={frame.wishId}
           shareToken={shareToken}
           onDone={handleBack}
+          actionMode={groupGiftActionMode}
+          onActionModeChange={setGroupGiftActionMode}
         />
       );
     }
@@ -223,7 +240,7 @@ export function PublicWishlistNavigator({
       >
         <div className="modal-handle" />
         <div className="public-nav-header">
-          {stack.length > 1 ? (
+          {stack.length > 1 && !(current.view === "viewGroupGift" && groupGiftActionMode !== "overview") ? (
             <button
               type="button"
               className="w-10 h-10 inline-flex items-center justify-center text-foreground hover:opacity-70 transition-opacity"
@@ -247,7 +264,7 @@ export function PublicWishlistNavigator({
               : current.view === "createGroupGift"
               ? t("createGroupGift")
               : current.view === "viewGroupGift"
-              ? t("groupGift")
+              ? groupGiftTitle()
               : t("copyToMyWishlist")}
           </h2>
           <span className="w-10" />
@@ -839,9 +856,17 @@ type PublicViewGroupGiftViewProps = {
   wishId: string;
   shareToken?: string | null;
   onDone: () => void;
+  actionMode: ActionMode;
+  onActionModeChange: (mode: ActionMode) => void;
 };
 
-function PublicViewGroupGiftView({ wishId, shareToken, onDone }: PublicViewGroupGiftViewProps) {
+function PublicViewGroupGiftView({
+  wishId,
+  shareToken,
+  onDone,
+  actionMode,
+  onActionModeChange,
+}: PublicViewGroupGiftViewProps) {
   return (
     <div className="public-nav-content px-4">
       <ViewGroupGiftContent
@@ -849,6 +874,8 @@ function PublicViewGroupGiftView({ wishId, shareToken, onDone }: PublicViewGroup
         shareToken={shareToken}
         showTitle={false}
         onClose={onDone}
+        actionMode={actionMode}
+        onActionModeChange={onActionModeChange}
       />
     </div>
   );

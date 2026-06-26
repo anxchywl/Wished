@@ -792,6 +792,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     ? t("editPaymentDetails")
     : groupGiftActionMode === "cancel"
     ? t("cancelGiftButton")
+    : groupGiftActionMode === "removeContribution"
+    ? t("removeContribution")
     : t("groupGift");
 
   return (
