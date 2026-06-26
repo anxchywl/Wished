@@ -13,6 +13,7 @@ import {
   joinGroupGift,
   leaveGroupGift,
   markGroupGiftPurchased,
+  organizerRemoveContribution,
   reportTransfer,
   updateGroupGiftPaymentDetails,
 } from "@/features/group-gifts/api";
@@ -160,6 +161,22 @@ export function useLeaveGroupGiftMutation(wishId: string, contributionId: string
           };
         },
       );
+      queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
+      queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
+      queryClient.invalidateQueries({ queryKey: ["wishes"] });
+    },
+  });
+}
+
+export function useOrganizerRemoveContributionMutation(wishId: string, groupGiftId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (contributionId: string) => (
+      organizerRemoveContribution(accessToken, groupGiftId, contributionId)
+    ),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
       queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
       queryClient.invalidateQueries({ queryKey: ["wishes"] });

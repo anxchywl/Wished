@@ -15,6 +15,7 @@ import {
   useUpdateGroupGiftPaymentDetailsMutation,
   useMarkGroupGiftPurchasedMutation,
   useGiftMembersQuery,
+  useOrganizerRemoveContributionMutation,
 } from "@/features/group-gifts/hooks";
 
 
@@ -33,6 +34,10 @@ type ContentProps = Props & {
 };
 
 export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel";
+
+function stripTrailingZeros(amount: string): string {
+  return amount.replace(/\.00$/, "");
+}
 
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [active, setActive] = useState(false);
@@ -72,6 +77,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   const joinMutation = useJoinGroupGiftMutation(wishId, gift?.id ?? "");
   const reportMutation = useReportTransferMutation(wishId, gift?.my_contribution?.id ?? "");
   const leaveMutation = useLeaveGroupGiftMutation(wishId, gift?.my_contribution?.id ?? "");
+  const removeContribMutation = useOrganizerRemoveContributionMutation(wishId, gift?.id ?? "");
   const canLoadMembers = Boolean(gift && (gift.is_organizer || gift.is_contributor || gift.organizer_display_name));
   const membersQuery = useGiftMembersQuery(gift?.id, canLoadMembers);
 
@@ -79,6 +85,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [internalActionMode, setInternalActionMode] = useState<ActionMode>("overview");
+  const [confirmCancelContribId, setConfirmCancelContribId] = useState<string | null>(null);
   const actionMode = controlledActionMode ?? internalActionMode;
 
   function changeActionMode(mode: ActionMode) {
@@ -183,6 +190,8 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
     });
   }
 
+  const isNonOverview = actionMode !== "overview";
+
   return (
     <>
       {showTitle ? (
@@ -195,49 +204,71 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
           </div>
         ) : !gift ? (
           <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
-        ) : actionMode !== "overview" ? (
-          <div key={actionMode} className="action-mode-animate">
-            {renderActionPanel()}
-          </div>
         ) : (
-          <div key="overview" className="action-mode-animate flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-end justify-between gap-3">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("collected")}</span>
-                  <span className="text-2xl font-bold text-foreground leading-none">{gift.collected_amount}</span>
-                </div>
-                {gift.total_amount ? (
-                  <div className="flex flex-col gap-0.5 items-end">
-                    <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("target")}</span>
-                    <span className="text-lg font-semibold text-muted leading-none">{gift.total_amount}</span>
+          <>
+            {/* Overview content — smoothly hides when entering action mode */}
+            <div
+              className={`modal-footer-transition ${
+                !isNonOverview
+                  ? "opacity-100 max-h-[700px] scale-100"
+                  : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+              }`}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("collected")}</span>
+                      <span className="text-2xl font-bold text-foreground leading-none">{stripTrailingZeros(gift.collected_amount)}</span>
+                    </div>
+                    {gift.total_amount ? (
+                      <div className="flex flex-col gap-0.5 items-end">
+                        <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("target")}</span>
+                        <span className="text-lg font-semibold text-muted leading-none">{stripTrailingZeros(gift.total_amount)}</span>
+                      </div>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
 
-              <div className="w-full h-2.5 rounded-full bg-muted/20 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.min(100, gift.percent_complete)}%` }}
-                />
-              </div>
+                  <div className="w-full h-2.5 rounded-full bg-muted/20 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                      style={{ width: `${Math.min(100, gift.percent_complete)}%` }}
+                    />
+                  </div>
 
-              <span
-                className="text-xs text-muted transition-opacity duration-300 text-center"
-                style={{ opacity: percentOpacity }}
-              >
-                {gift.percent_complete >= 100
-                  ? t("giftComplete")
-                  : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
-              </span>
+                  <span
+                    className="text-xs text-muted transition-opacity duration-300 text-center"
+                    style={{ opacity: percentOpacity }}
+                  >
+                    {gift.percent_complete >= 100
+                      ? t("giftComplete")
+                      : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
+                  </span>
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  {renderActionPanel()}
+                </div>
+
+                {renderMembers()}
+              </div>
             </div>
 
-            <div className="border-t border-border pt-4">
-              {renderActionPanel()}
+            {/* Non-overview action panel — smoothly reveals when entering action mode */}
+            <div
+              className={`modal-footer-transition ${
+                isNonOverview
+                  ? "opacity-100 max-h-[500px] scale-100"
+                  : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+              }`}
+            >
+              {isNonOverview ? (
+                <div key={actionMode} className="action-mode-animate">
+                  {renderActionPanel()}
+                </div>
+              ) : null}
             </div>
-
-            {renderMembers()}
-          </div>
+          </>
         )}
     </>
   );
@@ -392,44 +423,113 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
   function renderMembers() {
     const members = membersQuery.data ?? [];
     if (!members.length) return null;
-    // count includes organizer
-    const total = members.length;
+
+    // Find organizer's contribution_id (if they contributed)
+    const organizerMember = members.find((m) => m.role === "organizer");
+    const organizerContribAsContributor = organizerMember
+      ? members.find((m) => m.role === "contributor" && m.user_id === organizerMember.user_id)
+      : null;
+
+    // Filter out the organizer's duplicate contributor entry
+    const filteredMembers = members.filter(
+      (m) => !(m.role === "contributor" && m.user_id === organizerMember?.user_id),
+    );
+
+    const total = filteredMembers.length;
+
     return (
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
           {t("contributors")} ({total})
         </p>
         <div className="flex flex-col gap-1.5">
-          {members.map((member) => {
+          {filteredMembers.map((member) => {
             const displayName = member.first_name || (member.username ? `@${member.username}` : t("unknownUser"));
             const isOrganizer = member.role === "organizer";
+            // For organizer row, show their own contribution amount if they contributed
+            const displayAmount = isOrganizer && organizerContribAsContributor?.amount
+              ? organizerContribAsContributor.amount
+              : member.amount;
+            const contributionId = isOrganizer
+              ? organizerContribAsContributor?.contribution_id
+              : member.contribution_id;
+            const isConfirming = confirmCancelContribId === contributionId;
+
             return (
-              <div
-                key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}
-                className="flex items-center justify-between gap-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {displayName}
-                    {isOrganizer ? (
-                      <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
+              <div key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {displayName}
+                      {isOrganizer ? (
+                        <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
+                      ) : null}
+                    </p>
+                    {member.username ? (
+                      <button
+                        type="button"
+                        className="truncate text-xs text-muted pressable-link text-left"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`@${member.username}`).catch(() => {});
+                        }}
+                      >
+                        @{member.username}
+                      </button>
                     ) : null}
-                  </p>
-                  {member.username ? (
-                    <button
-                      type="button"
-                      className="truncate text-xs text-muted pressable-link text-left"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`@${member.username}`).catch(() => {});
-                      }}
-                    >
-                      @{member.username}
-                    </button>
-                  ) : null}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {displayAmount ? (
+                      <p className="text-sm font-semibold text-foreground">{stripTrailingZeros(displayAmount)}</p>
+                    ) : null}
+                    {/* Cancel button shown to organizer for each contributor with a contribution */}
+                    {gift?.is_organizer && contributionId && !isOrganizer ? (
+                      <button
+                        type="button"
+                        className="w-6 h-6 inline-flex items-center justify-center rounded-full text-muted hover:text-red-500 transition-colors"
+                        onClick={() => setConfirmCancelContribId(isConfirming ? null : contributionId)}
+                        aria-label={t("removeContribution")}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-                {member.amount ? (
-                  <p className="shrink-0 text-sm font-semibold text-foreground">{member.amount}</p>
-                ) : null}
+                {/* Inline confirm removal */}
+                <div
+                  className={`modal-footer-transition ${
+                    isConfirming
+                      ? "opacity-100 max-h-24 scale-100 mt-2"
+                      : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden mt-0"
+                  }`}
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-muted text-center">{t("removeContribution")}</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="flex-1 h-8 rounded-xl bg-muted/10 text-muted text-xs font-medium"
+                        onClick={() => setConfirmCancelContribId(null)}
+                      >
+                        {t("cancelButton")}
+                      </button>
+                      <button
+                        type="button"
+                        className="theme-confirm-danger flex-1 h-8 rounded-xl text-xs font-bold disabled:opacity-60"
+                        disabled={removeContribMutation.isPending}
+                        onClick={() => {
+                          if (!contributionId) return;
+                          removeContribMutation.mutate(contributionId, {
+                            onSuccess: () => setConfirmCancelContribId(null),
+                          });
+                        }}
+                      >
+                        {removeContribMutation.isPending ? t("deleting") : t("removeContribution")}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -665,7 +765,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         <div className="flex flex-col gap-3">
           {contrib.amount ? (
             <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{contrib.amount}</span>
+              {t("amountLabel")}: <span className="font-semibold text-foreground">{stripTrailingZeros(contrib.amount)}</span>
             </p>
           ) : null}
 
@@ -708,7 +808,7 @@ export function ViewGroupGiftContent({ wishId, shareToken, onClose, showTitle = 
         <div className="flex flex-col gap-3">
           {contrib.amount ? (
             <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{contrib.amount}</span>
+              {t("amountLabel")}: <span className="font-semibold text-foreground">{stripTrailingZeros(contrib.amount)}</span>
             </p>
           ) : null}
           {renderPaymentDetails()}

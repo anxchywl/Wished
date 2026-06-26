@@ -19,6 +19,7 @@ from app.modules.group_gifts import (
     join_group_gift,
     leave_group_gift,
     mark_group_gift_purchased,
+    organizer_remove_contribution,
     report_transfer,
     update_payment_details,
 )
@@ -156,6 +157,20 @@ async def delete_contribution(
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> Response:
     await leave_group_gift(db, current_user, contribution_id, redis=redis)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/group-gifts/{group_gift_id}/contributions/{contribution_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_group_gift_contribution(
+    group_gift_id: UUID,
+    contribution_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> Response:
+    await organizer_remove_contribution(db, current_user, group_gift_id, contribution_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

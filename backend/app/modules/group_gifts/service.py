@@ -608,6 +608,55 @@ async def leave_group_gift(
             await db.commit()
 
 
+async def organizer_remove_contribution(
+    db: AsyncSession,
+    current_user: User,
+    group_gift_id: UUID,
+    contribution_id: UUID,
+) -> None:
+    result = await db.execute(
+        select(GroupGiftContribution)
+        .options(
+            selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish)
+        )
+        .where(
+            GroupGiftContribution.id == contribution_id,
+            GroupGiftContribution.group_gift_id == group_gift_id,
+        )
+    )
+    contrib = result.scalar_one_or_none()
+    if not contrib:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contribution not found")
+
+    if contrib.group_gift.organizer_user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
+
+    if contrib.status in _TERMINAL_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove a confirmed contribution",
+        )
+
+    contrib.status = "cancelled"
+    await db.commit()
+
+    gift = contrib.group_gift
+    if gift.status == "completed":
+        collected_amount = await _compute_collected(db, gift.id)
+        total_amount = gift.wish.price
+        if not total_amount or collected_amount < total_amount:
+            gift.status = "active"
+            result = await db.execute(
+                select(GroupGiftContribution).where(
+                    GroupGiftContribution.group_gift_id == gift.id,
+                    GroupGiftContribution.status == "notified",
+                )
+            )
+            for c in result.scalars().all():
+                c.status = "pledged"
+            await db.commit()
+
+
 async def get_gift_members(
     db: AsyncSession,
     current_user: User,

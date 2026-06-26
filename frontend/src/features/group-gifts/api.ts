@@ -159,6 +159,17 @@ export function leaveGroupGift(
   }).then(() => undefined);
 }
 
+export function organizerRemoveContribution(
+  accessToken: string | null,
+  groupGiftId: string,
+  contributionId: string,
+): Promise<void> {
+  return apiClient<null>(`/group-gifts/${groupGiftId}/contributions/${contributionId}`, {
+    method: "DELETE",
+    accessToken,
+  }).then(() => undefined);
+}
+
 export function getGiftMembers(
   accessToken: string | null,
   groupGiftId: string,

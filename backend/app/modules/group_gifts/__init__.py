@@ -8,6 +8,7 @@ from app.modules.group_gifts.service import (
     join_group_gift,
     leave_group_gift,
     mark_group_gift_purchased,
+    organizer_remove_contribution,
     report_transfer,
     update_payment_details,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "join_group_gift",
     "leave_group_gift",
     "mark_group_gift_purchased",
+    "organizer_remove_contribution",
     "report_transfer",
     "update_payment_details",
 ]
