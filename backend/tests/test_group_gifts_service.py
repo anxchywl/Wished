@@ -439,10 +439,7 @@ async def test_non_participant_cannot_toggle_approval() -> None:
     wish_id = uuid4()
     gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),  # existing approval lookup
-    ])
+    db = FakeDb([FakeResult(gift)])
 
     with pytest.raises(HTTPException) as exc:
         await toggle_group_gift_approval(db, _user(user_id=uuid4()), gift.id, "cancel")
@@ -456,26 +453,18 @@ async def test_organizer_approval_with_no_contributors_cancels_immediately() -> 
     wish_id = uuid4()
     gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
-    new_approval = _approval(gift.id, organizer_id)
 
-    # calls: (1) get gift locked, (2) get existing approval (None), (3) reload gift with approval
-    reloaded_gift = _gift_with_approvals(
-        wish_id=wish_id,
-        organizer_user_id=organizer_id,
-        approvals=[new_approval],
-    )
-    reloaded_gift.wish = gift.wish
+    # single query: gift loaded in-memory; _execute_cancel queries for Reservation (returns None)
     db = FakeDb([
         FakeResult(gift),
-        FakeResult(None),  # no prior approval
-        FakeResult(reloaded_gift),
+        FakeResult(None),  # Reservation lookup in _execute_cancel
     ])
 
     result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
 
     # unanimous (1/1) → deletes gift, returns None
     assert result is None
-    assert db.deleted is reloaded_gift
+    assert db.deleted is gift
 
 
 @pytest.mark.asyncio
@@ -489,21 +478,9 @@ async def test_organizer_approval_with_contributor_is_partial() -> None:
         _contribution(gift.id, contributor_id, contributor, status="pledged")
     ]
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
-    organizer_approval = _approval(gift.id, organizer_id)
 
-    # 1 out of 2 participants — not unanimous
-    reloaded_gift = _gift_with_approvals(
-        wish_id=wish_id,
-        organizer_user_id=organizer_id,
-        approvals=[organizer_approval],
-    )
-    reloaded_gift.contributions = gift.contributions
-    reloaded_gift.wish = gift.wish
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),
-        FakeResult(reloaded_gift),
-    ])
+    # single query: gift loaded in-memory; 1 of 2 participants → not unanimous
+    db = FakeDb([FakeResult(gift)])
 
     result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
 
@@ -518,18 +495,12 @@ async def test_organizer_approval_with_contributor_is_partial() -> None:
 async def test_revoking_existing_approval_removes_it() -> None:
     organizer_id = uuid4()
     wish_id = uuid4()
-    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    existing = _approval(uuid4(), organizer_id)
+    # gift already has the approval in-memory — no separate DB query for it
+    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id, approvals=[existing])
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
-    existing = _approval(gift.id, organizer_id)
 
-    # reload after delete — 0 approvals
-    reloaded_gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id, approvals=[])
-    reloaded_gift.wish = gift.wish
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(existing),   # existing approval found → will be deleted (revoke)
-        FakeResult(reloaded_gift),
-    ])
+    db = FakeDb([FakeResult(gift)])
 
     result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
 
