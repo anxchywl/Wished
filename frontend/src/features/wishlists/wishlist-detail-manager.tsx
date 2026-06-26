@@ -663,6 +663,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
             title={wish.title}
             imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url}
             className="w-full h-full object-cover"
+            hideIcon={showBooked || showGroupGift}
           />
           {isCompleted && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">

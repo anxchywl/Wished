@@ -126,7 +126,7 @@ export function getWishlistCoverStyle({ coverStyle, fallback }: WishlistCoverSty
 /**
  * wish image placeholder
  */
-export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVisualProps, "imageUrl">) {
+export function WishImagePlaceholder({ id, title, className = "", hideIcon = false }: Omit<WishVisualProps, "imageUrl"> & { hideIcon?: boolean }) {
   // hash on title only so the gradient is stable during the optimistic→real id transition
   const hash = hashString(title);
   // golden-angle hue steps so adjacent wishes never share the same hue
@@ -141,13 +141,15 @@ export function WishImagePlaceholder({ id, title, className = "" }: Omit<WishVis
 
   return (
     <div className={`wish-image-placeholder ${className}`} style={{ background: bg }} aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M20 12v8.5H4V12" />
-        <path d="M3.5 8h17v4h-17z" />
-        <path d="M12 8v12.5" />
-        <path d="M12 8H8.5a2.5 2.5 0 1 1 2.35-3.35L12 8Z" />
-        <path d="M12 8h3.5a2.5 2.5 0 1 0-2.35-3.35L12 8Z" />
-      </svg>
+      {!hideIcon && (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M20 12v8.5H4V12" />
+          <path d="M3.5 8h17v4h-17z" />
+          <path d="M12 8v12.5" />
+          <path d="M12 8H8.5a2.5 2.5 0 1 1 2.35-3.35L12 8Z" />
+          <path d="M12 8h3.5a2.5 2.5 0 1 0-2.35-3.35L12 8Z" />
+        </svg>
+      )}
     </div>
   );
 }
@@ -171,7 +173,7 @@ export function resolveImageUrl(url?: string | null): string {
 /**
  * wish image thumbnail
  */
-export function WishImageThumb({ id, title, imageUrl, className = "" }: WishVisualProps) {
+export function WishImageThumb({ id, title, imageUrl, className = "", hideIcon = false }: WishVisualProps & { hideIcon?: boolean }) {
   const accountId = useAuthStore((state) => state.tgUserId);
   const [failed, setFailed] = useState(false);
   const [displayUrl, setDisplayUrl] = useState("");
@@ -205,11 +207,11 @@ export function WishImageThumb({ id, title, imageUrl, className = "" }: WishVisu
   }, [accountId, imageUrl]);
 
   if (!imageUrl || failed) {
-    return <WishImagePlaceholder id={id} title={title} className={className} />;
+    return <WishImagePlaceholder id={id} title={title} className={className} hideIcon={hideIcon} />;
   }
 
   if (!displayUrl) {
-    return <WishImagePlaceholder id={id} title={title} className={className} />;
+    return <WishImagePlaceholder id={id} title={title} className={className} hideIcon={hideIcon} />;
   }
 
   return (
