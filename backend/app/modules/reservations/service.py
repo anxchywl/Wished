@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Reservation, User, Wish, Wishlist
-from app.db.models.group_gifts import GroupGift, GroupGiftApproval, GroupGiftContribution
+from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
     BookedWishContributorSummary,
