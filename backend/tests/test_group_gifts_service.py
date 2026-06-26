@@ -560,6 +560,9 @@ class FakeDb:
     async def rollback(self) -> None:
         self.committed = False
 
+    async def get(self, model, pk):  # noqa: ANN001
+        return SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous")
+
     async def refresh(self, value) -> None:  # noqa: ANN001
         if getattr(value, "id", None) is None:
             value.id = uuid4()

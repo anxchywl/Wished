@@ -366,6 +366,7 @@ class TestReservationStatus:
         no_rsv.scalar_one_or_none = MagicMock(return_value=None)
         db.execute = AsyncMock(side_effect=[wish_result, no_rsv])
         db.scalar = AsyncMock(return_value=0)
+        db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")
@@ -393,6 +394,7 @@ class TestReservationStatus:
         rsv_result.scalar_one_or_none = MagicMock(return_value=rsv)
         db.execute = AsyncMock(side_effect=[wish_result, rsv_result])
         db.scalar = AsyncMock(return_value=0)
+        db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")
