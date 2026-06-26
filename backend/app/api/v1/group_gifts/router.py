@@ -11,7 +11,6 @@ from app.api.deps.database import get_db_session
 from app.api.deps.redis import get_redis
 from app.db.models import User
 from app.modules.group_gifts import (
-    cancel_group_gift,
     confirm_transfer,
     create_group_gift,
     get_gift_members,
