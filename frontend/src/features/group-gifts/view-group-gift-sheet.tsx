@@ -982,7 +982,13 @@ export function ViewGroupGiftContent({
             className={`h-11 rounded-xl px-2 inline-flex flex-col items-center justify-center gap-0.5 ${
               gift?.my_cancel_approval ? "bg-red-500/20" : "bg-red-500/10"
             }`}
-            onClick={() => changeActionMode("cancel")}
+            onClick={() => {
+              if ((gift?.participant_count ?? 0) <= 1) {
+                handleCancelGift();
+              } else {
+                changeActionMode("cancel");
+              }
+            }}
           >
             <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
             {(gift?.participant_count ?? 0) > 1 ? (
