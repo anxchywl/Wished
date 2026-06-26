@@ -123,6 +123,7 @@ async def test_wish_owner_can_join_group_gift_organized_by_someone_else() -> Non
     db = FakeDb([
         FakeResult(gift),
         FakeResult(None),
+        FakeResult([]),
     ])
 
     response = await join_group_gift(
@@ -146,6 +147,7 @@ async def test_organizer_can_join_their_own_group_gift() -> None:
     db = FakeDb([
         FakeResult(gift),
         FakeResult(None),
+        FakeResult([]),
     ])
 
     response = await join_group_gift(
@@ -158,6 +160,80 @@ async def test_organizer_can_join_their_own_group_gift() -> None:
     assert db.added is not None
     assert db.added.contributor_user_id == organizer_id
     assert response.amount == Decimal("35.00")
+
+
+@pytest.mark.asyncio
+async def test_join_rejects_amount_above_remaining_target() -> None:
+    contributor_id = uuid4()
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    existing = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=uuid4(),
+        contributor=_user(),
+        amount=Decimal("75.00"),
+    )
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),
+        FakeResult([existing]),
+    ])
+
+    with pytest.raises(HTTPException) as exc:
+        await join_group_gift(
+            db,
+            _user(user_id=contributor_id),
+            gift.id,
+            SimpleNamespace(amount=Decimal("30.00")),
+        )
+
+    assert exc.value.status_code == 400
+    assert "Contribution exceeds remaining amount" in exc.value.detail
+    assert db.added is None
+
+
+@pytest.mark.asyncio
+async def test_commit_goal_reached_keeps_gift_active_until_organizer_completes() -> None:
+    contributor_id = uuid4()
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.collection_type = "commit"
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    existing = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=uuid4(),
+        contributor=_user(),
+        amount=Decimal("75.00"),
+        status="pledged",
+    )
+    new_contribution = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=contributor_id,
+        contributor=_user(user_id=contributor_id),
+        amount=Decimal("25.00"),
+        status="pledged",
+    )
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),
+        FakeResult([existing]),
+        FakeResult([existing, new_contribution]),
+        FakeResult([existing, new_contribution]),
+    ])
+
+    response = await join_group_gift(
+        db,
+        _user(user_id=contributor_id),
+        gift.id,
+        SimpleNamespace(amount=Decimal("25.00")),
+    )
+
+    assert response.status == "pledged"
+    assert gift.status == "active"
+    assert existing.status == "notified"
 
 
 @pytest.mark.asyncio
@@ -279,7 +355,10 @@ async def test_organizer_can_mark_group_gift_purchased_for_existing_active_wish(
 
     assert db.committed is True
     assert gift.status == "completed"
-    assert gift.wish.status == "active"  # wish stays active; only owner can mark fulfilled
+    assert gift.wish.status == "active"
+    assert db.added.wish_id == wish_id
+    assert db.added.reserver_user_id == organizer_id
+    assert db.added.status == "active"
     assert response.status == "completed"
 
 
@@ -399,13 +478,15 @@ def _contribution(
     group_gift_id,  # noqa: ANN001
     contributor_user_id,  # noqa: ANN001
     contributor: SimpleNamespace,
+    amount: Decimal = Decimal("25.00"),
+    status: str = "pledged",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         id=uuid4(),
         group_gift_id=group_gift_id,
         contributor_user_id=contributor_user_id,
         contributor=contributor,
-        amount=Decimal("25.00"),
-        status="pledged",
+        amount=amount,
+        status=status,
         created_at=datetime(2026, 6, 25, 12, 5, tzinfo=UTC),
     )

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
@@ -37,6 +37,16 @@ export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" 
 
 function stripTrailingZeros(amount: string): string {
   return amount.replace(/\.00$/, "");
+}
+
+function formatAmount(amount: string | null | undefined): string {
+  if (!amount) return "";
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) return stripTrailingZeros(amount);
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(numeric);
 }
 
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
@@ -101,8 +111,23 @@ export function ViewGroupGiftContent({
     displayName: string;
   } | null>(null);
   const [renderedActionMode, setRenderedActionMode] = useState<ActionMode>("overview");
+  const overviewPanelRef = useRef<HTMLDivElement | null>(null);
+  const actionPanelRef = useRef<HTMLDivElement | null>(null);
+  const [overviewHeight, setOverviewHeight] = useState(0);
+  const [actionHeight, setActionHeight] = useState(0);
   const actionMode = controlledActionMode ?? internalActionMode;
   const isNonOverview = actionMode !== "overview";
+  const remainingAmount = gift?.remaining_amount ? Number(gift.remaining_amount) : null;
+  const enteredContributionAmount = joinAmount ? Number(joinAmount) : 0;
+  const remainingAfterContribution =
+    remainingAmount !== null
+      ? Math.max(0, remainingAmount - (Number.isFinite(enteredContributionAmount) ? enteredContributionAmount : 0))
+      : null;
+  const isCollectedState = Boolean(
+    gift?.status === "active" &&
+    gift.total_amount &&
+    (gift.percent_complete >= 100 || remainingAmount === 0),
+  );
 
   function changeActionMode(mode: ActionMode) {
     if (controlledActionMode === undefined) setInternalActionMode(mode);
@@ -123,6 +148,25 @@ export function ViewGroupGiftContent({
     const timer = window.setTimeout(() => setRenderedActionMode("overview"), 280);
     return () => window.clearTimeout(timer);
   }, [actionMode]);
+
+  useLayoutEffect(() => {
+    const updateHeights = () => {
+      setOverviewHeight(overviewPanelRef.current?.scrollHeight ?? 0);
+      setActionHeight(actionPanelRef.current?.scrollHeight ?? 0);
+    };
+
+    updateHeights();
+
+    if (typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const observer = new ResizeObserver(updateHeights);
+    if (overviewPanelRef.current) observer.observe(overviewPanelRef.current);
+    if (actionPanelRef.current) observer.observe(actionPanelRef.current);
+
+    return () => observer.disconnect();
+  });
 
   useEffect(() => {
     if (!gift?.is_contributor) {
@@ -166,7 +210,7 @@ export function ViewGroupGiftContent({
     if (actionMode === "contribute") return t("makeContribution");
     if (actionMode === "editPayment") return t("editPaymentDetails");
     if (actionMode === "purchase") return t("markGiftPurchased");
-    if (actionMode === "cancel") return t("cancelGiftButton");
+    if (actionMode === "cancel") return t("actionCancel");
     if (actionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
@@ -215,6 +259,7 @@ export function ViewGroupGiftContent({
   function handleJoin() {
     const amount = parseFloat(joinAmount);
     if (!amount || amount < 1) return;
+    if (remainingAmount !== null && amount > remainingAmount) return;
     joinMutation.mutate(amount, {
       onSuccess: () => { setJoinAmount(""); changeActionMode("overview"); },
     });
@@ -246,25 +291,26 @@ export function ViewGroupGiftContent({
       ) : !gift ? (
         <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col">
           <div
             className={`modal-footer-transition ${
               !isNonOverview
-                ? "opacity-100 max-h-[640px] scale-100"
-                : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+                ? "opacity-100 scale-100"
+                : "opacity-0 scale-95 pointer-events-none overflow-hidden"
             }`}
+            style={{ maxHeight: !isNonOverview ? overviewHeight : 0 }}
           >
-            <div className="flex flex-col gap-4">
+            <div ref={overviewPanelRef} className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
                 <div className="flex items-end justify-between gap-3">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("collected")}</span>
-                    <span className="text-2xl font-bold text-foreground leading-none">{stripTrailingZeros(gift.collected_amount)}</span>
+                    <span className="text-2xl font-bold text-foreground leading-none transition-all duration-500">{formatAmount(gift.collected_amount)}</span>
                   </div>
                   {gift.total_amount ? (
                     <div className="flex flex-col gap-0.5 items-end">
                       <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("target")}</span>
-                      <span className="text-lg font-semibold text-muted leading-none">{stripTrailingZeros(gift.total_amount)}</span>
+                      <span className="text-lg font-semibold text-muted leading-none">{formatAmount(gift.total_amount)}</span>
                     </div>
                   ) : null}
                 </div>
@@ -280,7 +326,9 @@ export function ViewGroupGiftContent({
                   className="text-xs text-muted transition-opacity duration-300 text-center"
                   style={{ opacity: percentOpacity }}
                 >
-                  {gift.percent_complete >= 100
+                  {isCollectedState
+                    ? t("collectedState")
+                    : gift.percent_complete >= 100
                     ? t("giftComplete")
                     : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
                 </span>
@@ -297,11 +345,12 @@ export function ViewGroupGiftContent({
           <div
             className={`modal-footer-transition ${
               isNonOverview
-                ? "opacity-100 max-h-[640px] scale-100"
-                : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+                ? "opacity-100 scale-100"
+                : "opacity-0 scale-95 pointer-events-none overflow-hidden"
             }`}
+            style={{ maxHeight: isNonOverview ? actionHeight : 0 }}
           >
-            {renderNonOverviewPanel()}
+            <div ref={actionPanelRef}>{renderNonOverviewPanel()}</div>
           </div>
         </div>
       )}
@@ -320,6 +369,32 @@ export function ViewGroupGiftContent({
     }
     if (gift.is_organizer) return renderOrganizerActions();
     const contrib = gift.my_contribution;
+    if (isCollectedState && gift.is_contributor && contrib) {
+      const canCancelContribution = !["confirmed", "notified"].includes(contrib.status);
+      return (
+        <div className="flex flex-col gap-3">
+          {gift.organizer_display_name ? (
+            <p className="text-xs text-muted text-center">
+              {t("groupGiftCreator")}: <span className="font-semibold text-foreground">{gift.organizer_display_name}</span>
+            </p>
+          ) : null}
+          {contrib.amount ? (
+            <p className="text-sm text-muted text-center">
+              {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
+            </p>
+          ) : null}
+          <p className="text-sm font-semibold text-center" style={{ color: "var(--color-success, #22c55e)" }}>
+            {contrib.status === "waiting_transfer"
+              ? t("waitingTransfer")
+              : contrib.status === "waiting_confirmation"
+              ? t("waitingConfirmation")
+              : t("transferConfirmedStatus")}
+          </p>
+          {renderPaymentDetails()}
+          {canCancelContribution ? renderLeaveButtons() : null}
+        </div>
+      );
+    }
     if (gift.is_contributor && contrib?.status === "waiting_transfer") {
       return (
         <div className="flex flex-col gap-3">
@@ -357,7 +432,7 @@ export function ViewGroupGiftContent({
         <div className="flex flex-col gap-3">
           {contrib.amount ? (
             <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{stripTrailingZeros(contrib.amount)}</span>
+              {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
             </p>
           ) : null}
           {renderLeaveButtons()}
@@ -369,14 +444,14 @@ export function ViewGroupGiftContent({
         <div className="flex flex-col gap-3">
           {contrib.amount ? (
             <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{stripTrailingZeros(contrib.amount)}</span>
+              {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
             </p>
           ) : null}
           {renderPaymentDetails()}
         </div>
       );
     }
-    if (!gift.is_organizer && !gift.is_contributor && gift.status === "active") {
+    if (!gift.is_organizer && !gift.is_contributor && gift.status === "active" && !isCollectedState) {
       return (
         <button
           type="button"
@@ -405,11 +480,17 @@ export function ViewGroupGiftContent({
             <input
               type="number"
               min={1}
+              max={remainingAmount ?? undefined}
               className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               placeholder={t("amountPlaceholder")}
               value={joinAmount}
               onChange={(e) => setJoinAmount(e.currentTarget.value)}
             />
+            {remainingAmount !== null ? (
+              <p className="text-xs text-muted">
+                {t("remainingAmount").replace("{amount}", formatAmount(String(remainingAfterContribution)))}
+              </p>
+            ) : null}
           </div>
           <div className="flex gap-2">
             <button
@@ -422,7 +503,12 @@ export function ViewGroupGiftContent({
             <button
               type="button"
               className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-              disabled={joinMutation.isPending || !joinAmount || parseFloat(joinAmount) < 1}
+              disabled={
+                joinMutation.isPending ||
+                !joinAmount ||
+                parseFloat(joinAmount) < 1 ||
+                (remainingAmount !== null && parseFloat(joinAmount) > remainingAmount)
+              }
               onClick={handleJoin}
             >
               {joinMutation.isPending ? t("saving") : t("confirmJoin")}
@@ -448,7 +534,7 @@ export function ViewGroupGiftContent({
             </button>
             <button
               type="button"
-              className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              className="flex-1 h-10 rounded-xl bg-green-500 text-white text-sm font-bold disabled:opacity-60"
               disabled={purchaseMutation.isPending}
               onClick={handleMarkPurchased}
             >
@@ -476,7 +562,7 @@ export function ViewGroupGiftContent({
               disabled={cancelMutation.isPending}
               onClick={handleCancelGift}
             >
-              {cancelMutation.isPending ? t("deleting") : t("actionCancel")}
+              {cancelMutation.isPending ? t("deleting") : t("doButton")}
             </button>
           </div>
         </div>
@@ -488,7 +574,7 @@ export function ViewGroupGiftContent({
           <div className="flex flex-col gap-1 text-center">
             <p className="text-xs text-muted">{removeContribution?.displayName ?? t("unknownUser")}</p>
             {removeContribution?.amount ? (
-              <p className="text-sm font-semibold text-foreground">{stripTrailingZeros(removeContribution.amount)}</p>
+              <p className="text-sm font-semibold text-foreground">{formatAmount(removeContribution.amount)}</p>
             ) : null}
           </div>
           <div className="flex gap-2">
@@ -716,6 +802,20 @@ export function ViewGroupGiftContent({
   }
 
   function renderOrganizerActions() {
+    if (isCollectedState) {
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            className="w-full h-11 rounded-xl bg-green-500 text-white text-sm font-bold"
+            onClick={() => changeActionMode("purchase")}
+          >
+            {t("actionPurchased")}
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-3">
         {!gift?.is_contributor ? (
@@ -730,10 +830,10 @@ export function ViewGroupGiftContent({
         <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
-            className="h-11 rounded-xl bg-muted/10 px-2 inline-flex items-center justify-center"
+            className="h-11 rounded-xl bg-green-500/10 px-2 inline-flex items-center justify-center"
             onClick={() => changeActionMode("purchase")}
           >
-            <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionPurchased")}</span>
+            <span className="min-w-0 truncate text-xs font-bold text-green-600">{t("actionPurchased")}</span>
           </button>
           <button
             type="button"
@@ -804,7 +904,7 @@ export function ViewGroupGiftContent({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {displayAmount ? (
-                      <p className="text-sm font-semibold text-foreground">{stripTrailingZeros(displayAmount)}</p>
+                      <p className="text-sm font-semibold text-foreground">{formatAmount(displayAmount)}</p>
                     ) : null}
                     {gift?.is_organizer && contributionId ? (
                       <button

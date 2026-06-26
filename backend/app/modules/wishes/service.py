@@ -482,9 +482,20 @@ def _build_group_gift_summary(
         (c.amount for c in non_cancelled if c.status in confirmed_statuses),
         Decimal("0"),
     )
+    committed_amount = sum((c.amount for c in non_cancelled), Decimal("0"))
     total_amount = gift.wish.price if gift.wish else None
+    display_collected_amount = (
+        min(collected_amount, total_amount)
+        if total_amount and total_amount > 0
+        else collected_amount
+    )
+    remaining_amount = (
+        max(total_amount - committed_amount, Decimal("0"))
+        if total_amount and total_amount > 0
+        else None
+    )
     percent_complete = (
-        min(100, int(collected_amount / total_amount * 100))
+        min(100, int(display_collected_amount / total_amount * 100))
         if total_amount and total_amount > 0
         else 0
     )
@@ -493,7 +504,8 @@ def _build_group_gift_summary(
         id=gift.id,
         status=gift.status,
         collection_type=gift.collection_type,
-        collected_amount=collected_amount,
+        collected_amount=display_collected_amount,
+        remaining_amount=remaining_amount,
         percent_complete=percent_complete,
         contributor_count=len(non_cancelled),
         is_organizer=is_organizer,

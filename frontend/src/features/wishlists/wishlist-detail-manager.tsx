@@ -703,8 +703,10 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [active, setActive] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [removeBookingConfirming, setRemoveBookingConfirming] = useState(false);
-  const [createGroupGiftOpen, setCreateGroupGiftOpen] = useState(false);
-  const [viewGroupGiftSheetOpen, setViewGroupGiftSheetOpen] = useState(false);
+  type DetailView = "wish" | "createGroupGift" | "viewGroupGift";
+  const [activeView, setActiveView] = useState<DetailView>("wish");
+  const [previousView, setPreviousView] = useState<DetailView | null>(null);
+  const [navDirection, setNavDirection] = useState<"forward" | "back">("forward");
   const [groupGiftActionMode, setGroupGiftActionMode] = useState<ActionMode>("overview");
   const [groupGiftResetTrigger, setGroupGiftResetTrigger] = useState(0);
   const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
@@ -724,8 +726,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     }
     if (!open) {
       setRemoveBookingConfirming(false);
-      setCreateGroupGiftOpen(false);
-      setViewGroupGiftSheetOpen(false);
+      setActiveView("wish");
+      setPreviousView(null);
       setGroupGiftActionMode("overview");
       setGroupGiftFocusMode(false);
     }
@@ -791,113 +793,54 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     : groupGiftActionMode === "editPayment"
     ? t("editPaymentDetails")
     : groupGiftActionMode === "cancel"
-    ? t("cancelGiftButton")
+    ? t("actionCancel")
     : groupGiftActionMode === "removeContribution"
     ? t("removeContribution")
     : t("groupGift");
 
-  return (
-    <div
-      className={`modal-backdrop ${active ? "visible" : ""}`}
-      onClick={handleClose}
-    >
-      <div
-        className={`modal-sheet ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="modal-handle" />
-        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
-          {viewGroupGiftSheetOpen ? (
-            <span className="w-10 h-10" />
-          ) : createGroupGiftOpen ? (
-            <button
-              type="button"
-              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
-              onClick={() => setCreateGroupGiftOpen(false)}
-              aria-label={t("back")}
-            >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          ) : isOwner && !removeBookingConfirming ? (
-            <button
-              type="button"
-              className={`pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-sm font-bold ${isCompleted ? "text-green-500" : "text-muted"}`}
-              disabled={isCompletePending}
-              onClick={() => {
-                if (isCompleted) {
-                  uncompleteWishMutation.mutate(wish.id);
-                } else {
-                  completeWishMutation.mutate(wish.id);
-                }
-              }}
-              aria-label={isCompleted ? t("unfulfill") : t("markFulfilled")}
-              title={isCompleted ? t("unfulfill") : t("markFulfilled")}
-            >
-              {isCompleted ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                  <circle cx="12" cy="12" r="9" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
-                </svg>
-              )}
-            </button>
-          ) : (
-            <span className="w-10" />
-          )}
-          <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
-            {createGroupGiftOpen
-              ? t("createGroupGift")
-              : viewGroupGiftSheetOpen
-              ? groupGiftTitle
-              : wish.title}
-          </h3>
-          {createGroupGiftOpen || viewGroupGiftSheetOpen ? (
-            <span className="w-10" />
-          ) : isOwner && !removeBookingConfirming ? (
-            <button
-              type="button"
-              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-primary"
-              onClick={onEdit}
-              aria-label={t("editWish")}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5.5v.01M12 12v.01M12 18.5v.01" />
-              </svg>
-            </button>
-          ) : (
-            <span className="w-10" />
-          )}
-        </div>
+  function openView(view: DetailView) {
+    setNavDirection("forward");
+    setPreviousView(activeView);
+    setActiveView(view);
+  }
 
-        {createGroupGiftOpen ? (
-          <div className="modal-footer-transition opacity-100 max-h-[760px] scale-100">
-            <CreateGroupGiftContent
-              wishId={wish.id}
-              showTitle={false}
-              onCancel={() => setCreateGroupGiftOpen(false)}
-              onClose={() => setCreateGroupGiftOpen(false)}
-              onFocusModeChange={setGroupGiftFocusMode}
-            />
-          </div>
-        ) : viewGroupGiftSheetOpen ? (
-          <div>
-            <ViewGroupGiftContent
-              wishId={wish.id}
-              showTitle={false}
-              actionMode={groupGiftActionMode}
-              onClose={() => setViewGroupGiftSheetOpen(false)}
-              onActionModeChange={setGroupGiftActionMode}
-              onFocusModeChange={setGroupGiftFocusMode}
-              resetTrigger={groupGiftResetTrigger}
-            />
-          </div>
-        ) : (
-          <>
+  function closeView() {
+    setNavDirection("back");
+    setPreviousView(activeView);
+    setActiveView("wish");
+  }
+
+  function renderViewContent(view: DetailView) {
+    if (view === "createGroupGift") {
+      return (
+        <div className="public-nav-content px-1 pb-1">
+          <CreateGroupGiftContent
+            wishId={wish!.id}
+            showTitle={false}
+            onCancel={closeView}
+            onClose={closeView}
+            onFocusModeChange={setGroupGiftFocusMode}
+          />
+        </div>
+      );
+    }
+    if (view === "viewGroupGift") {
+      return (
+        <div className="public-nav-content px-1 pb-1">
+          <ViewGroupGiftContent
+            wishId={wish!.id}
+            showTitle={false}
+            actionMode={groupGiftActionMode}
+            onClose={closeView}
+            onActionModeChange={setGroupGiftActionMode}
+            onFocusModeChange={setGroupGiftFocusMode}
+            resetTrigger={groupGiftResetTrigger}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="public-nav-content">
         <div
           className={`modal-footer-transition ${
             removeBookingConfirming
@@ -920,7 +863,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                 className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold"
                 disabled={removeReservation.isPending}
                 onClick={() => {
-                  removeReservation.mutate(wish.id, {
+                  removeReservation.mutate(wish!.id, {
                     onSuccess: () => setRemoveBookingConfirming(false),
                   });
                 }}
@@ -940,9 +883,9 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         <div className={`flex flex-col items-center gap-3 ${isCompleted ? "opacity-60" : ""}`}>
           <div className="relative w-full max-w-[210px] aspect-square rounded-3xl overflow-hidden border border-border shadow-lg">
             <WishImageThumb
-              id={wish.id}
-              title={wish.title}
-              imageUrl={wish.images?.[0]?.medium_url ?? wish.images?.[0]?.thumbnail_url}
+              id={wish!.id}
+              title={wish!.title}
+              imageUrl={wish!.images?.[0]?.medium_url ?? wish!.images?.[0]?.thumbnail_url}
               className="w-full h-full object-cover"
             />
           </div>
@@ -981,8 +924,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                   onClick={handleOwnerBook}
                   disabled={isBusy}
                 >
-                  {wish.price
-                    ? `${createReservation.isPending ? t("reserving") : t("book")} · ${formatPrice(wish.price, wish.currency)}`
+                  {wish!.price
+                    ? `${createReservation.isPending ? t("reserving") : t("book")} · ${formatPrice(wish!.price, wish!.currency)}`
                     : (createReservation.isPending ? t("reserving") : t("book"))
                   }
                 </button>
@@ -991,19 +934,19 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
 
           {/* owner price when no booking controls visible */}
-          {isOwner && (isCompleted || (!isMine && ownerBookingVisibility === "hide")) && wish.price ? (
-            <p className="text-lg font-extrabold text-primary">{formatPrice(wish.price, wish.currency)}</p>
+          {isOwner && (isCompleted || (!isMine && ownerBookingVisibility === "hide")) && wish!.price ? (
+            <p className="text-lg font-extrabold text-primary">{formatPrice(wish!.price, wish!.currency)}</p>
           ) : null}
 
           {/* non-owner booking controls */}
           {!isOwner && !isCompleted && (
             <div className="w-full flex flex-col gap-2">
               {hasActiveGroupGift ? (
-                wish.group_gift?.is_contributor || wish.group_gift?.is_organizer ? null : (
+                wish!.group_gift?.is_contributor || wish!.group_gift?.is_organizer ? null : (
                   <button
                     type="button"
                     className="w-full h-12 rounded-xl bg-primary text-white text-sm font-bold inline-flex items-center justify-center"
-                    onClick={() => setViewGroupGiftSheetOpen(true)}
+                    onClick={() => openView("viewGroupGift")}
                   >
                     {t("joinGiftButton")}
                   </button>
@@ -1022,7 +965,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                     <button
                       type="button"
                       className="w-full h-11 rounded-xl border border-border bg-background text-primary text-sm font-semibold inline-flex items-center justify-center"
-                      onClick={() => setCreateGroupGiftOpen(true)}
+                      onClick={() => openView("createGroupGift")}
                     >
                       {t("createGroupGift")}
                     </button>
@@ -1040,34 +983,34 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
 
           {/* Slot 2 — group gift progress row */}
-          {wish.group_gift ? (
+          {wish!.group_gift ? (
             <button
               type="button"
               className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
-              onClick={() => setViewGroupGiftSheetOpen(true)}
+              onClick={() => openView("viewGroupGift")}
             >
               <div className="flex justify-between items-center text-xs text-muted">
                 <span>{t("groupGift")}</span>
                 <span>
-                  {wish.group_gift.status === "cancelled"
+                  {wish!.group_gift.status === "cancelled"
                     ? t("giftCancelled")
-                    : wish.group_gift.status === "completed" || wish.group_gift.percent_complete >= 100
+                    : wish!.group_gift.status === "completed" || wish!.group_gift.percent_complete >= 100
                     ? t("giftComplete")
-                    : t("giftProgress").replace("{percent}", String(wish.group_gift.percent_complete))}
+                    : t("giftProgress").replace("{percent}", String(wish!.group_gift.percent_complete))}
                 </span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.min(100, wish.group_gift.percent_complete)}%` }}
+                  style={{ width: `${Math.min(100, wish!.group_gift.percent_complete)}%` }}
                 />
               </div>
             </button>
           ) : null}
 
-          {wish.original_product_url ? (
+          {wish!.original_product_url ? (
             <a
-              href={wish.original_product_url}
+              href={wish!.original_product_url}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground transition-colors"
@@ -1081,20 +1024,114 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
             </a>
           ) : null}
 
-          {wish.description ? (
+          {wish!.description ? (
             <section className="w-full rounded-xl border border-border bg-muted/5 px-3 py-2.5 text-left">
               <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-muted mb-1.5">
                 {t("descriptionLabel")}
               </h4>
               <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80">
-                {wish.description}
+                {wish!.description}
               </p>
             </section>
           ) : null}
         </div>
         </div>
-          </>
-        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`modal-backdrop ${active ? "visible" : ""}`}
+      onClick={handleClose}
+    >
+      <div
+        className={`modal-sheet ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-handle" />
+        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"}`}>
+          {activeView === "viewGroupGift" ? (
+            <span className="w-10 h-10" />
+          ) : activeView === "createGroupGift" ? (
+            <button
+              type="button"
+              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
+              onClick={closeView}
+              aria-label={t("back")}
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          ) : isOwner && !removeBookingConfirming ? (
+            <button
+              type="button"
+              className={`pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-sm font-bold ${isCompleted ? "text-green-500" : "text-muted"}`}
+              disabled={isCompletePending}
+              onClick={() => {
+                if (isCompleted) {
+                  uncompleteWishMutation.mutate(wish.id);
+                } else {
+                  completeWishMutation.mutate(wish.id);
+                }
+              }}
+              aria-label={isCompleted ? t("unfulfill") : t("markFulfilled")}
+              title={isCompleted ? t("unfulfill") : t("markFulfilled")}
+            >
+              {isCompleted ? (
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+                </svg>
+              )}
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
+          <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2">
+            {activeView === "createGroupGift"
+              ? t("createGroupGift")
+              : activeView === "viewGroupGift"
+              ? groupGiftTitle
+              : wish.title}
+          </h3>
+          {activeView === "createGroupGift" || activeView === "viewGroupGift" ? (
+            <span className="w-10" />
+          ) : isOwner && !removeBookingConfirming ? (
+            <button
+              type="button"
+              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-primary"
+              onClick={onEdit}
+              aria-label={t("editWish")}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5.5v.01M12 12v.01M12 18.5v.01" />
+              </svg>
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
+        </div>
+
+        <div className="public-nav-viewport">
+          {previousView ? (
+            <div className={`public-nav-frame public-nav-exit-${navDirection}`} key={`prev-${previousView}`}>
+              {renderViewContent(previousView)}
+            </div>
+          ) : null}
+          <div
+            className={`public-nav-frame ${previousView ? `public-nav-enter-${navDirection}` : ""}`}
+            key={`curr-${activeView}`}
+            onAnimationEnd={() => setPreviousView(null)}
+          >
+            {renderViewContent(activeView)}
+          </div>
+        </div>
       </div>
       <CopyWishModal
         open={copyModalOpen}

@@ -169,8 +169,9 @@ async def delete_group_gift_contribution(
     contribution_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> Response:
-    await organizer_remove_contribution(db, current_user, group_gift_id, contribution_id)
+    await organizer_remove_contribution(db, current_user, group_gift_id, contribution_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

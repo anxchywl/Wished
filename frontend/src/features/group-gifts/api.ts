@@ -24,6 +24,7 @@ export interface GroupGiftSummary {
   status: string;
   collection_type: string;
   collected_amount: string;
+  remaining_amount: string | null;
   percent_complete: number;
   contributor_count: number;
   is_organizer: boolean;
@@ -40,6 +41,7 @@ export interface GroupGiftResponse {
   payment_comment: string | null;
   total_amount: string | null;
   collected_amount: string;
+  remaining_amount: string | null;
   percent_complete: number;
   contributor_count: number;
   is_organizer: boolean;

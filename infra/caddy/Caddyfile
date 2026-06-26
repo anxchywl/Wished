@@ -2,7 +2,7 @@
     # route API requests to the backend container
     reverse_proxy /api/* backend:8000
 
-    handle_path /wished-assets-v2/* {
+    handle_path /wished-assets-v3/* {
         header Cache-Control "no-store, max-age=0"
         reverse_proxy host.docker.internal:3000
     }

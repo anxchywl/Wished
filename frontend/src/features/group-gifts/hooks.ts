@@ -102,14 +102,21 @@ export function useJoinGroupGiftMutation(wishId: string, groupGiftId: string) {
         (current) => {
           if (!current) return current;
           const nextCollected = current.collection_type === "commit"
-            ? String(Number(current.collected_amount) + Number(result.amount))
+            ? String(Math.min(
+                Number(current.total_amount ?? Number.MAX_SAFE_INTEGER),
+                Number(current.collected_amount) + Number(result.amount),
+              ))
             : current.collected_amount;
+          const nextRemaining = current.remaining_amount
+            ? String(Math.max(0, Number(current.remaining_amount) - Number(result.amount)))
+            : current.remaining_amount;
           const nextPercent = current.collection_type === "commit" && current.total_amount
             ? Math.min(100, Math.trunc((Number(nextCollected) / Number(current.total_amount)) * 100))
             : current.percent_complete;
           return {
             ...current,
             collected_amount: nextCollected,
+            remaining_amount: nextRemaining,
             percent_complete: nextPercent,
             is_contributor: true,
             my_contribution: result,

@@ -169,7 +169,7 @@ export function PublicWishlistNavigator({
     if (groupGiftActionMode === "purchase") return t("markGiftPurchased");
     if (groupGiftActionMode === "contribute") return t("makeContribution");
     if (groupGiftActionMode === "editPayment") return t("editPaymentDetails");
-    if (groupGiftActionMode === "cancel") return t("cancelGiftButton");
+    if (groupGiftActionMode === "cancel") return t("actionCancel");
     if (groupGiftActionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }

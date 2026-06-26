@@ -31,6 +31,13 @@ def _organizer_display_name(organizer: User | None) -> str | None:
     return f"@{organizer.username}" if organizer.username else organizer.first_name
 
 
+def _sum_committed(contributions: list[GroupGiftContribution]) -> Decimal:
+    return sum(
+        (c.amount for c in contributions if c.status != "cancelled"),
+        Decimal("0"),
+    )
+
+
 def _build_group_gift_response(
     wish: Wish,
     gift: GroupGift,
@@ -38,11 +45,22 @@ def _build_group_gift_response(
     non_cancelled: list[GroupGiftContribution],
     status_override: str | None = None,
 ) -> GroupGiftResponse:
-    collected_amount = sum(
+    raw_collected_amount = sum(
         (c.amount for c in non_cancelled if c.status in _CONFIRMED_STATUSES),
         Decimal("0"),
     )
+    committed_amount = _sum_committed(non_cancelled)
     total_amount = wish.price
+    collected_amount = (
+        min(raw_collected_amount, total_amount)
+        if total_amount and total_amount > 0
+        else raw_collected_amount
+    )
+    remaining_amount = (
+        max(total_amount - committed_amount, Decimal("0"))
+        if total_amount and total_amount > 0
+        else None
+    )
     percent_complete = (
         min(100, int(collected_amount / total_amount * 100))
         if total_amount and total_amount > 0
@@ -86,6 +104,7 @@ def _build_group_gift_response(
         payment_comment=gift.payment_comment if show_payment else None,
         total_amount=total_amount,
         collected_amount=collected_amount,
+        remaining_amount=remaining_amount,
         percent_complete=percent_complete,
         contributor_count=len(non_cancelled),
         is_organizer=is_organizer,
@@ -197,6 +216,7 @@ async def create_group_gift(
         payment_comment=gift.payment_comment,
         total_amount=wish.price,
         collected_amount=Decimal("0"),
+        remaining_amount=wish.price,
         percent_complete=0,
         contributor_count=0,
         is_organizer=True,
@@ -316,9 +336,35 @@ async def mark_group_gift_purchased(
             detail="Wish is not active",
         )
 
+    result = await db.execute(
+        select(Reservation)
+        .where(Reservation.wish_id == wish.id, Reservation.status == "active")
+        .with_for_update()
+    )
+    reservation = result.scalar_one_or_none()
+    if reservation and reservation.reserver_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is already reserved",
+        )
+
+    if reservation is None:
+        reservation = Reservation(
+            wish_id=wish.id,
+            reserver_user_id=current_user.id,
+            status="active",
+        )
+        db.add(reservation)
+
     gift.status = "completed"
-    # Wish stays active — only the wish owner can mark it fulfilled.
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wish is already reserved",
+        ) from None
     await db.refresh(gift)
 
     if redis is not None:
@@ -404,6 +450,28 @@ async def join_group_gift(
             detail="Already contributing to this gift",
         )
 
+    result = await db.execute(
+        select(GroupGiftContribution)
+        .where(
+            GroupGiftContribution.group_gift_id == group_gift_id,
+            GroupGiftContribution.status != "cancelled",
+        )
+        .with_for_update()
+    )
+    active_contributions = result.scalars().all()
+    total_amount = gift.wish.price
+    committed_amount = _sum_committed(active_contributions)
+    remaining_amount = (
+        max(total_amount - committed_amount, Decimal("0"))
+        if total_amount and total_amount > 0
+        else None
+    )
+    if remaining_amount is not None and payload.amount > remaining_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Contribution exceeds remaining amount: {remaining_amount}",
+        )
+
     initial_status = (
         "waiting_transfer" if gift.collection_type == "immediate" else "pledged"
     )
@@ -425,7 +493,7 @@ async def join_group_gift(
     await db.refresh(contrib)
 
     if gift.collection_type == "commit":
-        await _maybe_complete_gift(db, gift, redis)
+        await _maybe_notify_goal_reached(db, gift, redis, committed_before=committed_amount)
 
     return ContributionSummary(
         id=contrib.id,
@@ -517,6 +585,7 @@ async def confirm_transfer(
         )
 
     if confirmed:
+        collected_before = await _compute_collected(db, gift.id)
         contrib.status = "confirmed"
         await db.commit()
         await db.refresh(contrib)
@@ -529,8 +598,7 @@ async def confirm_transfer(
             else 0
         )
 
-        if total_amount and total_amount > 0 and collected_amount >= total_amount:
-            await _complete_gift(db, gift, redis)
+        await _maybe_notify_goal_reached(db, gift, redis, committed_before=collected_before)
 
         if redis:
             await publish_event(redis, "TRANSFER_CONFIRMED", {
@@ -613,6 +681,7 @@ async def organizer_remove_contribution(
     current_user: User,
     group_gift_id: UUID,
     contribution_id: UUID,
+    redis: Redis | None = None,
 ) -> None:
     result = await db.execute(
         select(GroupGiftContribution)
@@ -631,30 +700,27 @@ async def organizer_remove_contribution(
     if contrib.group_gift.organizer_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
 
-    if contrib.status in _TERMINAL_STATUSES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot remove a confirmed contribution",
-        )
-
     contrib.status = "cancelled"
     await db.commit()
 
     gift = contrib.group_gift
-    if gift.status == "completed":
-        collected_amount = await _compute_collected(db, gift.id)
-        total_amount = gift.wish.price
-        if not total_amount or collected_amount < total_amount:
+    collected_amount = await _compute_collected(db, gift.id)
+    total_amount = gift.wish.price
+    if not total_amount or collected_amount < total_amount:
+        if gift.status == "completed":
             gift.status = "active"
-            result = await db.execute(
-                select(GroupGiftContribution).where(
-                    GroupGiftContribution.group_gift_id == gift.id,
-                    GroupGiftContribution.status == "notified",
-                )
+        result = await db.execute(
+            select(GroupGiftContribution).where(
+                GroupGiftContribution.group_gift_id == gift.id,
+                GroupGiftContribution.status == "notified",
             )
-            for c in result.scalars().all():
-                c.status = "pledged"
-            await db.commit()
+        )
+        for c in result.scalars().all():
+            c.status = "pledged"
+        await db.commit()
+
+    if redis and gift.wish:
+        await cache_delete(redis, wishes_cache_key(gift.wish.wishlist_id))
 
 
 async def get_gift_members(
@@ -720,8 +786,8 @@ async def get_gift_members(
     return members
 
 
-async def _complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:
-    """transition gift to completed/notified state and publish event"""
+async def _notify_goal_reached(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:
+    """notify contributors that the target is reached without completing the gift"""
     if gift.status != "active":
         return
 
@@ -738,7 +804,6 @@ async def _complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis | None)
         Decimal("0"),
     )
 
-    gift.status = "completed"
     if gift.collection_type == "commit":
         for c in active_contributions:
             if c.status == "pledged":
@@ -762,8 +827,13 @@ async def _complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis | None)
         })
 
 
-async def _maybe_complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:
-    """check if gift has reached 100% and call _complete_gift if so"""
+async def _maybe_notify_goal_reached(
+    db: AsyncSession,
+    gift: GroupGift,
+    redis: Redis | None,
+    committed_before: Decimal,
+) -> None:
+    """notify once when the target is crossed; organizer completes explicitly"""
     if gift.status != "active":
         return
     if not gift.wish:
@@ -772,8 +842,8 @@ async def _maybe_complete_gift(db: AsyncSession, gift: GroupGift, redis: Redis |
     if not total_amount or total_amount <= 0:
         return
     collected_amount = await _compute_collected(db, gift.id)
-    if collected_amount >= total_amount:
-        await _complete_gift(db, gift, redis)
+    if committed_before < total_amount <= collected_amount:
+        await _notify_goal_reached(db, gift, redis)
 
 
 async def _compute_collected(db: AsyncSession, group_gift_id: UUID) -> Decimal:

@@ -96,6 +96,7 @@ class GroupGiftResponse(BaseModel):
     payment_comment: str | None
     total_amount: Decimal | None
     collected_amount: Decimal
+    remaining_amount: Decimal | None
     percent_complete: int
     contributor_count: int
     is_organizer: bool
@@ -111,6 +112,7 @@ class GroupGiftSummary(BaseModel):
     status: str
     collection_type: str
     collected_amount: Decimal
+    remaining_amount: Decimal | None
     percent_complete: int
     contributor_count: int
     is_organizer: bool

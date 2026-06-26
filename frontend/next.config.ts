@@ -5,7 +5,7 @@ const allowedDevOrigins = process.env.NEXT_PUBLIC_TELEGRAM_DEV_ORIGINS
   : [];
 
 const nextConfig: NextConfig = {
-  assetPrefix: "/wished-assets-v2",
+  assetPrefix: "/wished-assets-v3",
   devIndicators: false,
   output: "standalone",
   reactStrictMode: true,
