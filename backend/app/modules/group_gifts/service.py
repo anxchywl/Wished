@@ -256,9 +256,6 @@ async def get_group_gift(
     if not wish:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
 
-    if wish.wishlist.owner_user_id != current_user.id and wish.wishlist.visibility != "public":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
-
     result = await db.execute(
         select(GroupGift)
         .options(
@@ -269,14 +266,21 @@ async def get_group_gift(
         .where(GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed"]))
     )
     gift = result.scalar_one_or_none()
+
+    is_owner = wish.wishlist.owner_user_id == current_user.id
+    is_organizer = gift and current_user.id == gift.organizer_user_id
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"] if gift else []
+    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
+    is_participant = is_organizer or is_contributor
+
+    # participants always have access regardless of wishlist visibility
+    if not is_owner and not is_participant and wish.wishlist.visibility != "public":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Wish not found")
+
     if not gift:
         return None
 
-    is_owner = wish.wishlist.owner_user_id == current_user.id
-    is_organizer = current_user.id == gift.organizer_user_id
-    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
-    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
-    if is_owner and not is_organizer and not is_contributor:
+    if is_owner and not is_participant:
         visibility = getattr(current_user, "group_gift_visibility", "hide")
         if visibility == "hide":
             return None

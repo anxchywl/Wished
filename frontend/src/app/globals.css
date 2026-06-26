@@ -1644,7 +1644,7 @@ html[data-theme="dark"] .privacy-option-active {
 
 .public-nav-viewport {
   position: relative;
-  height: min(72dvh, 620px);
+  max-height: min(72dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 2px 8px;
@@ -1654,7 +1654,6 @@ html[data-theme="dark"] .privacy-option-active {
 }
 
 .public-nav-frame {
-  min-height: 100%;
   transform-origin: center center;
   will-change: transform, opacity, filter;
 }

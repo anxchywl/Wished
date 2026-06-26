@@ -30,6 +30,7 @@ export type BookedWishContributorSummary = {
 
 export type BookedWishGroupGiftDetail = {
   group_gift_id: string;
+  status: string;
   organizer_first_name: string | null;
   organizer_username: string | null;
   collected_amount: string;

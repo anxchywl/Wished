@@ -31,6 +31,7 @@ class WishReservationStatusResponse(BaseModel):
 class BookedWishGroupGiftDetail(BaseModel):
     """group gift details shown to organizer and contributors on booked wish"""
     group_gift_id: UUID
+    status: str
     organizer_first_name: str | None
     organizer_username: str | None
     collected_amount: str

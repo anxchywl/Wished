@@ -168,10 +168,11 @@ export function PublicWishlistNavigator({
   }
 
   function groupGiftTitle() {
-    if (groupGiftActionMode === "purchase") return t("groupGift");
+    if (groupGiftActionMode === "purchase") return "";
     if (groupGiftActionMode === "contribute") return t("makeContribution");
     if (groupGiftActionMode === "editPayment") return t("editPaymentDetails");
-    if (groupGiftActionMode === "cancel") return t("groupGift");
+    if (groupGiftActionMode === "cancel") return "";
+    if (groupGiftActionMode === "unbook") return "";
     if (groupGiftActionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }

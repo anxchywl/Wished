@@ -480,34 +480,65 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
                 ) : null}
               </div>
 
-              <div className="flex flex-col gap-2">
-                <p className="text-xs text-muted text-center">{t("groupGiftUnbookInfo")}</p>
-                {gg.participant_count > 1 ? (
-                  <p className="text-xs font-semibold text-center text-foreground">
-                    {t("approvedOf")
-                      .replace("{approved}", String(gg.unbook_approval_count))
-                      .replace("{total}", String(gg.participant_count))}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
-                    gg.my_unbook_approval ? "bg-primary text-white" : "theme-confirm-danger"
-                  }`}
-                  disabled={approvalMutation.isPending}
-                  onClick={() =>
-                    approvalMutation.mutate("unbook", {
-                      onSuccess: (result) => { if (result === null) handleClose(); },
-                    })
-                  }
-                >
-                  {approvalMutation.isPending
-                    ? t("saving")
-                    : gg.my_unbook_approval
-                    ? t("cancelButton")
-                    : t("unbookApproval")}
-                </button>
-              </div>
+              {gg.status === "completed" ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted text-center">{t("groupGiftUnbookInfo")}</p>
+                  {gg.participant_count > 1 ? (
+                    <p className="text-xs font-semibold text-center text-foreground">
+                      {t("approvedOf")
+                        .replace("{approved}", String(gg.unbook_approval_count))
+                        .replace("{total}", String(gg.participant_count))}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
+                      gg.my_unbook_approval ? "bg-primary text-white" : "theme-confirm-danger"
+                    }`}
+                    disabled={approvalMutation.isPending}
+                    onClick={() =>
+                      approvalMutation.mutate("unbook", {
+                        onSuccess: (result) => { if (result === null) handleClose(); },
+                      })
+                    }
+                  >
+                    {approvalMutation.isPending
+                      ? t("saving")
+                      : gg.my_unbook_approval
+                      ? t("cancelButton")
+                      : t("unbookApproval")}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted text-center">{t("groupGiftCancelInfo")}</p>
+                  {gg.participant_count > 1 ? (
+                    <p className="text-xs font-semibold text-center text-foreground">
+                      {t("approvedOf")
+                        .replace("{approved}", String(gg.cancel_approval_count))
+                        .replace("{total}", String(gg.participant_count))}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
+                      gg.my_cancel_approval ? "bg-primary text-white" : "theme-confirm-danger"
+                    }`}
+                    disabled={approvalMutation.isPending}
+                    onClick={() =>
+                      approvalMutation.mutate("cancel", {
+                        onSuccess: (result) => { if (result === null) handleClose(); },
+                      })
+                    }
+                  >
+                    {approvalMutation.isPending
+                      ? t("saving")
+                      : gg.my_cancel_approval
+                      ? t("cancelButton")
+                      : t("cancelApproval")}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <button

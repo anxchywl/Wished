@@ -259,7 +259,7 @@ async def list_my_booked_wishes(
             selectinload(GroupGift.approvals),
         )
         .where(
-            GroupGift.status == "completed",
+            GroupGift.status.in_(["active", "completed"]),
             Wishlist.owner_user_id != current_user.id,
         )
     )
@@ -359,6 +359,7 @@ async def list_my_booked_wishes(
 
         gift_detail = BookedWishGroupGiftDetail(
             group_gift_id=gift.id,
+            status=gift.status,
             organizer_first_name=organizer.first_name if organizer else None,
             organizer_username=organizer.username if organizer else None,
             collected_amount=str(collected),

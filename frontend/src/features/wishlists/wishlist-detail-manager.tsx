@@ -637,14 +637,20 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
   const isBooked = reservationStatus.data?.is_reserved ?? false;
   const isMine = reservationStatus.data?.is_mine ?? false;
   const ownerBookingVisibility = reservationStatus.data?.owner_booking_visibility ?? "hide";
-  const showBooked = !isCompleted && isBooked && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed");
+  const hasActiveGroupGift = wish.group_gift?.status === "active";
+  // owner sees group gift as crowd icon unless visibility is hidden, then falls back to lock
+  const showGroupGift = !isCompleted && hasActiveGroupGift && ownerBookingVisibility !== "hide";
+  const showBooked = !isCompleted && !showGroupGift && (
+    (isBooked && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed")) ||
+    (hasActiveGroupGift && ownerBookingVisibility === "hide")
+  );
   return (
     <div
       onClick={onClick}
       onContextMenu={(event) => {
         if (isOwner) event.preventDefault();
       }}
-      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"}`}
+      className={`draggable-row pressable-action flex items-center justify-between py-3 ${isCompleted || showBooked || showGroupGift ? "opacity-50" : ""} ${isOwner ? "cursor-grab" : "cursor-pointer"}`}
     >
       <div className="flex items-center gap-3 pointer-events-none min-w-0">
         <div className="relative w-12 h-12 flex-shrink-0 overflow-hidden rounded-xl">
@@ -666,6 +672,13 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
                 <rect x="6" y="10" width="12" height="9" rx="2" />
                 <path strokeLinecap="round" d="M9 10V7a3 3 0 0 1 6 0v3" />
+              </svg>
+            </div>
+          )}
+          {showGroupGift && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-700/35">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
               </svg>
             </div>
           )}
@@ -793,6 +806,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     : groupGiftActionMode === "editPayment"
     ? t("editPaymentDetails")
     : groupGiftActionMode === "cancel"
+    ? ""
+    : groupGiftActionMode === "unbook"
     ? ""
     : groupGiftActionMode === "removeContribution"
     ? t("removeContribution")
