@@ -89,6 +89,7 @@ export function ViewGroupGiftContent({
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
   const isMounted = useRef(false);
+  const giftWasLoaded = useRef(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -96,6 +97,15 @@ export function ViewGroupGiftContent({
 
   const giftQuery = useGroupGiftQuery(wishId, shareToken);
   const gift = giftQuery.data ?? null;
+
+  // Auto-close for all users when the gift is cancelled unanimously (polled null after being active)
+  useEffect(() => {
+    if (gift) { giftWasLoaded.current = true; return; }
+    if (giftWasLoaded.current && giftQuery.data === null && !giftQuery.isPending) {
+      onClose();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gift, giftQuery.isPending]);
 
   const cancelMutation = useCancelGroupGiftMutation(wishId, gift?.id ?? "");
   const approvalMutation = useToggleGroupGiftApprovalMutation(wishId, gift?.id ?? "");
@@ -519,7 +529,7 @@ export function ViewGroupGiftContent({
 
   function renderCancelButton(): ReactNode {
     if (!gift || gift.status !== "active") return null;
-    if (!gift.is_organizer && !gift.is_contributor) return null;
+    if (!gift.is_contributor || gift.is_organizer) return null;
     const myApproval = gift.my_cancel_approval ?? false;
     return (
       <div className="pt-2">
@@ -952,7 +962,7 @@ export function ViewGroupGiftContent({
             {t("makeContribution")}
           </button>
         ) : null}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             className="h-11 rounded-xl bg-green-500/10 px-2 inline-flex items-center justify-center"
@@ -966,6 +976,20 @@ export function ViewGroupGiftContent({
             onClick={() => changeActionMode("editPayment")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionEdit")}</span>
+          </button>
+          <button
+            type="button"
+            className={`h-11 rounded-xl px-2 inline-flex flex-col items-center justify-center gap-0.5 ${
+              gift?.my_cancel_approval ? "bg-red-500/20" : "bg-red-500/10"
+            }`}
+            onClick={() => changeActionMode("cancel")}
+          >
+            <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
+            {(gift?.participant_count ?? 0) > 1 ? (
+              <span className="text-[9px] text-red-400">
+                {gift?.cancel_approval_count}/{gift?.participant_count}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

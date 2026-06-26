@@ -322,11 +322,6 @@ function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
-          {item.is_group_gift ? (
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-              {t("groupGiftBadge")}
-            </span>
-          ) : null}
         </div>
         <span className="text-xs text-muted block mt-0.5 line-clamp-1">
           {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
@@ -535,7 +530,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
       >
         <div className="modal-handle" />
         <div className={`flex items-center justify-between mb-4 ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
-          {view === "viewGroupGift" ? (
+          {view === "viewGroupGift" && groupGiftActionMode === "overview" ? (
             <button
               type="button"
               className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
@@ -551,11 +546,6 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
           )}
           <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2 flex items-center gap-2">
             {modalTitle}
-            {view === "wish" && item.is_group_gift ? (
-              <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                {t("groupGiftBadge")}
-              </span>
-            ) : null}
           </h3>
           <span className="w-10" />
         </div>

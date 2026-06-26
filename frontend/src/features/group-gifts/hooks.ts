@@ -79,11 +79,29 @@ export function useToggleGroupGiftApprovalMutation(wishId: string, groupGiftId: 
   return useMutation({
     mutationFn: (approvalType: "cancel" | "unbook") =>
       toggleGroupGiftApproval(accessToken, groupGiftId, approvalType),
+    onMutate: async (approvalType: "cancel" | "unbook") => {
+      await queryClient.cancelQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
+      const previous = queryClient.getQueryData<GroupGiftResponse | null>(groupGiftQueryKeys.gift(wishId));
+      if (previous) {
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), {
+          ...previous,
+          ...(approvalType === "cancel"
+            ? { my_cancel_approval: !previous.my_cancel_approval }
+            : { my_unbook_approval: !previous.my_unbook_approval }),
+        });
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), context.previous);
+      }
+    },
     onSuccess: (result) => {
       if (result === null) {
-        // cancelled unanimously
         queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
         queryClient.invalidateQueries({ queryKey: ["wishes"] });
+        queryClient.invalidateQueries({ queryKey: ["reservations"] });
       } else {
         queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
       }
