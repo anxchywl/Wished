@@ -730,6 +730,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const reservationStatus = useReservationStatusQuery(wish?.id ?? "");
   const liveGroupGift = useGroupGiftQuery(wish?.id ?? "");
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const profileQuery = useProfileQuery(accessToken);
   const createReservation = useCreateReservationMutation(wishlistId);
   const cancelReservation = useCancelReservationMutation(wishlistId);
   const removeReservation = useRemoveWishReservationMutation(wishlistId);
@@ -768,6 +770,10 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const isCompleted = wish.status === "completed";
   const hasActiveGroupGift =
     wish.group_gift?.status === "active" || reservStatus?.has_active_group_gift === true;
+  const ownerGroupGiftVisibility = profileQuery.data?.privacy?.group_gift_visibility ?? "hide";
+  const visibleGroupGift = isOwner && ownerGroupGiftVisibility === "hide"
+    ? null
+    : (liveGroupGift.data ?? wish.group_gift);
 
   // booking actions available to non-owner viewer
   function handleBookToggle() {
@@ -899,7 +905,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         <div
           className={`modal-footer-transition ${
             !removeBookingConfirming
-              ? "opacity-100 max-h-[620px] scale-100"
+              ? "opacity-100 max-h-[2000px] scale-100"
               : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
           }`}
         >
@@ -1006,8 +1012,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
 
           {/* Slot 2 — group gift progress row (use live polled data for real-time updates) */}
-          {(liveGroupGift.data ?? wish!.group_gift) ? (() => {
-            const gg = liveGroupGift.data ?? wish!.group_gift!;
+          {visibleGroupGift ? (() => {
+            const gg = visibleGroupGift;
             return (
               <button
                 type="button"
@@ -1392,7 +1398,7 @@ function EditWishlistModal({
           <div
             className={`modal-footer-transition ${
               !deleteConfirming
-                ? "opacity-100 max-h-[640px] scale-100"
+                ? "opacity-100 max-h-[2000px] scale-100"
                 : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
             }`}
           >
@@ -2148,7 +2154,7 @@ function EditWishModal({
           <div
             className={`modal-footer-transition ${
               !deleteConfirming
-                ? "opacity-100 max-h-[760px] scale-100"
+                ? "opacity-100 max-h-[2000px] scale-100"
                 : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
             }`}
           >

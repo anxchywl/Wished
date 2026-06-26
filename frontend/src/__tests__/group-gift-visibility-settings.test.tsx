@@ -74,10 +74,7 @@ describe("BookingVisibilityHeaderButton", () => {
     expect(groupGiftOption).not.toBeNull();
     fireEvent.click(groupGiftOption!);
 
-    expect(mutate).toHaveBeenCalledWith(
-      { group_gift_visibility: "names" },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
+    expect(mutate).toHaveBeenCalledWith({ group_gift_visibility: "names" });
   });
 
   it("keeps booking and group gift controls independent", () => {
@@ -93,15 +90,7 @@ describe("BookingVisibilityHeaderButton", () => {
     fireEvent.click(bookingHide!);
     fireEvent.click(groupGiftHide!);
 
-    expect(mutate).toHaveBeenNthCalledWith(
-      1,
-      { booking_visibility: "hide" },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
-    expect(mutate).toHaveBeenNthCalledWith(
-      2,
-      { group_gift_visibility: "hide" },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
+    expect(mutate).toHaveBeenNthCalledWith(1, { booking_visibility: "hide" });
+    expect(mutate).toHaveBeenNthCalledWith(2, { group_gift_visibility: "hide" });
   });
 });
