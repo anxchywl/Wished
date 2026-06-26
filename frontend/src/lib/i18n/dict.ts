@@ -309,6 +309,9 @@ export const dict = {
     groupGiftCollectionStatus: "Collection status",
     groupGiftUnbookInfo: "All participants must approve to unbook. This will restore the wish to available.",
     groupGiftCancelInfo: "All participants must approve to cancel the group gift.",
+    undoCancelApproval: "Cancel vote",
+    undoCancelApprovalInfo: "You voted to cancel this gift. Tap Undo to withdraw your vote.",
+    undoButton: "Undo",
     groupGiftBookedCompleted: "Completed",
   },
   ru: {
@@ -620,6 +623,9 @@ export const dict = {
     groupGiftCollectionStatus: "Статус сбора",
     groupGiftUnbookInfo: "Все участники должны подтвердить отмену брони. Желание снова станет доступным.",
     groupGiftCancelInfo: "Все участники должны подтвердить отмену группового подарка.",
+    undoCancelApproval: "Отозвать голос",
+    undoCancelApprovalInfo: "Вы проголосовали за отмену. Нажмите «Отменить», чтобы отозвать свой голос.",
+    undoButton: "Отменить",
     groupGiftBookedCompleted: "Завершён",
   },
   kz: {
@@ -931,6 +937,9 @@ export const dict = {
     groupGiftCollectionStatus: "Жинау мәртебесі",
     groupGiftUnbookInfo: "Бронды болдырмау үшін барлық қатысушылар мақұлдауы керек. Тілек қайтадан қолжетімді болады.",
     groupGiftCancelInfo: "Топтық сыйлықты болдырмау үшін барлық қатысушылар мақұлдауы керек.",
+    undoCancelApproval: "Дауысты қайтарып алу",
+    undoCancelApprovalInfo: "Сіз болдырмауға дауыс бердіңіз. Дауысты қайтарып алу үшін «Болдырма» түймесін басыңыз.",
+    undoButton: "Болдырма",
     groupGiftBookedCompleted: "Аяқталды",
   }
 };

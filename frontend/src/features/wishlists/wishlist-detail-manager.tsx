@@ -815,6 +815,8 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
     ? ""
     : groupGiftActionMode === "unbook"
     ? ""
+    : groupGiftActionMode === "leave"
+    ? ""
     : groupGiftActionMode === "removeContribution"
     ? t("removeContribution")
     : t("groupGift");
@@ -1070,7 +1072,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       onClick={handleClose}
     >
       <div
-        className={`modal-sheet ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
+        className={`modal-sheet modal-sheet-nav-host ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />

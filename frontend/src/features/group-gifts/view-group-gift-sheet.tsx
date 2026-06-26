@@ -34,7 +34,7 @@ type ContentProps = Props & {
   resetTrigger?: number;
 };
 
-export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel" | "removeContribution" | "unbook";
+export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel" | "removeContribution" | "unbook" | "leave";
 
 function stripTrailingZeros(amount: string): string {
   return amount.replace(/\.00$/, "");
@@ -109,7 +109,6 @@ export function ViewGroupGiftContent({
   const membersQuery = useGiftMembersQuery(gift?.id, canLoadMembers);
 
   const [joinAmount, setJoinAmount] = useState("");
-  const [leaveConfirming, setLeaveConfirming] = useState(false);
   const [phoneCopied, setPhoneCopied] = useState(false);
   const [internalActionMode, setInternalActionMode] = useState<ActionMode>("overview");
   const [removeContribution, setRemoveContribution] = useState<{
@@ -272,8 +271,7 @@ export function ViewGroupGiftContent({
   }
 
   function handleLeave() {
-    if (!leaveConfirming) { setLeaveConfirming(true); return; }
-    leaveMutation.mutate(undefined, { onSuccess: () => setLeaveConfirming(false) });
+    leaveMutation.mutate(undefined, { onSuccess: () => changeActionMode("overview") });
   }
 
   function handleJoin() {
@@ -361,6 +359,7 @@ export function ViewGroupGiftContent({
               </div>
 
               {renderMembers()}
+              {renderCancelButton()}
             </div>
           </div>
 
@@ -515,26 +514,33 @@ export function ViewGroupGiftContent({
   }
 
   function renderCancelApprovalToggle(): ReactNode {
-    if (!gift || gift.status !== "active" || gift.is_organizer) return null;
-    if (!gift.is_contributor) return null;
+    return null;
+  }
+
+  function renderCancelButton(): ReactNode {
+    if (!gift || gift.status !== "active") return null;
+    if (!gift.is_organizer && !gift.is_contributor) return null;
+    const myApproval = gift.my_cancel_approval ?? false;
     return (
-      <button
-        type="button"
-        className={`w-full h-10 rounded-xl text-sm font-medium transition-colors ${
-          gift.my_cancel_approval
-            ? "bg-red-500/20 text-red-600"
-            : "bg-muted/10 text-muted"
-        }`}
-        disabled={approvalMutation.isPending}
-        onClick={() => changeActionMode("cancel")}
-      >
-        {t("actionCancel")}
-        {(gift.participant_count ?? 0) > 1 ? (
-          <span className="ml-2 text-xs opacity-70">
-            {gift.cancel_approval_count}/{gift.participant_count}
-          </span>
-        ) : null}
-      </button>
+      <div className="pt-2">
+        <button
+          type="button"
+          className={`w-full h-10 rounded-xl text-sm font-medium transition-colors ${
+            myApproval
+              ? "bg-red-500/20 text-red-600"
+              : "bg-muted/10 text-muted"
+          }`}
+          disabled={approvalMutation.isPending}
+          onClick={() => changeActionMode("cancel")}
+        >
+          {myApproval ? t("undoCancelApproval") : t("actionCancel")}
+          {(gift.participant_count ?? 0) > 1 ? (
+            <span className="ml-2 text-xs opacity-70">
+              {gift.cancel_approval_count}/{gift.participant_count}
+            </span>
+          ) : null}
+        </button>
+      </div>
     );
   }
 
@@ -625,7 +631,9 @@ export function ViewGroupGiftContent({
       const myApproval = gift.my_cancel_approval ?? false;
       return (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted text-center">{t("groupGiftCancelInfo")}</p>
+          <p className="text-xs text-muted text-center">
+            {myApproval ? t("undoCancelApprovalInfo") : t("groupGiftCancelInfo")}
+          </p>
           {participantCount > 1 ? (
             <p className="text-xs font-semibold text-center text-foreground">
               {t("approvedOf")
@@ -639,20 +647,20 @@ export function ViewGroupGiftContent({
               className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
               onClick={() => changeActionMode("overview")}
             >
-              {t("cancelButton")}
+              {t("back")}
             </button>
             <button
               type="button"
               className={`flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60 ${
-                myApproval ? "bg-red-500 text-white" : "theme-confirm-danger"
+                myApproval ? "bg-primary text-white" : "theme-confirm-danger"
               }`}
               disabled={approvalMutation.isPending}
               onClick={handleCancelGift}
             >
               {approvalMutation.isPending
-                ? t("deleting")
+                ? t("saving")
                 : myApproval
-                ? t("cancelButton")
+                ? t("undoButton")
                 : t("doButton")}
             </button>
           </div>
@@ -699,6 +707,30 @@ export function ViewGroupGiftContent({
         </div>
       );
     }
+    if (mode === "leave") {
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted text-center">{t("confirmLeave")}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              onClick={() => changeActionMode("overview")}
+            >
+              {t("cancelButton")}
+            </button>
+            <button
+              type="button"
+              className="theme-confirm-danger flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60"
+              disabled={leaveMutation.isPending}
+              onClick={handleLeave}
+            >
+              {leaveMutation.isPending ? t("deleting") : t("leaveGiftButton")}
+            </button>
+          </div>
+        </div>
+      );
+    }
     if (mode === "removeContribution") {
       return (
         <div className="flex flex-col gap-2">
@@ -740,51 +772,13 @@ export function ViewGroupGiftContent({
 
   function renderLeaveButtons() {
     return (
-      <>
-        <div
-          className={`modal-footer-transition ${
-            leaveConfirming
-              ? "opacity-100 max-h-28 scale-100"
-              : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
-          }`}
-        >
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-muted text-center">{t("confirmLeave")}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="flex-1 h-11 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-                onClick={() => setLeaveConfirming(false)}
-              >
-                {t("cancelButton")}
-              </button>
-              <button
-                type="button"
-                className="theme-confirm-danger flex-1 h-11 rounded-xl text-sm font-bold disabled:opacity-60"
-                disabled={leaveMutation.isPending}
-                onClick={handleLeave}
-              >
-                {leaveMutation.isPending ? t("deleting") : t("leaveGiftButton")}
-              </button>
-            </div>
-          </div>
-        </div>
-        <div
-          className={`modal-footer-transition ${
-            !leaveConfirming
-              ? "opacity-100 max-h-16 scale-100"
-              : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
-          }`}
-        >
-          <button
-            type="button"
-            className="theme-press-danger w-full h-11 rounded-xl text-sm font-medium"
-            onClick={() => setLeaveConfirming(true)}
-          >
-            {t("leaveGiftButton")}
-          </button>
-        </div>
-      </>
+      <button
+        type="button"
+        className="theme-press-danger w-full h-11 rounded-xl text-sm font-medium"
+        onClick={() => changeActionMode("leave")}
+      >
+        {t("leaveGiftButton")}
+      </button>
     );
   }
 
@@ -958,7 +952,7 @@ export function ViewGroupGiftContent({
             {t("makeContribution")}
           </button>
         ) : null}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             className="h-11 rounded-xl bg-green-500/10 px-2 inline-flex items-center justify-center"
@@ -972,20 +966,6 @@ export function ViewGroupGiftContent({
             onClick={() => changeActionMode("editPayment")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-foreground">{t("actionEdit")}</span>
-          </button>
-          <button
-            type="button"
-            className={`h-11 rounded-xl px-2 inline-flex flex-col items-center justify-center gap-0.5 ${
-              gift?.my_cancel_approval ? "bg-red-500/20" : "bg-red-500/10"
-            }`}
-            onClick={() => changeActionMode("cancel")}
-          >
-            <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
-            {(gift?.participant_count ?? 0) > 1 ? (
-              <span className="text-[9px] text-red-400">
-                {gift?.cancel_approval_count}/{gift?.participant_count}
-              </span>
-            ) : null}
           </button>
         </div>
       </div>

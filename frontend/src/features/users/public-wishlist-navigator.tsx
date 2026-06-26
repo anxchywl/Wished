@@ -174,6 +174,7 @@ export function PublicWishlistNavigator({
     if (groupGiftActionMode === "editPayment") return t("editPaymentDetails");
     if (groupGiftActionMode === "cancel") return "";
     if (groupGiftActionMode === "unbook") return "";
+    if (groupGiftActionMode === "leave") return "";
     if (groupGiftActionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }

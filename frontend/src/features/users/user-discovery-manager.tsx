@@ -8,7 +8,8 @@ import { PublicWishlistNavigator } from "@/features/users/public-wishlist-naviga
 import { UserAvatar } from "@/features/users/user-avatar";
 import { useFollowingQuery } from "@/features/users/hooks";
 import { useBookedWishesQuery, useCancelReservationMutation } from "@/features/reservations/hooks";
-import { useToggleGroupGiftApprovalMutation } from "@/features/group-gifts/hooks";
+import { useGroupGiftQuery } from "@/features/group-gifts/hooks";
+import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { useProfileQuery, useUpdatePrivacyMutation } from "@/features/profile/hooks";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { logStartup } from "@/lib/debug/startup-log";
@@ -343,12 +344,6 @@ type BookedWishModalProps = {
   onClose: () => void;
 };
 
-function formatGiftAmount(amount: string | null | undefined): string {
-  if (!amount) return "";
-  const num = Number(amount);
-  if (!Number.isFinite(num)) return amount;
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(num);
-}
 
 /**
  * booked wish details
@@ -356,8 +351,13 @@ function formatGiftAmount(amount: string | null | undefined): string {
 function BookedWishModal({ item, onClose }: BookedWishModalProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
+  const [view, setView] = useState<"wish" | "viewGroupGift">("wish");
+  const [previousView, setPreviousView] = useState<"wish" | "viewGroupGift" | null>(null);
+  const [navDirection, setNavDirection] = useState<"forward" | "back">("forward");
+  const [groupGiftActionMode, setGroupGiftActionMode] = useState<ActionMode>("overview");
+  const [groupGiftFocusMode, setGroupGiftFocusMode] = useState(false);
   const cancelMutation = useCancelReservationMutation(item.wishlist_id);
-  const approvalMutation = useToggleGroupGiftApprovalMutation(item.wish_id, item.group_gift?.group_gift_id ?? "");
+  const liveGroupGift = useGroupGiftQuery(item.wish_id);
 
   useEffect(() => {
     requestAnimationFrame(() => setActive(true));
@@ -368,6 +368,19 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     window.setTimeout(onClose, 340);
   }
 
+  function openGroupGift() {
+    setGroupGiftActionMode("overview");
+    setNavDirection("forward");
+    setPreviousView(view);
+    setView("viewGroupGift");
+  }
+
+  function closeGroupGift() {
+    setNavDirection("back");
+    setPreviousView(view);
+    setView("wish");
+  }
+
   function fmtPrice(price: string) {
     const num = parseFloat(price);
     return isNaN(num) ? price.replace(".", ",") : (Number.isInteger(num) ? String(num) : num.toFixed(2).replace(".", ","));
@@ -376,24 +389,19 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     ? `${t("unbookWish")} · ${fmtPrice(item.wish_price)} ${item.wish_currency ?? ""}`.trim()
     : t("unbookWish");
 
-  const gg = item.group_gift;
-  const organizerName = gg
-    ? (gg.organizer_first_name || (gg.organizer_username ? `@${gg.organizer_username}` : null))
-    : null;
+  const groupGiftTitle = groupGiftActionMode === "contribute"
+    ? t("makeContribution")
+    : groupGiftActionMode === "editPayment"
+    ? t("editPaymentDetails")
+    : groupGiftActionMode === "removeContribution"
+    ? t("removeContribution")
+    : (groupGiftActionMode === "cancel" || groupGiftActionMode === "purchase" || groupGiftActionMode === "unbook" || groupGiftActionMode === "leave")
+    ? ""
+    : t("groupGift");
 
-  return (
-    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
-      <div className={`modal-sheet ${active ? "visible" : ""}`} onClick={(e) => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <h3 className="modal-title font-bold text-lg text-center">{item.wish_title}</h3>
-          {item.is_group_gift ? (
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-              {t("groupGiftBadge")}
-            </span>
-          ) : null}
-        </div>
-
+  function renderWishView() {
+    return (
+      <div className="public-nav-content">
         <section className="flex flex-col items-center gap-3">
           <div className="public-wish-gallery relative">
             <WishImageThumb
@@ -420,115 +428,48 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
         </section>
 
         {item.wish_description ? (
-          <section className="px-4 mt-3">
+          <section className="mt-3">
             <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
               {item.wish_description}
             </p>
           </section>
         ) : null}
 
-        <section className="flex flex-col gap-2 w-full mt-3 px-4">
+        <section className="flex flex-col gap-2 w-full mt-3">
           <p className="text-xs text-muted text-center mb-1">
             {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
           </p>
 
-          {item.is_group_gift && gg ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5 bg-muted/5 rounded-xl p-3 border border-border text-sm">
-                {organizerName ? (
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="text-xs text-muted">{t("groupGiftOrganizer")}</span>
-                    <span className="font-semibold text-foreground">{organizerName}</span>
-                  </div>
-                ) : null}
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-xs text-muted">{t("groupGiftTotalCollected")}</span>
-                  <span className="font-semibold text-foreground">
-                    {formatGiftAmount(gg.collected_amount)}
-                    {gg.total_amount ? ` / ${formatGiftAmount(gg.total_amount)}` : ""}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-xs text-muted">{t("contributors")}</span>
-                  <span className="font-semibold text-foreground">{gg.participant_count}</span>
-                </div>
-                {gg.contributors.length > 0 ? (
-                  <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-border">
-                    {gg.contributors.map((c, i) => {
-                      const name = c.first_name || (c.username ? `@${c.username}` : t("unknownUser") ?? "—");
-                      return (
-                        <div key={i} className="flex justify-between items-center gap-2">
-                          <span className="text-xs text-foreground truncate">{name}</span>
-                          {c.amount ? (
-                            <span className="text-xs font-semibold text-foreground shrink-0">{formatGiftAmount(c.amount)}</span>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-
-              {gg.status === "completed" ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs text-muted text-center">{t("groupGiftUnbookInfo")}</p>
-                  {gg.participant_count > 1 ? (
-                    <p className="text-xs font-semibold text-center text-foreground">
-                      {t("approvedOf")
-                        .replace("{approved}", String(gg.unbook_approval_count))
-                        .replace("{total}", String(gg.participant_count))}
-                    </p>
-                  ) : null}
+          {item.is_group_gift ? (
+            <>
+              {(liveGroupGift.data ?? item.group_gift) ? (() => {
+                const gg = liveGroupGift.data ?? item.group_gift!;
+                return (
                   <button
                     type="button"
-                    className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
-                      gg.my_unbook_approval ? "bg-primary text-white" : "theme-confirm-danger"
-                    }`}
-                    disabled={approvalMutation.isPending}
-                    onClick={() =>
-                      approvalMutation.mutate("unbook", {
-                        onSuccess: (result) => { if (result === null) handleClose(); },
-                      })
-                    }
+                    className="w-full text-left rounded-xl border border-border bg-muted/5 px-3 py-2.5 flex flex-col gap-1.5"
+                    onClick={openGroupGift}
                   >
-                    {approvalMutation.isPending
-                      ? t("saving")
-                      : gg.my_unbook_approval
-                      ? t("cancelButton")
-                      : t("unbookApproval")}
+                    <div className="flex justify-between items-center text-xs text-muted">
+                      <span>{t("groupGift")}</span>
+                      <span>
+                        {gg.status === "cancelled"
+                          ? t("giftCancelled")
+                          : gg.status === "completed" || gg.percent_complete >= 100
+                          ? t("giftComplete")
+                          : t("giftProgress").replace("{percent}", String(gg.percent_complete))}
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-muted/20 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                        style={{ width: `${Math.min(100, gg.percent_complete)}%` }}
+                      />
+                    </div>
                   </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs text-muted text-center">{t("groupGiftCancelInfo")}</p>
-                  {gg.participant_count > 1 ? (
-                    <p className="text-xs font-semibold text-center text-foreground">
-                      {t("approvedOf")
-                        .replace("{approved}", String(gg.cancel_approval_count))
-                        .replace("{total}", String(gg.participant_count))}
-                    </p>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
-                      gg.my_cancel_approval ? "bg-primary text-white" : "theme-confirm-danger"
-                    }`}
-                    disabled={approvalMutation.isPending}
-                    onClick={() =>
-                      approvalMutation.mutate("cancel", {
-                        onSuccess: (result) => { if (result === null) handleClose(); },
-                      })
-                    }
-                  >
-                    {approvalMutation.isPending
-                      ? t("saving")
-                      : gg.my_cancel_approval
-                      ? t("cancelButton")
-                      : t("cancelApproval")}
-                  </button>
-                </div>
-              )}
-            </div>
+                );
+              })() : null}
+            </>
           ) : (
             <button
               type="button"
@@ -561,6 +502,78 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
             </a>
           ) : null}
         </section>
+      </div>
+    );
+  }
+
+  function renderGroupGiftView() {
+    return (
+      <div className="public-nav-content px-1 pb-1">
+        <ViewGroupGiftContent
+          wishId={item.wish_id}
+          showTitle={false}
+          actionMode={groupGiftActionMode}
+          onClose={closeGroupGift}
+          onActionModeChange={setGroupGiftActionMode}
+          onFocusModeChange={setGroupGiftFocusMode}
+        />
+      </div>
+    );
+  }
+
+  function renderView(v: "wish" | "viewGroupGift") {
+    return v === "viewGroupGift" ? renderGroupGiftView() : renderWishView();
+  }
+
+  const modalTitle = view === "viewGroupGift" ? groupGiftTitle : item.wish_title;
+
+  return (
+    <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
+      <div
+        className={`modal-sheet modal-sheet-nav-host ${active ? "visible" : ""} ${groupGiftFocusMode ? "keyboard-focus-mode" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-handle" />
+        <div className={`flex items-center justify-between mb-4 ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
+          {view === "viewGroupGift" ? (
+            <button
+              type="button"
+              className="pressable-link w-10 h-10 inline-flex items-center justify-center rounded-xl text-muted"
+              onClick={closeGroupGift}
+              aria-label={t("back")}
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
+          <h3 className="modal-title font-bold text-lg text-center text-foreground line-clamp-2 flex items-center gap-2">
+            {modalTitle}
+            {view === "wish" && item.is_group_gift ? (
+              <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                {t("groupGiftBadge")}
+              </span>
+            ) : null}
+          </h3>
+          <span className="w-10" />
+        </div>
+
+        <div className="public-nav-viewport">
+          {previousView ? (
+            <div className={`public-nav-frame public-nav-exit-${navDirection}`} key={`prev-${previousView}`}>
+              {renderView(previousView)}
+            </div>
+          ) : null}
+          <div
+            className={`public-nav-frame ${previousView ? `public-nav-enter-${navDirection}` : ""}`}
+            key={`curr-${view}`}
+            onAnimationEnd={() => setPreviousView(null)}
+          >
+            {renderView(view)}
+          </div>
+        </div>
       </div>
     </div>
   );

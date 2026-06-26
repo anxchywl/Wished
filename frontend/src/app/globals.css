@@ -1653,6 +1653,21 @@ html[data-theme="dark"] .privacy-option-active {
   transform: translateZ(0);
 }
 
+/* Used when public-nav-viewport is embedded inside a modal-sheet.
+   Turns the sheet into a flex column so the viewport fills remaining height
+   without nested-scroll conflicts. */
+.modal-sheet-nav-host {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-sheet-nav-host .public-nav-viewport {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 .public-nav-frame {
   transform-origin: center center;
   will-change: transform, opacity, filter;
