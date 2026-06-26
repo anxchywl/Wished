@@ -637,7 +637,7 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
   const isBooked = reservationStatus.data?.is_reserved ?? false;
   const isMine = reservationStatus.data?.is_mine ?? false;
   const ownerBookingVisibility = reservationStatus.data?.owner_booking_visibility ?? "hide";
-  const showBooked = !isCompleted && isBooked && (isMine || ownerBookingVisibility !== "hide");
+  const showBooked = !isCompleted && isBooked && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed");
   return (
     <div
       onClick={onClick}
@@ -787,13 +787,13 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
 
   const isCompletePending = completeWishMutation.isPending || uncompleteWishMutation.isPending;
   const groupGiftTitle = groupGiftActionMode === "purchase"
-    ? t("groupGift")
+    ? ""
     : groupGiftActionMode === "contribute"
     ? t("makeContribution")
     : groupGiftActionMode === "editPayment"
     ? t("editPaymentDetails")
     : groupGiftActionMode === "cancel"
-    ? t("groupGift")
+    ? ""
     : groupGiftActionMode === "removeContribution"
     ? t("removeContribution")
     : t("groupGift");
@@ -894,7 +894,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {/* owner self-booking controls */}
-          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide") && (
+          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed") && (
             <div className="w-full flex flex-col gap-2">
               {isMine ? (
                 <button

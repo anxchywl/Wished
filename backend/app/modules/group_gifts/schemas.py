@@ -12,7 +12,7 @@ class GroupGiftCreateRequest(BaseModel):
 
     collection_type: Literal["immediate", "commit"]
     payment_method: str = Field(min_length=1, max_length=100)
-    payment_phone: str = Field(min_length=7, max_length=30)
+    payment_phone: str | None = Field(default=None, max_length=30)
     payment_comment: str | None = Field(default=None, max_length=500)
 
     @field_validator("payment_method", "payment_comment", mode="before")
@@ -24,9 +24,13 @@ class GroupGiftCreateRequest(BaseModel):
 
     @field_validator("payment_phone", mode="before")
     @classmethod
-    def strip_and_validate_phone(cls, value: str) -> str:
+    def strip_and_validate_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if isinstance(value, str):
             value = value.strip()
+            if not value:
+                return None
         if not re.match(r"^\+?[\d\s\-]{7,30}$", value):
             raise ValueError("Invalid phone number format")
         return value
@@ -36,7 +40,7 @@ class GroupGiftPaymentDetailsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     payment_method: str = Field(min_length=1, max_length=100)
-    payment_phone: str = Field(min_length=7, max_length=30)
+    payment_phone: str | None = Field(default=None, max_length=30)
     payment_comment: str | None = Field(default=None, max_length=500)
 
     @field_validator("payment_method", "payment_comment", mode="before")
@@ -48,9 +52,13 @@ class GroupGiftPaymentDetailsUpdate(BaseModel):
 
     @field_validator("payment_phone", mode="before")
     @classmethod
-    def strip_and_validate_phone(cls, value: str) -> str:
+    def strip_and_validate_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if isinstance(value, str):
             value = value.strip()
+            if not value:
+                return None
         if not re.match(r"^\+?[\d\s\-]{7,30}$", value):
             raise ValueError("Invalid phone number format")
         return value
@@ -66,6 +74,12 @@ class TransferConfirmRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confirmed: bool
+
+
+class ApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    approval_type: Literal["cancel", "unbook"]
 
 
 class ContributionSummary(BaseModel):
@@ -104,6 +118,12 @@ class GroupGiftResponse(BaseModel):
     my_contribution: ContributionSummary | None
     organizer_display_name: str | None
     created_at: datetime
+    # distributed approval fields
+    participant_count: int = 0
+    cancel_approval_count: int = 0
+    unbook_approval_count: int = 0
+    my_cancel_approval: bool = False
+    my_unbook_approval: bool = False
 
 
 class GroupGiftSummary(BaseModel):

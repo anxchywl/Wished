@@ -21,8 +21,30 @@ export type WishReservationStatusResponse = {
   has_active_group_gift: boolean;
 };
 
+export type BookedWishContributorSummary = {
+  first_name: string | null;
+  username: string | null;
+  amount: string | null;
+  status: string;
+};
+
+export type BookedWishGroupGiftDetail = {
+  group_gift_id: string;
+  organizer_first_name: string | null;
+  organizer_username: string | null;
+  collected_amount: string;
+  total_amount: string | null;
+  percent_complete: number;
+  participant_count: number;
+  cancel_approval_count: number;
+  unbook_approval_count: number;
+  my_cancel_approval: boolean;
+  my_unbook_approval: boolean;
+  contributors: BookedWishContributorSummary[];
+};
+
 export type BookedWishItem = {
-  reservation_id: string;
+  reservation_id: string | null;
   wish_id: string;
   wish_title: string;
   wish_description: string | null;
@@ -37,6 +59,8 @@ export type BookedWishItem = {
   owner_photo_url: string | null;
   images: WishImage[];
   reserved_at: string;
+  is_group_gift: boolean;
+  group_gift: BookedWishGroupGiftDetail | null;
 };
 
 export type BookedWishListResponse = {

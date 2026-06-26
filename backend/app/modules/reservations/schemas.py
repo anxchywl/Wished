@@ -28,9 +28,32 @@ class WishReservationStatusResponse(BaseModel):
     has_active_group_gift: bool = False
 
 
+class BookedWishGroupGiftDetail(BaseModel):
+    """group gift details shown to organizer and contributors on booked wish"""
+    group_gift_id: UUID
+    organizer_first_name: str | None
+    organizer_username: str | None
+    collected_amount: str
+    total_amount: str | None
+    percent_complete: int
+    participant_count: int
+    cancel_approval_count: int
+    unbook_approval_count: int
+    my_cancel_approval: bool
+    my_unbook_approval: bool
+    contributors: list["BookedWishContributorSummary"]
+
+
+class BookedWishContributorSummary(BaseModel):
+    first_name: str | None
+    username: str | None
+    amount: str | None
+    status: str
+
+
 class BookedWishItem(BaseModel):
     """single wish the current user has booked"""
-    reservation_id: UUID
+    reservation_id: UUID | None
     wish_id: UUID
     wish_title: str
     wish_description: str | None
@@ -45,6 +68,8 @@ class BookedWishItem(BaseModel):
     owner_photo_url: str | None
     images: list[WishImageResponse]
     reserved_at: datetime
+    is_group_gift: bool = False
+    group_gift: BookedWishGroupGiftDetail | None = None
 
 
 class BookedWishListResponse(BaseModel):

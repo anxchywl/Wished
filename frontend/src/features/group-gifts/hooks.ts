@@ -15,8 +15,10 @@ import {
   markGroupGiftPurchased,
   organizerRemoveContribution,
   reportTransfer,
+  toggleGroupGiftApproval,
   updateGroupGiftPaymentDetails,
 } from "@/features/group-gifts/api";
+import { bookedWishesQueryKey } from "@/features/reservations/hooks";
 import { groupGiftQueryKeys } from "@/features/group-gifts/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -54,10 +56,38 @@ export function useCancelGroupGiftMutation(wishId: string, groupGiftId: string) 
   const accessToken = useAuthStore((state) => state.accessToken);
 
   return useMutation({
-    mutationFn: () => cancelGroupGift(accessToken, groupGiftId),
-    onSuccess: () => {
-      queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
-      queryClient.invalidateQueries({ queryKey: ["wishes"] });
+    mutationFn: () => toggleGroupGiftApproval(accessToken, groupGiftId, "cancel"),
+    onSuccess: (result) => {
+      if (result === null) {
+        // unanimous — gift deleted
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
+        queryClient.invalidateQueries({ queryKey: ["wishes"] });
+        queryClient.invalidateQueries({ queryKey: ["reservations"] });
+        queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+      } else {
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
+        queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
+      }
+    },
+  });
+}
+
+export function useToggleGroupGiftApprovalMutation(wishId: string, groupGiftId: string) {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationFn: (approvalType: "cancel" | "unbook") =>
+      toggleGroupGiftApproval(accessToken, groupGiftId, approvalType),
+    onSuccess: (result) => {
+      if (result === null) {
+        // cancelled unanimously
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), null);
+        queryClient.invalidateQueries({ queryKey: ["wishes"] });
+      } else {
+        queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
+      }
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }
@@ -86,6 +116,8 @@ export function useMarkGroupGiftPurchasedMutation(wishId: string, groupGiftId: s
     onSuccess: (result) => {
       queryClient.setQueryData(groupGiftQueryKeys.gift(wishId), result);
       queryClient.invalidateQueries({ queryKey: ["wishes"] });
+      queryClient.invalidateQueries({ queryKey: ["reservations"] });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }

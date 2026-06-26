@@ -79,7 +79,7 @@ export function CreateGroupGiftContent({
   }, [focusMode.isFocusMode]);
 
   function handlePhoneBlur() {
-    if (paymentPhone && !validatePhoneOrCredentials(paymentPhone)) {
+    if (paymentPhone.trim() && !validatePhoneOrCredentials(paymentPhone)) {
       setPhoneError(t("invalidPhoneNumber"));
     } else {
       setPhoneError("");
@@ -88,7 +88,7 @@ export function CreateGroupGiftContent({
 
   function handleSubmit() {
     if (!collectionType) return;
-    if (!validatePhoneOrCredentials(paymentPhone)) {
+    if (paymentPhone.trim() && !validatePhoneOrCredentials(paymentPhone)) {
       setPhoneError(t("invalidPhoneNumber"));
       return;
     }
@@ -97,7 +97,7 @@ export function CreateGroupGiftContent({
     const payload: GroupGiftCreatePayload = {
       collection_type: collectionType,
       payment_method: paymentMethod.trim(),
-      payment_phone: paymentPhone.trim(),
+      payment_phone: paymentPhone.trim() || null,
       ...(paymentComment.trim() ? { payment_comment: paymentComment.trim() } : {}),
     };
 
@@ -207,12 +207,11 @@ export function CreateGroupGiftContent({
                 maxLength={isPhoneMode(paymentPhone) ? 20 : 50}
                 value={paymentPhone}
                 onChange={(e) => {
-                  const raw = e.currentTarget.value.replace(/^\s+/, "");
+                  const raw = e.currentTarget.value.replace(/[^0-9+\s\-()]/g, "");
                   setPaymentPhone(isPhoneMode(paymentPhone) || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
                   setPhoneError("");
                 }}
                 onBlur={() => { handlePhoneBlur(); focusMode.onFieldBlur(); }}
-                required
                 {...focusMode.fieldFocusProps("phone")}
               />
               {phoneError ? (
@@ -261,7 +260,7 @@ export function CreateGroupGiftContent({
                   <button
                     type="button"
                     className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-                    disabled={createMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
+                    disabled={createMutation.isPending || !paymentMethod.trim()}
                     onClick={handleSubmit}
                   >
                     {createMutation.isPending ? t("creating") : t("createGiftButton")}

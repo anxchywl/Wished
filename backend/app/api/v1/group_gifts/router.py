@@ -21,6 +21,7 @@ from app.modules.group_gifts import (
     mark_group_gift_purchased,
     organizer_remove_contribution,
     report_transfer,
+    toggle_group_gift_approval,
     update_payment_details,
 )
 from app.modules.group_gifts.rate_limit import (
@@ -28,6 +29,7 @@ from app.modules.group_gifts.rate_limit import (
     check_gift_create_limit,
 )
 from app.modules.group_gifts.schemas import (
+    ApprovalRequest,
     ContributionCreateRequest,
     ContributionSummary,
     GroupGiftCreateRequest,
@@ -70,15 +72,24 @@ async def get_wish_group_gift(
     return result
 
 
-@router.delete("/group-gifts/{group_gift_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_group_gift(
+@router.post(
+    "/group-gifts/{group_gift_id}/approve",
+    response_model=GroupGiftResponse,
+    responses={status.HTTP_204_NO_CONTENT: {"description": "Group gift deleted after unanimous cancel approval"}},
+)
+async def post_group_gift_approve(
     group_gift_id: UUID,
+    body: ApprovalRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
-) -> Response:
-    await cancel_group_gift(db, current_user, group_gift_id, redis=redis)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    response: Response,
+) -> GroupGiftResponse | None:
+    result = await toggle_group_gift_approval(db, current_user, group_gift_id, body.approval_type, redis=redis)
+    if result is None:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return None
+    return result
 
 
 @router.patch(

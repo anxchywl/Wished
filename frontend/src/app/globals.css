@@ -1419,7 +1419,7 @@ html[data-theme="dark"] .modal-sheet {
 
 .modal-sheet.keyboard-focus-mode {
   max-height: min(82dvh, 660px);
-  padding-bottom: calc(10px + min(env(safe-area-inset-bottom), 34px));
+  padding-bottom: 12px;
   scroll-padding: 16px 0 calc(42px + min(env(safe-area-inset-bottom), 34px));
   scroll-behavior: smooth;
 }
@@ -1438,8 +1438,8 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .modal-sheet.keyboard-focus-mode .modal-focus-footer {
-  margin-top: 0.4rem !important;
-  padding-top: 0.5rem !important;
+  margin-top: 12px !important;
+  padding-top: 12px !important;
 }
 
 .keyboard-focus-mode .flex.flex-col.gap-4 {
@@ -1483,16 +1483,16 @@ html[data-theme="dark"] .modal-sheet {
   padding: 2px;
 }
 
-.keyboard-focus-mode .modal-focus-collapsed {
-  max-height: 0;
+.modal-focus-collapsed {
+  max-height: 0 !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transform: translateY(-8px) scale(0.96);
+  opacity: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  transform: translateY(-8px) scale(0.96) !important;
   /* collapse direction: shrink height and fade content simultaneously for smooth keyboard opening */
   transition:
     opacity 0.15s cubic-bezier(0.4, 0, 1, 1),

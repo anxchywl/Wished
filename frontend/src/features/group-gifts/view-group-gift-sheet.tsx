@@ -16,6 +16,7 @@ import {
   useMarkGroupGiftPurchasedMutation,
   useGiftMembersQuery,
   useOrganizerRemoveContributionMutation,
+  useToggleGroupGiftApprovalMutation,
 } from "@/features/group-gifts/hooks";
 
 
@@ -33,7 +34,7 @@ type ContentProps = Props & {
   resetTrigger?: number;
 };
 
-export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel" | "removeContribution";
+export type ActionMode = "overview" | "contribute" | "editPayment" | "purchase" | "cancel" | "removeContribution" | "unbook";
 
 function stripTrailingZeros(amount: string): string {
   return amount.replace(/\.00$/, "");
@@ -97,6 +98,7 @@ export function ViewGroupGiftContent({
   const gift = giftQuery.data ?? null;
 
   const cancelMutation = useCancelGroupGiftMutation(wishId, gift?.id ?? "");
+  const approvalMutation = useToggleGroupGiftApprovalMutation(wishId, gift?.id ?? "");
   const updatePaymentMutation = useUpdateGroupGiftPaymentDetailsMutation(wishId, gift?.id ?? "");
   const purchaseMutation = useMarkGroupGiftPurchasedMutation(wishId, gift?.id ?? "");
   const joinMutation = useJoinGroupGiftMutation(wishId, gift?.id ?? "");
@@ -217,6 +219,7 @@ export function ViewGroupGiftContent({
     if (actionMode === "editPayment") return t("editPaymentDetails");
     if (actionMode === "purchase") return t("groupGift");
     if (actionMode === "cancel") return t("groupGift");
+    if (actionMode === "unbook") return t("groupGift");
     if (actionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
@@ -230,7 +233,18 @@ export function ViewGroupGiftContent({
   }
 
   function handleCancelGift() {
-    cancelMutation.mutate(undefined, { onSuccess: () => onClose() });
+    approvalMutation.mutate("cancel", {
+      onSuccess: (result) => {
+        if (result === null) onClose();
+        else changeActionMode("overview");
+      },
+    });
+  }
+
+  function handleUnbookApproval() {
+    approvalMutation.mutate("unbook", {
+      onSuccess: () => changeActionMode("overview"),
+    });
   }
 
   function handleSavePaymentDetails() {
@@ -238,12 +252,12 @@ export function ViewGroupGiftContent({
     const trimmedMethod = paymentMethod.trim();
     const trimmedPhone = paymentPhone.trim();
     const trimmedComment = paymentComment.trim();
-    if (!validatePhoneOrCredentials(trimmedPhone)) {
+    if (trimmedPhone && !validatePhoneOrCredentials(trimmedPhone)) {
       setPaymentPhoneError(t("invalidPhoneNumber"));
       return;
     }
     updatePaymentMutation.mutate(
-      { payment_method: trimmedMethod, payment_phone: trimmedPhone, payment_comment: trimmedComment || undefined },
+      { payment_method: trimmedMethod, payment_phone: trimmedPhone || null, payment_comment: trimmedComment || undefined },
       {
         onSuccess: () => {
           changeActionMode("overview");
@@ -294,8 +308,10 @@ export function ViewGroupGiftContent({
         <div className="flex items-center justify-center py-8">
           <div className="w-6 h-6 rounded-full border-2 border-muted border-t-primary animate-spin" />
         </div>
-      ) : !gift ? (
-        <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
+      ) : !gift || cancelMutation.isSuccess ? (
+        cancelMutation.isSuccess ? null : (
+          <p className="text-sm text-muted text-center py-6">{t("giftNotActive")}</p>
+        )
       ) : (
         <div className="flex flex-col">
           <div
@@ -368,7 +384,33 @@ export function ViewGroupGiftContent({
   function renderOverviewPanel(): ReactNode {
     if (!gift) return null;
     if (gift.status === "completed") {
-      return <p className="text-sm font-semibold text-muted text-center py-2">{t("giftComplete")}</p>;
+      const canUnbook = gift.is_organizer || gift.is_contributor;
+      return (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm font-semibold text-muted text-center py-2">{t("giftComplete")}</p>
+          {canUnbook ? (
+            <button
+              type="button"
+              className={`w-full h-11 rounded-xl text-sm font-bold transition-colors ${
+                gift.my_unbook_approval
+                  ? "bg-primary text-white"
+                  : "bg-muted/10 text-foreground"
+              }`}
+              disabled={approvalMutation.isPending}
+              onClick={() => changeActionMode("unbook")}
+            >
+              {t("unbookApproval")}
+              {gift.participant_count > 1 ? (
+                <span className="ml-2 text-xs font-normal opacity-70">
+                  {t("approvedOf")
+                    .replace("{approved}", String(gift.unbook_approval_count))
+                    .replace("{total}", String(gift.participant_count))}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
+        </div>
+      );
     }
     if (gift.status === "cancelled") {
       return <p className="text-sm font-semibold text-muted text-center py-2">{t("giftCancelled")}</p>;
@@ -442,6 +484,7 @@ export function ViewGroupGiftContent({
             </p>
           ) : null}
           {renderLeaveButtons()}
+          {renderCancelApprovalToggle()}
         </div>
       );
     }
@@ -469,6 +512,30 @@ export function ViewGroupGiftContent({
       );
     }
     return null;
+  }
+
+  function renderCancelApprovalToggle(): ReactNode {
+    if (!gift || gift.status !== "active" || gift.is_organizer) return null;
+    if (!gift.is_contributor) return null;
+    return (
+      <button
+        type="button"
+        className={`w-full h-10 rounded-xl text-sm font-medium transition-colors ${
+          gift.my_cancel_approval
+            ? "bg-red-500/20 text-red-600"
+            : "bg-muted/10 text-muted"
+        }`}
+        disabled={approvalMutation.isPending}
+        onClick={() => changeActionMode("cancel")}
+      >
+        {t("actionCancel")}
+        {(gift.participant_count ?? 0) > 1 ? (
+          <span className="ml-2 text-xs opacity-70">
+            {gift.cancel_approval_count}/{gift.participant_count}
+          </span>
+        ) : null}
+      </button>
+    );
   }
 
   // ── Non-overview panel: forms/confirmations (shown only in action section) ──
@@ -553,9 +620,19 @@ export function ViewGroupGiftContent({
       );
     }
     if (mode === "cancel") {
+      const cancelCount = gift.cancel_approval_count ?? 0;
+      const participantCount = gift.participant_count ?? 1;
+      const myApproval = gift.my_cancel_approval ?? false;
       return (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted text-center">{t("confirmCancelGift")}</p>
+          <p className="text-xs text-muted text-center">{t("groupGiftCancelInfo")}</p>
+          {participantCount > 1 ? (
+            <p className="text-xs font-semibold text-center text-foreground">
+              {t("approvedOf")
+                .replace("{approved}", String(cancelCount))
+                .replace("{total}", String(participantCount))}
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <button
               type="button"
@@ -566,11 +643,57 @@ export function ViewGroupGiftContent({
             </button>
             <button
               type="button"
-              className="theme-confirm-danger flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60"
-              disabled={cancelMutation.isPending}
+              className={`flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60 ${
+                myApproval ? "bg-red-500 text-white" : "theme-confirm-danger"
+              }`}
+              disabled={approvalMutation.isPending}
               onClick={handleCancelGift}
             >
-              {cancelMutation.isPending ? t("deleting") : t("doButton")}
+              {approvalMutation.isPending
+                ? t("deleting")
+                : myApproval
+                ? t("cancelButton")
+                : t("doButton")}
+            </button>
+          </div>
+        </div>
+      );
+    }
+    if (mode === "unbook") {
+      const unbookCount = gift.unbook_approval_count ?? 0;
+      const participantCount = gift.participant_count ?? 1;
+      const myApproval = gift.my_unbook_approval ?? false;
+      return (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted text-center">{t("groupGiftUnbookInfo")}</p>
+          {participantCount > 1 ? (
+            <p className="text-xs font-semibold text-center text-foreground">
+              {t("approvedOf")
+                .replace("{approved}", String(unbookCount))
+                .replace("{total}", String(participantCount))}
+            </p>
+          ) : null}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+              onClick={() => changeActionMode("overview")}
+            >
+              {t("cancelButton")}
+            </button>
+            <button
+              type="button"
+              className={`flex-1 h-10 rounded-xl text-sm font-bold disabled:opacity-60 ${
+                myApproval ? "bg-primary text-white" : "bg-muted/20 text-foreground"
+              }`}
+              disabled={approvalMutation.isPending}
+              onClick={handleUnbookApproval}
+            >
+              {approvalMutation.isPending
+                ? t("saving")
+                : myApproval
+                ? t("cancelButton")
+                : t("unbookApproval")}
             </button>
           </div>
         </div>
@@ -746,7 +869,7 @@ export function ViewGroupGiftContent({
               focusMode.onFieldBlur();
             }}
             onChange={(e) => {
-              const raw = e.currentTarget.value.replace(/^\s+/, "");
+              const raw = e.currentTarget.value.replace(/[^0-9+\s\-()]/g, "");
               setPaymentPhone(phoneMode || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
               setPaymentPhoneError("");
             }}
@@ -770,7 +893,7 @@ export function ViewGroupGiftContent({
             {...focusMode.fieldFocusProps("comment")}
           />
         </div>
-        <div className="modal-focus-footer flex gap-2">
+        <div className="modal-focus-footer border-t border-border pt-3 flex gap-2">
           {focusMode.isFocusMode ? (
             <button
               type="button"
@@ -797,7 +920,7 @@ export function ViewGroupGiftContent({
               <button
                 type="button"
                 className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-                disabled={updatePaymentMutation.isPending || !paymentMethod.trim() || !paymentPhone.trim()}
+                disabled={updatePaymentMutation.isPending || !paymentMethod.trim()}
                 onClick={handleSavePaymentDetails}
               >
                 {updatePaymentMutation.isPending ? t("saving") : t("savePaymentDetails")}
@@ -852,10 +975,17 @@ export function ViewGroupGiftContent({
           </button>
           <button
             type="button"
-            className="h-11 rounded-xl bg-red-500/10 px-2 inline-flex items-center justify-center"
+            className={`h-11 rounded-xl px-2 inline-flex flex-col items-center justify-center gap-0.5 ${
+              gift?.my_cancel_approval ? "bg-red-500/20" : "bg-red-500/10"
+            }`}
             onClick={() => changeActionMode("cancel")}
           >
             <span className="min-w-0 truncate text-xs font-bold text-red-500">{t("actionCancel")}</span>
+            {(gift?.participant_count ?? 0) > 1 ? (
+              <span className="text-[9px] text-red-400">
+                {gift?.cancel_approval_count}/{gift?.participant_count}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>

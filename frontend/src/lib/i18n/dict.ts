@@ -298,6 +298,18 @@ export const dict = {
     groupGiftVisibilityAnonymousDesc: "Show progress and contributor count, but not names",
     groupGiftVisibilityNames: "Show organizer and contributors",
     groupGiftVisibilityNamesDesc: "Show who organized the gift",
+    // distributed approval
+    unbookApproval: "Unbook",
+    cancelApproval: "Cancel Group Gift",
+    approvedOf: "{approved} / {total} approved",
+    groupGiftBadge: "Group Gift",
+    groupGiftWishOwner: "Wish owner",
+    groupGiftOrganizer: "Organizer",
+    groupGiftTotalCollected: "Total collected",
+    groupGiftCollectionStatus: "Collection status",
+    groupGiftUnbookInfo: "All participants must approve to unbook. This will restore the wish to available.",
+    groupGiftCancelInfo: "All participants must approve to cancel the group gift.",
+    groupGiftBookedCompleted: "Completed",
   },
   ru: {
     wished: "Wished",
@@ -597,6 +609,18 @@ export const dict = {
     groupGiftVisibilityAnonymousDesc: "Показывать прогресс и количество участников, но не имена",
     groupGiftVisibilityNames: "Показывать организатора и участников",
     groupGiftVisibilityNamesDesc: "Показывать, кто организовал подарок",
+    // distributed approval
+    unbookApproval: "Отменить бронь",
+    cancelApproval: "Отменить групповой подарок",
+    approvedOf: "{approved} / {total} одобрили",
+    groupGiftBadge: "Групповой подарок",
+    groupGiftWishOwner: "Владелец желания",
+    groupGiftOrganizer: "Организатор",
+    groupGiftTotalCollected: "Всего собрано",
+    groupGiftCollectionStatus: "Статус сбора",
+    groupGiftUnbookInfo: "Все участники должны подтвердить отмену брони. Желание снова станет доступным.",
+    groupGiftCancelInfo: "Все участники должны подтвердить отмену группового подарка.",
+    groupGiftBookedCompleted: "Завершён",
   },
   kz: {
     wished: "Wished",
@@ -896,6 +920,18 @@ export const dict = {
     groupGiftVisibilityAnonymousDesc: "Прогресс пен қатысушылар санын көрсету, бірақ аттарды емес",
     groupGiftVisibilityNames: "Ұйымдастырушы мен қатысушыларды көрсету",
     groupGiftVisibilityNamesDesc: "Сыйлықты кім ұйымдастырғанын көрсету",
+    // distributed approval
+    unbookApproval: "Броннан бас тарту",
+    cancelApproval: "Топтық сыйлықты болдырмау",
+    approvedOf: "{approved} / {total} мақұлдады",
+    groupGiftBadge: "Топтық сыйлық",
+    groupGiftWishOwner: "Тілек иесі",
+    groupGiftOrganizer: "Ұйымдастырушы",
+    groupGiftTotalCollected: "Барлығы жиналды",
+    groupGiftCollectionStatus: "Жинау мәртебесі",
+    groupGiftUnbookInfo: "Бронды болдырмау үшін барлық қатысушылар мақұлдауы керек. Тілек қайтадан қолжетімді болады.",
+    groupGiftCancelInfo: "Топтық сыйлықты болдырмау үшін барлық қатысушылар мақұлдауы керек.",
+    groupGiftBookedCompleted: "Аяқталды",
   }
 };
 

@@ -12,6 +12,7 @@ from app.modules.group_gifts.service import (
     get_group_gift,
     join_group_gift,
     mark_group_gift_purchased,
+    toggle_group_gift_approval,
     update_payment_details,
 )
 
@@ -88,6 +89,35 @@ async def test_non_owner_create_group_gift_becomes_organizer() -> None:
     assert db.added.organizer_user_id == organizer_id
     assert response.is_organizer is True
     assert response.payment_method == "Kaspi"
+
+
+@pytest.mark.asyncio
+async def test_create_group_gift_optional_phone() -> None:
+    owner_id = uuid4()
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    db = FakeDb([
+        FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
+        FakeResult(None),
+        FakeResult(None),
+    ])
+
+    response = await create_group_gift(
+        db,
+        _user(user_id=organizer_id),
+        wish_id,
+        SimpleNamespace(
+            collection_type="immediate",
+            payment_method="Kaspi",
+            payment_phone=None,
+            payment_comment=None,
+        ),
+    )
+
+    assert db.added is not None
+    assert db.added.organizer_user_id == organizer_id
+    assert response.is_organizer is True
+    assert response.payment_phone is None
 
 
 @pytest.mark.asyncio
@@ -382,10 +412,137 @@ async def test_non_organizer_cannot_mark_group_gift_purchased() -> None:
     assert db.committed is False
 
 
+def _gift_with_approvals(
+    wish_id,  # noqa: ANN001
+    organizer_user_id,  # noqa: ANN001
+    approvals: list | None = None,
+    status: str = "active",
+) -> SimpleNamespace:
+    g = _gift(wish_id=wish_id, organizer_user_id=organizer_user_id)
+    g.status = status
+    g.approvals = approvals or []
+    return g
+
+
+def _approval(group_gift_id, user_id, approval_type: str = "cancel") -> SimpleNamespace:  # noqa: ANN001
+    return SimpleNamespace(
+        id=uuid4(),
+        group_gift_id=group_gift_id,
+        user_id=user_id,
+        approval_type=approval_type,
+    )
+
+
+@pytest.mark.asyncio
+async def test_non_participant_cannot_toggle_approval() -> None:
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),  # existing approval lookup
+    ])
+
+    with pytest.raises(HTTPException) as exc:
+        await toggle_group_gift_approval(db, _user(user_id=uuid4()), gift.id, "cancel")
+
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_organizer_approval_with_no_contributors_cancels_immediately() -> None:
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    new_approval = _approval(gift.id, organizer_id)
+
+    # calls: (1) get gift locked, (2) get existing approval (None), (3) reload gift with approval
+    reloaded_gift = _gift_with_approvals(
+        wish_id=wish_id,
+        organizer_user_id=organizer_id,
+        approvals=[new_approval],
+    )
+    reloaded_gift.wish = gift.wish
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),  # no prior approval
+        FakeResult(reloaded_gift),
+    ])
+
+    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+
+    # unanimous (1/1) → deletes gift, returns None
+    assert result is None
+    assert db.deleted is reloaded_gift
+
+
+@pytest.mark.asyncio
+async def test_organizer_approval_with_contributor_is_partial() -> None:
+    organizer_id = uuid4()
+    contributor_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    contributor = _user(user_id=contributor_id)
+    gift.contributions = [
+        _contribution(gift.id, contributor_id, contributor, status="pledged")
+    ]
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    organizer_approval = _approval(gift.id, organizer_id)
+
+    # 1 out of 2 participants — not unanimous
+    reloaded_gift = _gift_with_approvals(
+        wish_id=wish_id,
+        organizer_user_id=organizer_id,
+        approvals=[organizer_approval],
+    )
+    reloaded_gift.contributions = gift.contributions
+    reloaded_gift.wish = gift.wish
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(None),
+        FakeResult(reloaded_gift),
+    ])
+
+    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+
+    # not unanimous — gift survives, response returned with 1 cancel approval
+    assert result is not None
+    assert result.cancel_approval_count == 1
+    assert result.participant_count == 2
+    assert db.deleted is None
+
+
+@pytest.mark.asyncio
+async def test_revoking_existing_approval_removes_it() -> None:
+    organizer_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    existing = _approval(gift.id, organizer_id)
+
+    # reload after delete — 0 approvals
+    reloaded_gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id, approvals=[])
+    reloaded_gift.wish = gift.wish
+    db = FakeDb([
+        FakeResult(gift),
+        FakeResult(existing),   # existing approval found → will be deleted (revoke)
+        FakeResult(reloaded_gift),
+    ])
+
+    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+
+    assert result is not None
+    assert result.cancel_approval_count == 0
+    assert db.deleted is existing
+
+
 class FakeDb:
     def __init__(self, results: list["FakeResult"]) -> None:
         self.results = results
         self.added = None
+        self.deleted = None
         self.committed = False
 
     async def execute(self, query):  # noqa: ANN001
@@ -393,6 +550,9 @@ class FakeDb:
 
     def add(self, value) -> None:  # noqa: ANN001
         self.added = value
+
+    async def delete(self, value) -> None:  # noqa: ANN001
+        self.deleted = value
 
     async def commit(self) -> None:
         self.committed = True
@@ -469,6 +629,7 @@ def _gift(
         payment_phone="+7 777 777 77 77",
         payment_comment="comment",
         contributions=[],
+        approvals=[],
         organizer=organizer or _user(user_id=organizer_user_id),
         created_at=datetime(2026, 6, 25, 12, 0, tzinfo=UTC),
     )

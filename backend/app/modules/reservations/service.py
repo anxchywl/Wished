@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Reservation, User, Wish, Wishlist
-from app.db.models.group_gifts import GroupGift
+from app.db.models.group_gifts import GroupGift, GroupGiftApproval, GroupGiftContribution
 from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
+    BookedWishContributorSummary,
+    BookedWishGroupGiftDetail,
     BookedWishItem,
     BookedWishListResponse,
     ReservationResponse,
@@ -218,7 +220,11 @@ async def list_my_booked_wishes(
     db: AsyncSession,
     current_user: User,
 ) -> BookedWishListResponse:
-    """list wishes the current user has actively booked (reserved)"""
+    """list wishes the current user has actively booked (reserved or group-gifted)"""
+    from app.integrations.minio import get_presigned_url
+    from app.modules.media.schemas import WishImageResponse
+
+    # regular reservations (non-group-gift)
     result = await db.execute(
         select(Reservation)
         .join(Wish, Wish.id == Reservation.wish_id)
@@ -238,15 +244,41 @@ async def list_my_booked_wishes(
     )
     reservations = result.scalars().all()
 
-    from app.integrations.minio import get_presigned_url
-    from app.modules.media.schemas import WishImageResponse
+    # completed group gifts where user is organizer or contributor
+    gift_result = await db.execute(
+        select(GroupGift)
+        .join(Wish, Wish.id == GroupGift.wish_id)
+        .join(Wishlist, Wishlist.id == Wish.wishlist_id)
+        .options(
+            selectinload(GroupGift.wish).options(
+                selectinload(Wish.images),
+                selectinload(Wish.wishlist).options(selectinload(Wishlist.owner)),
+            ),
+            selectinload(GroupGift.organizer),
+            selectinload(GroupGift.contributions).selectinload(GroupGiftContribution.contributor),
+            selectinload(GroupGift.approvals),
+        )
+        .where(
+            GroupGift.status == "completed",
+            Wishlist.owner_user_id != current_user.id,
+        )
+    )
+    completed_gifts = gift_result.scalars().all()
 
-    items = []
-    for rsv in reservations:
-        wish = rsv.wish
-        wishlist = wish.wishlist
-        owner = wishlist.owner
-        images = [
+    # filter to gifts where user is organizer or active contributor
+    my_gifts: list[GroupGift] = []
+    for gift in completed_gifts:
+        non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+        is_organizer = gift.organizer_user_id == current_user.id
+        is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
+        if is_organizer or is_contributor:
+            my_gifts.append(gift)
+
+    # build set of wish_ids covered by group gifts to avoid duplicates in reservation list
+    gift_wish_ids = {g.wish_id for g in my_gifts}
+
+    def _make_images(wish: Wish) -> list[WishImageResponse]:
+        return [
             WishImageResponse(
                 id=img.id,
                 wish_id=img.wish_id,
@@ -267,6 +299,16 @@ async def list_my_booked_wishes(
             )
             for img in wish.images
         ]
+
+    items: list[BookedWishItem] = []
+
+    for rsv in reservations:
+        wish = rsv.wish
+        # skip if this wish is covered as a group gift
+        if wish.id in gift_wish_ids:
+            continue
+        wishlist = wish.wishlist
+        owner = wishlist.owner
         items.append(
             BookedWishItem(
                 reservation_id=rsv.id,
@@ -282,11 +324,89 @@ async def list_my_booked_wishes(
                 owner_first_name=owner.first_name,
                 owner_username=owner.username,
                 owner_photo_url=owner.photo_url,
-                images=images,
+                images=_make_images(wish),
                 reserved_at=rsv.created_at,
+                is_group_gift=False,
+                group_gift=None,
             )
         )
 
+    for gift in my_gifts:
+        wish = gift.wish
+        wishlist = wish.wishlist
+        owner = wishlist.owner
+        non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+        is_organizer = gift.organizer_user_id == current_user.id
+
+        cancel_approvals = [a for a in gift.approvals if a.approval_type == "cancel"]
+        unbook_approvals = [a for a in gift.approvals if a.approval_type == "unbook"]
+        participant_count = 1 + len(non_cancelled)
+
+        from decimal import Decimal as D
+        _CONFIRMED = {"confirmed", "pledged", "notified"}
+        collected = sum((c.amount for c in non_cancelled if c.status in _CONFIRMED), D("0"))
+
+        organizer = gift.organizer
+        contributors = [
+            BookedWishContributorSummary(
+                first_name=c.contributor.first_name if c.contributor else None,
+                username=c.contributor.username if c.contributor else None,
+                amount=str(c.amount) if is_organizer else None,
+                status=c.status,
+            )
+            for c in non_cancelled
+        ]
+
+        gift_detail = BookedWishGroupGiftDetail(
+            group_gift_id=gift.id,
+            organizer_first_name=organizer.first_name if organizer else None,
+            organizer_username=organizer.username if organizer else None,
+            collected_amount=str(collected),
+            total_amount=str(wish.price) if wish.price is not None else None,
+            percent_complete=(
+                min(100, int(collected / wish.price * 100))
+                if wish.price and wish.price > 0 else 0
+            ),
+            participant_count=participant_count,
+            cancel_approval_count=len(cancel_approvals),
+            unbook_approval_count=len(unbook_approvals),
+            my_cancel_approval=any(a.user_id == current_user.id for a in cancel_approvals),
+            my_unbook_approval=any(a.user_id == current_user.id for a in unbook_approvals),
+            contributors=contributors,
+        )
+
+        # find reservation for organizer (contributors share the organizer's reservation)
+        rsv_result = await db.execute(
+            select(Reservation).where(
+                Reservation.wish_id == wish.id,
+                Reservation.status == "active",
+            )
+        )
+        organizer_rsv = rsv_result.scalar_one_or_none()
+
+        items.append(
+            BookedWishItem(
+                reservation_id=organizer_rsv.id if organizer_rsv else None,
+                wish_id=wish.id,
+                wish_title=wish.title,
+                wish_description=wish.description,
+                wish_url=wish.url,
+                wish_price=str(wish.price) if wish.price is not None else None,
+                wish_currency=wish.currency,
+                wish_status=wish.status,
+                wishlist_id=wishlist.id,
+                wishlist_title=wishlist.title,
+                owner_first_name=owner.first_name,
+                owner_username=owner.username,
+                owner_photo_url=owner.photo_url,
+                images=_make_images(wish),
+                reserved_at=gift.created_at,
+                is_group_gift=True,
+                group_gift=gift_detail,
+            )
+        )
+
+    items.sort(key=lambda x: x.reserved_at, reverse=True)
     return BookedWishListResponse(items=items)
 
 

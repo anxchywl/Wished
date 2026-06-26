@@ -49,18 +49,24 @@ export interface GroupGiftResponse {
   my_contribution: ContributionSummary | null;
   organizer_display_name: string | null;
   created_at: string;
+  // distributed approval
+  participant_count: number;
+  cancel_approval_count: number;
+  unbook_approval_count: number;
+  my_cancel_approval: boolean;
+  my_unbook_approval: boolean;
 }
 
 export interface GroupGiftCreatePayload {
   collection_type: "immediate" | "commit";
   payment_method: string;
-  payment_phone: string;
+  payment_phone?: string | null;
   payment_comment?: string;
 }
 
 export interface GroupGiftPaymentDetailsPayload {
   payment_method: string;
-  payment_phone: string;
+  payment_phone?: string | null;
   payment_comment?: string;
 }
 
@@ -177,4 +183,16 @@ export function getGiftMembers(
   groupGiftId: string,
 ): Promise<GroupGiftMemberSummary[]> {
   return apiClient<GroupGiftMemberSummary[]>(`/group-gifts/${groupGiftId}/members`, { accessToken });
+}
+
+export function toggleGroupGiftApproval(
+  accessToken: string | null,
+  groupGiftId: string,
+  approvalType: "cancel" | "unbook",
+): Promise<GroupGiftResponse | null> {
+  return apiClient<GroupGiftResponse | null>(`/group-gifts/${groupGiftId}/approve`, {
+    method: "POST",
+    body: { approval_type: approvalType },
+    accessToken,
+  });
 }

@@ -8,6 +8,7 @@ import { PublicWishlistNavigator } from "@/features/users/public-wishlist-naviga
 import { UserAvatar } from "@/features/users/user-avatar";
 import { useFollowingQuery } from "@/features/users/hooks";
 import { useBookedWishesQuery, useCancelReservationMutation } from "@/features/reservations/hooks";
+import { useToggleGroupGiftApprovalMutation } from "@/features/group-gifts/hooks";
 import { useProfileQuery, useUpdatePrivacyMutation } from "@/features/profile/hooks";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { logStartup } from "@/lib/debug/startup-log";
@@ -331,6 +332,7 @@ type BookedWishRowProps = {
  * single booked wish row
  */
 function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
+  const { t } = useTranslation();
   const isDeleted = item.wish_status === "completed";
 
   return (
@@ -344,7 +346,14 @@ function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
         <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.thumbnail_url ?? item.images?.[0]?.medium_url} className="w-full h-full object-cover" />
       </div>
       <div className="flex-1 min-w-0">
-        <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
+          {item.is_group_gift ? (
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+              {t("groupGiftBadge")}
+            </span>
+          ) : null}
+        </div>
         <span className="text-xs text-muted block mt-0.5 line-clamp-1">
           {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
         </span>
@@ -361,6 +370,13 @@ type BookedWishModalProps = {
   onClose: () => void;
 };
 
+function formatGiftAmount(amount: string | null | undefined): string {
+  if (!amount) return "";
+  const num = Number(amount);
+  if (!Number.isFinite(num)) return amount;
+  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(num);
+}
+
 /**
  * booked wish details
  */
@@ -368,6 +384,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
   const cancelMutation = useCancelReservationMutation(item.wishlist_id);
+  const approvalMutation = useToggleGroupGiftApprovalMutation(item.wish_id, item.group_gift?.group_gift_id ?? "");
 
   useEffect(() => {
     requestAnimationFrame(() => setActive(true));
@@ -386,11 +403,23 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     ? `${t("unbookWish")} · ${fmtPrice(item.wish_price)} ${item.wish_currency ?? ""}`.trim()
     : t("unbookWish");
 
+  const gg = item.group_gift;
+  const organizerName = gg
+    ? (gg.organizer_first_name || (gg.organizer_username ? `@${gg.organizer_username}` : null))
+    : null;
+
   return (
     <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={handleClose}>
       <div className={`modal-sheet ${active ? "visible" : ""}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-handle" />
-        <h3 className="modal-title font-bold text-lg mb-3 text-center">{item.wish_title}</h3>
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <h3 className="modal-title font-bold text-lg text-center">{item.wish_title}</h3>
+          {item.is_group_gift ? (
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+              {t("groupGiftBadge")}
+            </span>
+          ) : null}
+        </div>
 
         <section className="flex flex-col items-center gap-3">
           <div className="public-wish-gallery relative">
@@ -429,19 +458,89 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
           <p className="text-xs text-muted text-center mb-1">
             {item.owner_first_name || item.owner_username || "—"} · {item.wishlist_title}
           </p>
-          <button
-            type="button"
-            className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold"
-            disabled={cancelMutation.isPending}
-            onClick={() =>
-              cancelMutation.mutate(
-                { reservationId: item.reservation_id, wishId: item.wish_id },
-                { onSuccess: handleClose },
-              )
-            }
-          >
-            {cancelMutation.isPending ? t("cancellingReservation") : unbookLabel}
-          </button>
+
+          {item.is_group_gift && gg ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5 bg-muted/5 rounded-xl p-3 border border-border text-sm">
+                {organizerName ? (
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-xs text-muted">{t("groupGiftOrganizer")}</span>
+                    <span className="font-semibold text-foreground">{organizerName}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs text-muted">{t("groupGiftTotalCollected")}</span>
+                  <span className="font-semibold text-foreground">
+                    {formatGiftAmount(gg.collected_amount)}
+                    {gg.total_amount ? ` / ${formatGiftAmount(gg.total_amount)}` : ""}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-xs text-muted">{t("contributors")}</span>
+                  <span className="font-semibold text-foreground">{gg.participant_count}</span>
+                </div>
+                {gg.contributors.length > 0 ? (
+                  <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-border">
+                    {gg.contributors.map((c, i) => {
+                      const name = c.first_name || (c.username ? `@${c.username}` : t("unknownUser") ?? "—");
+                      return (
+                        <div key={i} className="flex justify-between items-center gap-2">
+                          <span className="text-xs text-foreground truncate">{name}</span>
+                          {c.amount ? (
+                            <span className="text-xs font-semibold text-foreground shrink-0">{formatGiftAmount(c.amount)}</span>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-muted text-center">{t("groupGiftUnbookInfo")}</p>
+                {gg.participant_count > 1 ? (
+                  <p className="text-xs font-semibold text-center text-foreground">
+                    {t("approvedOf")
+                      .replace("{approved}", String(gg.unbook_approval_count))
+                      .replace("{total}", String(gg.participant_count))}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  className={`w-full h-12 rounded-xl text-sm font-bold disabled:opacity-60 transition-colors ${
+                    gg.my_unbook_approval ? "bg-primary text-white" : "theme-confirm-danger"
+                  }`}
+                  disabled={approvalMutation.isPending}
+                  onClick={() =>
+                    approvalMutation.mutate("unbook", {
+                      onSuccess: (result) => { if (result === null) handleClose(); },
+                    })
+                  }
+                >
+                  {approvalMutation.isPending
+                    ? t("saving")
+                    : gg.my_unbook_approval
+                    ? t("cancelButton")
+                    : t("unbookApproval")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold"
+              disabled={cancelMutation.isPending}
+              onClick={() =>
+                cancelMutation.mutate(
+                  { reservationId: item.reservation_id ?? "", wishId: item.wish_id },
+                  { onSuccess: handleClose },
+                )
+              }
+            >
+              {cancelMutation.isPending ? t("cancellingReservation") : unbookLabel}
+            </button>
+          )}
+
           {item.wish_url ? (
             <a
               href={item.wish_url}

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Reservation, User, Wish
-from app.db.models.group_gifts import GroupGift, GroupGiftContribution
+from app.db.models.group_gifts import GroupGift, GroupGiftApproval, GroupGiftContribution
 from app.modules.cache import cache_delete, wishes_cache_key
 from app.modules.events import publish_event
 from app.modules.group_gifts.schemas import (
@@ -38,12 +38,18 @@ def _sum_committed(contributions: list[GroupGiftContribution]) -> Decimal:
     )
 
 
+def _participant_count(non_cancelled: list[GroupGiftContribution]) -> int:
+    """organizer + active contributors"""
+    return 1 + len(non_cancelled)
+
+
 def _build_group_gift_response(
     wish: Wish,
     gift: GroupGift,
     current_user: User,
     non_cancelled: list[GroupGiftContribution],
     status_override: str | None = None,
+    approvals: list[GroupGiftApproval] | None = None,
 ) -> GroupGiftResponse:
     raw_collected_amount = sum(
         (c.amount for c in non_cancelled if c.status in _CONFIRMED_STATUSES),
@@ -94,6 +100,10 @@ def _build_group_gift_response(
     if display_status == "cancelled":
         show_payment = False
 
+    all_approvals = approvals if approvals is not None else getattr(gift, "approvals", [])
+    cancel_approvals = [a for a in all_approvals if a.approval_type == "cancel"]
+    unbook_approvals = [a for a in all_approvals if a.approval_type == "unbook"]
+
     return GroupGiftResponse(
         id=gift.id,
         wish_id=gift.wish_id,
@@ -121,6 +131,11 @@ def _build_group_gift_response(
         ),
         organizer_display_name=organizer_display_name,
         created_at=gift.created_at,
+        participant_count=_participant_count(non_cancelled),
+        cancel_approval_count=len(cancel_approvals),
+        unbook_approval_count=len(unbook_approvals),
+        my_cancel_approval=any(a.user_id == current_user.id for a in cancel_approvals),
+        my_unbook_approval=any(a.user_id == current_user.id for a in unbook_approvals),
     )
 
 
@@ -246,8 +261,12 @@ async def get_group_gift(
 
     result = await db.execute(
         select(GroupGift)
-        .options(selectinload(GroupGift.contributions), selectinload(GroupGift.organizer))
-        .where(GroupGift.wish_id == wish_id, GroupGift.status == "active")
+        .options(
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.organizer),
+            selectinload(GroupGift.approvals),
+        )
+        .where(GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed"]))
     )
     gift = result.scalar_one_or_none()
     if not gift:
@@ -277,6 +296,7 @@ async def update_payment_details(
             selectinload(GroupGift.wish).selectinload(Wish.wishlist),
             selectinload(GroupGift.contributions),
             selectinload(GroupGift.organizer),
+            selectinload(GroupGift.approvals),
         )
         .where(GroupGift.id == group_gift_id)
         .with_for_update()
@@ -314,6 +334,7 @@ async def mark_group_gift_purchased(
             selectinload(GroupGift.wish).selectinload(Wish.wishlist),
             selectinload(GroupGift.contributions),
             selectinload(GroupGift.organizer),
+            selectinload(GroupGift.approvals),
         )
         .where(GroupGift.id == group_gift_id)
         .with_for_update()
@@ -385,25 +406,158 @@ async def cancel_group_gift(
     current_user: User,
     group_gift_id: UUID,
     redis: Redis | None = None,
-) -> None:
+) -> GroupGiftResponse | None:
+    """submit or revoke cancel approval; executes when all participants approve"""
+    return await toggle_group_gift_approval(db, current_user, group_gift_id, "cancel", redis=redis)
+
+
+async def toggle_group_gift_approval(
+    db: AsyncSession,
+    current_user: User,
+    group_gift_id: UUID,
+    approval_type: str,
+    redis: Redis | None = None,
+) -> GroupGiftResponse | None:
+    """toggle a participant's approval vote; executes the action when all approve"""
     result = await db.execute(
         select(GroupGift)
-        .options(selectinload(GroupGift.wish))
+        .options(
+            selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+            selectinload(GroupGift.contributions).selectinload(GroupGiftContribution.contributor),
+            selectinload(GroupGift.organizer),
+            selectinload(GroupGift.approvals),
+        )
         .where(GroupGift.id == group_gift_id)
+        .with_for_update()
     )
     gift = result.scalar_one_or_none()
     if not gift:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
 
-    if gift.organizer_user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    is_organizer = gift.organizer_user_id == current_user.id
+    is_contributor = any(c.contributor_user_id == current_user.id for c in non_cancelled)
 
+    if not is_organizer and not is_contributor:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a participant")
+
+    if approval_type == "cancel" and gift.status not in ("active", "completed"):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Group gift cannot be cancelled")
+    if approval_type == "unbook" and gift.status != "completed":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Group gift is not completed")
+
+    # reload approvals with lock
+    existing = await db.execute(
+        select(GroupGiftApproval)
+        .where(
+            GroupGiftApproval.group_gift_id == group_gift_id,
+            GroupGiftApproval.user_id == current_user.id,
+            GroupGiftApproval.approval_type == approval_type,
+        )
+        .with_for_update()
+    )
+    approval = existing.scalar_one_or_none()
+
+    if approval:
+        # revoke
+        await db.delete(approval)
+        await db.commit()
+    else:
+        # approve
+        new_approval = GroupGiftApproval(
+            group_gift_id=group_gift_id,
+            user_id=current_user.id,
+            approval_type=approval_type,
+        )
+        db.add(new_approval)
+        await db.commit()
+
+    # reload gift with fresh approval state
+    result = await db.execute(
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.organizer),
+            selectinload(GroupGift.approvals),
+        )
+        .where(GroupGift.id == group_gift_id)
+        .with_for_update()
+    )
+    gift = result.scalar_one_or_none()
+    if not gift:
+        # gift was deleted by concurrent execution; return empty-ish response
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
+
+    non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+    type_approvals = [a for a in gift.approvals if a.approval_type == approval_type]
+    participant_count = _participant_count(non_cancelled)
+
+    if len(type_approvals) >= participant_count:
+        # unanimous — execute the action
+        if approval_type == "cancel":
+            await _execute_cancel(db, gift, redis)
+            return None
+        elif approval_type == "unbook":
+            await _execute_unbook(db, gift, redis)
+
+        result = await db.execute(
+            select(GroupGift)
+            .options(
+                selectinload(GroupGift.wish).selectinload(Wish.wishlist),
+                selectinload(GroupGift.contributions),
+                selectinload(GroupGift.organizer),
+                selectinload(GroupGift.approvals),
+            )
+            .where(GroupGift.id == group_gift_id)
+        )
+        gift = result.scalar_one_or_none()
+        if not gift:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
+        non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
+
+    return _build_group_gift_response(gift.wish, gift, current_user, non_cancelled)
+
+
+async def _execute_cancel(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:
+    """hard-delete the group gift after unanimous cancel approval"""
     wishlist_id = gift.wish.wishlist_id
     await db.delete(gift)
     await db.commit()
-
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
+
+
+async def _execute_unbook(db: AsyncSession, gift: GroupGift, redis: Redis | None) -> None:
+    """revert completed group gift to active and remove its reservation"""
+    wish = gift.wish
+    result = await db.execute(
+        select(Reservation)
+        .where(
+            Reservation.wish_id == wish.id,
+            Reservation.status == "active",
+        )
+        .with_for_update()
+    )
+    reservation = result.scalar_one_or_none()
+    if reservation:
+        reservation.status = "cancelled"
+
+    gift.status = "active"
+    # clear unbook approvals so the slate is clean
+    for a in list(gift.approvals):
+        if a.approval_type == "unbook":
+            await db.delete(a)
+
+    # restore notified contributions back to pledged
+    for c in gift.contributions:
+        if c.status == "notified":
+            c.status = "pledged"
+
+    await db.commit()
+
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wish.wishlist_id))
 
 
 async def join_group_gift(

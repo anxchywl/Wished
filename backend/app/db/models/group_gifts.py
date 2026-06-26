@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,7 +28,7 @@ class GroupGift(Base):
     collection_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="active")
     payment_method: Mapped[str] = mapped_column(String(100), nullable=False)
-    payment_phone: Mapped[str] = mapped_column(String(30), nullable=False)
+    payment_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     payment_comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -46,6 +46,11 @@ class GroupGift(Base):
     organizer = relationship("User", foreign_keys=[organizer_user_id])
     contributions: Mapped[list["GroupGiftContribution"]] = relationship(
         "GroupGiftContribution",
+        back_populates="group_gift",
+        cascade="all, delete-orphan",
+    )
+    approvals: Mapped[list["GroupGiftApproval"]] = relationship(
+        "GroupGiftApproval",
         back_populates="group_gift",
         cascade="all, delete-orphan",
     )
@@ -83,3 +88,33 @@ class GroupGiftContribution(Base):
 
     group_gift = relationship("GroupGift", back_populates="contributions")
     contributor = relationship("User", foreign_keys=[contributor_user_id])
+
+
+class GroupGiftApproval(Base):
+    """per-participant vote for a distributed group gift action (cancel or unbook)"""
+    __tablename__ = "group_gift_approvals"
+    __table_args__ = (
+        UniqueConstraint("group_gift_id", "user_id", "approval_type", name="uq_group_gift_approvals"),
+    )
+
+    id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
+    group_gift_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("group_gifts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    approval_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    group_gift = relationship("GroupGift", back_populates="approvals")
+    user = relationship("User", foreign_keys=[user_id])

@@ -10,6 +10,7 @@ from app.modules.group_gifts.service import (
     mark_group_gift_purchased,
     organizer_remove_contribution,
     report_transfer,
+    toggle_group_gift_approval,
     update_payment_details,
 )
 
@@ -24,5 +25,6 @@ __all__ = [
     "mark_group_gift_purchased",
     "organizer_remove_contribution",
     "report_transfer",
+    "toggle_group_gift_approval",
     "update_payment_details",
 ]
