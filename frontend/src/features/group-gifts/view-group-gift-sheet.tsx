@@ -86,6 +86,11 @@ export function ViewGroupGiftContent({
 }: ContentProps) {
   const { t } = useTranslation();
   const focusMode = useModalFocusMode();
+  const isMounted = useRef(false);
+
+  useEffect(() => {
+    isMounted.current = true;
+  }, []);
 
   const giftQuery = useGroupGiftQuery(wishId, shareToken);
   const gift = giftQuery.data ?? null;
@@ -298,7 +303,7 @@ export function ViewGroupGiftContent({
                 ? "opacity-100 scale-100"
                 : "opacity-0 scale-95 pointer-events-none overflow-hidden"
             }`}
-            style={{ maxHeight: !isNonOverview ? overviewHeight : 0 }}
+            style={{ maxHeight: !isNonOverview ? (isMounted.current ? overviewHeight : undefined) : 0 }}
           >
             <div ref={overviewPanelRef} className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
