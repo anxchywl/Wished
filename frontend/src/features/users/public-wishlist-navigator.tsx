@@ -549,7 +549,7 @@ function PublicWishlistView({ wishlistId, shareToken, onOpenWish }: PublicWishli
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const wishlistQuery = useWishlistQuery(wishlistId, shareToken);
-  const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
+  const wishesQuery = useWishesQuery(wishlistId, true, shareToken, false);
   const wishlist = wishlistQuery.data;
   const wishes = wishesQuery.data?.items ?? [];
   const parsed = parseWishlistDescription(wishlist?.description);
@@ -668,7 +668,7 @@ function PublicWishView({
   onOpenCreateGroupGift,
   onOpenViewGroupGift,
 }: PublicWishViewProps) {
-  const wishesQuery = useWishesQuery(wishlistId, true, shareToken);
+  const wishesQuery = useWishesQuery(wishlistId, true, shareToken, false);
   const wish = useMemo(
     () => wishesQuery.data?.items.find((item) => item.id === wishId) ?? null,
     [wishId, wishesQuery.data?.items],

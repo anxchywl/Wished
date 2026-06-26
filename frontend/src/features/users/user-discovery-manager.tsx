@@ -203,12 +203,6 @@ export function UserDiscoveryManager() {
           <AuthRequiredPanel forcePending />
         ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
-        ) : followingQuery.isLoading ? (
-          <div className="panel flex flex-col gap-3 p-4 w-full">
-            <div className="public-skeleton h-16 w-full rounded-xl" />
-            <div className="public-skeleton h-16 w-full rounded-xl" />
-            <div className="public-skeleton h-16 w-full rounded-xl" />
-          </div>
         ) : followedUsers.length > 0 ? (
           <>
           <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>

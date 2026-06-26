@@ -1564,17 +1564,17 @@ type CreateWishModalProps = {
  * create wish modal
  */
 const PRODUCT_URL_PLACEHOLDERS = [
-  "ozon.ru/t/lwPE6ZK",
-  "wb.ru/s/xR9mK2",
-  "kaspi.kz/t/abc123",
-  "aliexpress.ru/item/...",
-  "amazon.com/dp/B0C...",
-  "ikea.com/ru/ru/p/...",
-  "lamoda.ru/p/...",
+  "ozon.ru/...",
+  "wb.ru/...",
+  "kaspi.kz/...",
+  "aliexpress.ru/...",
+  "amazon.com/...",
+  "ikea.com/...",
+  "lamoda.ru/...",
   "dns-shop.ru/...",
-  "mvideo.ru/products/...",
+  "mvideo.ru/...",
   "temu.com/...",
-  "olx.kz/d/...",
+  "olx.kz/...",
 ];
 
 function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModalProps) {

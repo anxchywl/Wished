@@ -73,7 +73,7 @@ export function useStoreLinkPreviewImageMutation() {
  * present) use a 30 s staleTime and poll every 30 s so the reserver sees others'
  * bookings update without excessive server load.
  */
-export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: string | null) {
+export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: string | null, isOwner?: boolean) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
   const queryClient = useQueryClient();
@@ -81,7 +81,9 @@ export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: 
     ? ([...wishQueryKeys.list(wishlistId), shareToken] as const)
     : wishQueryKeys.list(wishlistId);
 
-  const isSharedView = Boolean(shareToken);
+  // Poll for non-owner views so new wishes appear promptly for visitors.
+  // Owner views rely on mutation-based cache updates instead.
+  const shouldPoll = Boolean(shareToken) || isOwner === false;
 
   return useQuery({
     queryKey,
@@ -91,8 +93,8 @@ export function useWishesQuery(wishlistId: string, enabled = true, shareToken?: 
       return preserveWishImageUrls(response, cached);
     },
     enabled: Boolean(enabled && authStatus === "authenticated" && accessToken && wishlistId),
-    staleTime: isSharedView ? 30_000 : 2 * 60 * 1000,
-    refetchInterval: isSharedView ? 30_000 : false,
+    staleTime: shouldPoll ? 15_000 : 2 * 60 * 1000,
+    refetchInterval: shouldPoll ? 15_000 : false,
   });
 }
 

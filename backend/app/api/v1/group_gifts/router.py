@@ -23,10 +23,7 @@ from app.modules.group_gifts import (
     toggle_group_gift_approval,
     update_payment_details,
 )
-from app.modules.group_gifts.rate_limit import (
-    check_contribution_create_limit,
-    check_gift_create_limit,
-)
+from app.modules.group_gifts.rate_limit import check_contribution_create_limit
 from app.modules.group_gifts.schemas import (
     ApprovalRequest,
     ContributionCreateRequest,
@@ -53,7 +50,6 @@ async def post_group_gift(
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> GroupGiftResponse:
-    await check_gift_create_limit(redis, current_user.id)
     return await create_group_gift(db, current_user, wish_id, payload, redis=redis)
 
 
