@@ -700,7 +700,6 @@ function PublicWishView({
   const hasActiveGroupGift = visibleGroupGift?.status === "active" || (
     !liveGroupGift.isFetched && status?.has_active_group_gift === true
   );
-  const canCreateGroupGift = status?.owner_group_gift_visibility !== "hide";
 
   function handleBook() {
     if (!isReserved && !isCompleted) {
@@ -766,7 +765,7 @@ function PublicWishView({
               >
                 {bookButtonLabel()}
               </button>
-              {!isReserved && canCreateGroupGift ? (
+              {!isReserved ? (
                 <button
                   type="button"
                   className="public-action-button border border-border bg-background text-primary"

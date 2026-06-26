@@ -175,8 +175,7 @@ async def get_wish_reservation_status(
         getattr(current_user, "group_gift_visibility", "hide")
     )
 
-    # non-owners only learn a group gift exists when the owner hasn't hidden it
-    has_active_group_gift = active_gift_exists and (is_owner or owner_gg_visibility != "hide")
+    has_active_group_gift = active_gift_exists
 
     result = await db.execute(
         select(Reservation).where(
