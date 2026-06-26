@@ -894,7 +894,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {/* owner self-booking controls */}
-          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed") && (
+          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide" || wish?.group_gift?.status === "completed") && (
             <div className="w-full flex flex-col gap-2">
               {isMine ? (
                 <button
