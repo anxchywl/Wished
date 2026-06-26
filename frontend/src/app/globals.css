@@ -1438,7 +1438,7 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .modal-sheet.keyboard-focus-mode .modal-focus-footer {
-  margin-top: 12px !important;
+  margin-top: 0 !important;
   padding-top: 12px !important;
 }
 
@@ -1644,7 +1644,7 @@ html[data-theme="dark"] .privacy-option-active {
 
 .public-nav-viewport {
   position: relative;
-  height: auto; max-height: min(72dvh, 620px);
+  height: min(72dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 2px 8px;

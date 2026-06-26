@@ -238,11 +238,11 @@ export function UserDiscoveryManager() {
               <span>{t("followNew")}</span>
             </button>
           </div>
-          <BookedWishesPanel items={bookedWishes} isLoading={bookedWishesQuery.isLoading} />
+          <BookedWishesPanel items={bookedWishes} />
           </>
         ) : (
           <>
-          <BookedWishesPanel items={bookedWishes} isLoading={bookedWishesQuery.isLoading} />
+          <BookedWishesPanel items={bookedWishes} />
           <section className={`discover-launch ${bookedWishes.length ? "discover-launch-after-bookings" : ""}`}>
             <h2>{t("findTelegramFriends")}</h2>
             <button type="button" className="discover-launch-button" onClick={openTelegramFriendPicker}>
@@ -274,21 +274,11 @@ export function UserDiscoveryManager() {
  */
 function BookedWishesPanel({
   items,
-  isLoading,
 }: {
   items: BookedWishItem[];
-  isLoading: boolean;
 }) {
   const { t } = useTranslation();
   const [selectedWish, setSelectedWish] = useState<BookedWishItem | null>(null);
-
-  if (isLoading) {
-    return (
-      <div className="panel flex flex-col gap-3 p-4 w-full">
-        <div className="public-skeleton h-12 w-full rounded-xl" />
-      </div>
-    );
-  }
 
   if (!items.length) return null;
 
