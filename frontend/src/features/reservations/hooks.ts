@@ -107,6 +107,7 @@ export function useCreateReservationMutation(wishlistId: string, shareToken?: st
           owner_booking_visibility: null,
           owner_group_gift_visibility: null,
           reserver_display_name: null,
+          group_gift_organizer_display_name: null,
           has_active_group_gift: false,
         },
       );

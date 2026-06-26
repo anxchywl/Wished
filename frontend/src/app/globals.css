@@ -1442,6 +1442,14 @@ html[data-theme="dark"] .modal-sheet {
   padding-top: 12px !important;
 }
 
+.modal-sheet.keyboard-focus-mode .modal-focus-done {
+  margin-top: 0 !important;
+}
+
+.modal-sheet.keyboard-focus-mode .modal-focus-footer > .modal-footer-transition:first-child {
+  margin-top: 0 !important;
+}
+
 .keyboard-focus-mode .flex.flex-col.gap-4 {
   gap: 0px !important;
 }

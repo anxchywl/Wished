@@ -641,12 +641,12 @@ function WishRowBase({ wish, isOwner, isLast, onClick }: { wish: Wish; isOwner: 
   const isMine = reservationStatus.data?.is_mine ?? false;
   const ownerBookingVisibility = reservationStatus.data?.owner_booking_visibility ?? "hide";
   const ownerGroupGiftVisibility = profileQuery.data?.privacy?.group_gift_visibility ?? "hide";
-  const hasActiveGroupGift = wish.group_gift?.status === "active";
+  const hasActiveGroupGift = wish.group_gift?.status === "active" || reservationStatus.data?.has_active_group_gift === true;
   // owner sees crowd icon when group_gift_visibility != "hide"; falls back to lock when hidden
   const showGroupGift = !isCompleted && isOwner && hasActiveGroupGift && ownerGroupGiftVisibility !== "hide";
   const showBooked = !isCompleted && !showGroupGift && (
     (isBooked && (isMine || ownerBookingVisibility !== "hide" || wish.group_gift?.status === "completed")) ||
-    (isOwner && hasActiveGroupGift && ownerGroupGiftVisibility === "hide")
+    (isOwner && hasActiveGroupGift && ownerGroupGiftVisibility === "hide" && ownerBookingVisibility !== "hide")
   );
   return (
     <div
@@ -767,6 +767,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const reservationId = reservStatus?.reservation_id ?? null;
   const ownerBookingVisibility = reservStatus?.owner_booking_visibility ?? "hide";
   const reserverDisplayName = reservStatus?.reserver_display_name ?? null;
+  const groupGiftOrganizerDisplayName = reservStatus?.group_gift_organizer_display_name ?? null;
   const isCompleted = wish.status === "completed";
   const ownerGroupGiftVisibility = profileQuery.data?.privacy?.group_gift_visibility ?? "hide";
   const resolvedGroupGift = liveGroupGift.isFetched
@@ -775,9 +776,9 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
   const visibleGroupGift = isOwner && ownerGroupGiftVisibility === "hide"
     ? null
     : resolvedGroupGift;
-  const hasActiveGroupGift = visibleGroupGift?.status === "active" || (
-    !liveGroupGift.isFetched && reservStatus?.has_active_group_gift === true
-  );
+  const hasActiveGroupGift = visibleGroupGift?.status === "active" || reservStatus?.has_active_group_gift === true;
+  const showHiddenGroupGiftAsBooked =
+    isOwner && ownerGroupGiftVisibility === "hide" && hasActiveGroupGift && ownerBookingVisibility !== "hide";
 
   // booking actions available to non-owner viewer
   function handleBookToggle() {
@@ -927,7 +928,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           ) : null}
 
           {/* owner self-booking controls */}
-          {isOwner && !isCompleted && !hasActiveGroupGift && (isMine || ownerBookingVisibility !== "hide" || wish?.group_gift?.status === "completed") && (
+          {isOwner && !isCompleted && (!hasActiveGroupGift || showHiddenGroupGiftAsBooked) && (isMine || ownerBookingVisibility !== "hide" || wish?.group_gift?.status === "completed") && (
             <div className="w-full flex flex-col gap-2">
               {isMine ? (
                 <button
@@ -938,15 +939,17 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
                 >
                   {cancelReservation.isPending ? t("cancellingReservation") : t("wishBookedByYou")}
                 </button>
-              ) : isReserved ? (
+              ) : isReserved || showHiddenGroupGiftAsBooked ? (
                 <button
                   type="button"
                   className="w-full h-12 rounded-xl bg-muted/20 text-foreground text-sm font-bold inline-flex items-center justify-center gap-2"
-                  onClick={() => setRemoveBookingConfirming(true)}
+                  onClick={() => {
+                    if (isReserved) setRemoveBookingConfirming(true);
+                  }}
                 >
                   <span>
-                    {ownerBookingVisibility === "names" && reserverDisplayName
-                      ? `${t("wishBookedBySomeone")} · ${reserverDisplayName}`
+                    {ownerBookingVisibility === "names" && (reserverDisplayName || groupGiftOrganizerDisplayName)
+                      ? `${t("wishBookedBySomeone")} · ${reserverDisplayName || groupGiftOrganizerDisplayName}`
                       : t("wishBookedBySomeone")}
                   </span>
                 </button>
@@ -1086,7 +1089,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"} ${groupGiftFocusMode || groupGiftActionMode === "cancel" || groupGiftActionMode === "purchase" ? "modal-focus-collapsed" : "modal-focus-section"}`}>
+        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"} ${groupGiftFocusMode || groupGiftActionMode === "cancel" || groupGiftActionMode === "purchase" || groupGiftActionMode === "leave" ? "modal-focus-collapsed" : "modal-focus-section"}`}>
           {activeView === "viewGroupGift" ? (
             <span className="w-10 h-10" />
           ) : activeView === "createGroupGift" ? (
@@ -1503,11 +1506,11 @@ function EditWishlistModal({
             </div>
           </div>
 
-          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-2 pt-2 relative overflow-hidden`}>
             <div
-              className={`modal-footer-transition ${
+              className={`modal-focus-done modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming
-                  ? "opacity-100 max-h-12 scale-100 mt-1"
+                  ? "opacity-100 max-h-12 scale-100"
                   : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
               }`}
             >
@@ -1861,9 +1864,9 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
 
                 <div className="modal-focus-footer border-t border-border mt-2 pt-2 relative overflow-hidden">
                   <div
-                    className={`modal-footer-transition ${
+                    className={`modal-focus-done modal-footer-transition ${
                       focusMode.isFocusMode
-                        ? "opacity-100 max-h-12 scale-100 mt-1"
+                        ? "opacity-100 max-h-12 scale-100"
                         : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
                     }`}
                   >
@@ -2278,11 +2281,11 @@ function EditWishModal({
           </div>
 
 
-          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border mt-2 pt-2"} relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-2 pt-2 relative overflow-hidden`}>
             <div
-              className={`modal-footer-transition ${
+              className={`modal-focus-done modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming
-                  ? "opacity-100 max-h-12 scale-100 mt-1"
+                  ? "opacity-100 max-h-12 scale-100"
                   : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
               }`}
             >

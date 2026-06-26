@@ -246,7 +246,7 @@ export function PublicWishlistNavigator({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className={`public-nav-header ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
+        <div className={`public-nav-header ${groupGiftFocusMode || (current.view === "viewGroupGift" && groupGiftActionMode === "leave") ? "modal-focus-collapsed" : "modal-focus-section"}`}>
           {stack.length > 1 && !(current.view === "viewGroupGift" && groupGiftActionMode !== "overview") ? (
             <button
               type="button"

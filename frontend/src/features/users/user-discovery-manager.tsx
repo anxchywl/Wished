@@ -73,13 +73,13 @@ export function BookingVisibilityHeaderButton() {
         <div className={`modal-backdrop ${active ? "visible" : ""}`} onClick={() => setOpen(false)}>
           <div className={`modal-sheet ${active ? "visible" : ""}`} onClick={(e) => e.stopPropagation()}>
             <div className="modal-handle" />
-            <h3 className="modal-title font-bold text-base mb-4 text-center">{t("bookingVisibilityTitle")}</h3>
-            <div className="flex flex-col gap-2">
+            <h3 className="modal-title font-bold text-sm mb-2 text-center">{t("bookingVisibilityTitle")}</h3>
+            <div className="flex flex-col gap-1.5">
               {(["hide", "anonymous", "names"] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className={`flex flex-col items-start px-4 py-3 rounded-xl border transition-all text-left ${
+                  className={`flex flex-col items-start px-3 py-2 rounded-lg border transition-all text-left ${
                     currentVisibility === option
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-border bg-background text-foreground"
@@ -87,14 +87,14 @@ export function BookingVisibilityHeaderButton() {
                   onClick={() => handleChange(option)}
                   disabled={updatePrivacy.isPending}
                 >
-                  <span className="text-sm font-bold">
+                  <span className="text-xs font-bold">
                     {option === "hide"
                       ? t("bookingVisibilityHide")
                       : option === "anonymous"
                       ? t("bookingVisibilityAnonymous")
                       : t("bookingVisibilityNames")}
                   </span>
-                  <span className="text-xs text-muted mt-0.5">
+                  <span className="text-[11px] leading-snug text-muted mt-0.5">
                     {option === "hide"
                       ? t("bookingVisibilityHideDesc")
                       : option === "anonymous"
@@ -104,13 +104,13 @@ export function BookingVisibilityHeaderButton() {
                 </button>
               ))}
             </div>
-            <h3 className="modal-title font-bold text-base mt-5 mb-4 text-center">{t("groupGiftVisibilityTitle")}</h3>
-            <div className="flex flex-col gap-2">
+            <h3 className="modal-title font-bold text-sm mt-3 mb-2 text-center">{t("groupGiftVisibilityTitle")}</h3>
+            <div className="flex flex-col gap-1.5">
               {(["hide", "anonymous", "names"] as const).map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className={`flex flex-col items-start px-4 py-3 rounded-xl border transition-all text-left ${
+                  className={`flex flex-col items-start px-3 py-2 rounded-lg border transition-all text-left ${
                     currentGroupGiftVisibility === option
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-border bg-background text-foreground"
@@ -118,14 +118,14 @@ export function BookingVisibilityHeaderButton() {
                   onClick={() => handleGroupGiftChange(option)}
                   disabled={updatePrivacy.isPending}
                 >
-                  <span className="text-sm font-bold">
+                  <span className="text-xs font-bold">
                     {option === "hide"
                       ? t("groupGiftVisibilityHide")
                       : option === "anonymous"
                       ? t("groupGiftVisibilityAnonymous")
                       : t("groupGiftVisibilityNames")}
                   </span>
-                  <span className="text-xs text-muted mt-0.5">
+                  <span className="text-[11px] leading-snug text-muted mt-0.5">
                     {option === "hide"
                       ? t("groupGiftVisibilityHideDesc")
                       : option === "anonymous"

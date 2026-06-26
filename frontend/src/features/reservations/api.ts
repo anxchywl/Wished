@@ -19,6 +19,7 @@ export type WishReservationStatusResponse = {
   owner_booking_visibility: "hide" | "anonymous" | "names" | null;
   owner_group_gift_visibility: "hide" | "anonymous" | "names" | null;
   reserver_display_name: string | null;
+  group_gift_organizer_display_name: string | null;
   has_active_group_gift: boolean;
 };
 

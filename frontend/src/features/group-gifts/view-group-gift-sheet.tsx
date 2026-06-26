@@ -229,6 +229,7 @@ export function ViewGroupGiftContent({
     if (actionMode === "purchase") return t("groupGift");
     if (actionMode === "cancel") return t("groupGift");
     if (actionMode === "unbook") return t("groupGift");
+    if (actionMode === "leave") return "";
     if (actionMode === "removeContribution") return t("removeContribution");
     return t("groupGift");
   }
@@ -306,9 +307,11 @@ export function ViewGroupGiftContent({
     removeContribMutation.mutate(removeContribution.id, { onSuccess });
   }
 
+  const overviewPanel = renderOverviewPanel();
+
   return (
     <>
-      {showTitle ? (
+      {showTitle && getActionTitle() ? (
         <h3 className={`modal-title font-bold text-base mb-4 text-center ${focusMode.sectionClass("titleText")}`}>{getActionTitle()}</h3>
       ) : null}
 
@@ -364,9 +367,11 @@ export function ViewGroupGiftContent({
                 </span>
               </div>
 
-              <div className="border-t border-border pt-4">
-                {renderOverviewPanel()}
-              </div>
+              {overviewPanel ? (
+                <div className="border-t border-border pt-4">
+                  {overviewPanel}
+                </div>
+              ) : null}
 
               {renderMembers()}
               {renderCancelButton()}
@@ -427,17 +432,11 @@ export function ViewGroupGiftContent({
     if (gift.is_organizer) return renderOrganizerActions();
     const contrib = gift.my_contribution;
     if (isCollectedState && gift.is_contributor && contrib) {
-      const canCancelContribution = !["confirmed", "notified"].includes(contrib.status);
       return (
         <div className="flex flex-col gap-3">
           {gift.organizer_display_name ? (
             <p className="text-xs text-muted text-center">
               {t("groupGiftCreator")}: <span className="font-semibold text-foreground">{gift.organizer_display_name}</span>
-            </p>
-          ) : null}
-          {contrib.amount ? (
-            <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
             </p>
           ) : null}
           <p className="text-sm font-semibold text-center" style={{ color: "var(--color-success, #22c55e)" }}>
@@ -448,7 +447,6 @@ export function ViewGroupGiftContent({
               : t("transferConfirmedStatus")}
           </p>
           {renderPaymentDetails()}
-          {canCancelContribution ? renderLeaveButtons() : null}
         </div>
       );
     }
@@ -465,7 +463,6 @@ export function ViewGroupGiftContent({
           >
             {reportMutation.isPending ? t("saving") : t("iTransferred")}
           </button>
-          {renderLeaveButtons()}
         </div>
       );
     }
@@ -487,12 +484,6 @@ export function ViewGroupGiftContent({
     if (gift.is_contributor && contrib?.status === "pledged") {
       return (
         <div className="flex flex-col gap-3">
-          {contrib.amount ? (
-            <p className="text-sm text-muted text-center">
-              {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
-            </p>
-          ) : null}
-          {renderLeaveButtons()}
           {renderCancelApprovalToggle()}
         </div>
       );
@@ -719,8 +710,8 @@ export function ViewGroupGiftContent({
     }
     if (mode === "leave") {
       return (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted text-center">{t("confirmLeave")}</p>
+        <div className="flex flex-col gap-1.5 pt-0">
+          <p className="text-xs text-muted text-center leading-snug">{t("confirmLeave")}</p>
           <div className="flex gap-2">
             <button
               type="button"
@@ -779,18 +770,6 @@ export function ViewGroupGiftContent({
   }
 
   // ── Shared sub-renders ──
-
-  function renderLeaveButtons() {
-    return (
-      <button
-        type="button"
-        className="theme-press-danger w-full h-11 rounded-xl text-sm font-medium"
-        onClick={() => changeActionMode("leave")}
-      >
-        {t("leaveGiftButton")}
-      </button>
-    );
-  }
 
   function renderPaymentDetails() {
     if (!gift) return null;
@@ -1003,6 +982,7 @@ export function ViewGroupGiftContent({
   }
 
   function renderMembers() {
+    if (!canLoadMembers) return null;
     const members = membersQuery.data ?? [];
     if (!members.length) return null;
 
@@ -1030,6 +1010,15 @@ export function ViewGroupGiftContent({
             const contributionId = isOrganizer
               ? organizerContribAsContributor?.contribution_id
               : member.contribution_id;
+            const isMyContribution = Boolean(
+              gift?.my_contribution?.id && contributionId === gift.my_contribution.id,
+            );
+            const canRemoveContribution = Boolean(
+              contributionId && (
+                gift?.is_organizer ||
+                (isMyContribution && !["confirmed", "notified"].includes(member.status ?? ""))
+              ),
+            );
             return (
               <div key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}>
                 <div className="flex items-center justify-between gap-3">
@@ -1050,15 +1039,18 @@ export function ViewGroupGiftContent({
                       </button>
                     ) : null}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 min-w-[5rem] justify-end">
                     {displayAmount ? (
-                      <p className="text-sm font-semibold text-foreground">{formatAmount(displayAmount)}</p>
+                      <p className="min-w-[2.5rem] text-right text-sm font-semibold text-foreground">
+                        {formatAmount(displayAmount)}
+                      </p>
                     ) : null}
-                    {gift?.is_organizer && contributionId ? (
+                    {canRemoveContribution ? (
                       <button
                         type="button"
                         className="w-6 h-6 inline-flex items-center justify-center rounded-full text-muted hover:text-red-500 transition-colors"
                         onClick={() => {
+                          if (!contributionId) return;
                           setRemoveContribution({
                             id: contributionId,
                             isOrganizer,

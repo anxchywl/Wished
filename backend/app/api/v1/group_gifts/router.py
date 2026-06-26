@@ -53,7 +53,11 @@ async def post_group_gift(
     return await create_group_gift(db, current_user, wish_id, payload, redis=redis)
 
 
-@router.get("/wishes/{wish_id}/group-gift", response_model=GroupGiftResponse, response_model_exclude_none=False)
+@router.get(
+    "/wishes/{wish_id}/group-gift",
+    response_model=GroupGiftResponse | None,
+    response_model_exclude_none=False,
+)
 async def get_wish_group_gift(
     wish_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -69,7 +73,7 @@ async def get_wish_group_gift(
 
 @router.post(
     "/group-gifts/{group_gift_id}/approve",
-    response_model=GroupGiftResponse,
+    response_model=GroupGiftResponse | None,
     responses={status.HTTP_204_NO_CONTENT: {"description": "Group gift deleted after unanimous cancel approval"}},
 )
 async def post_group_gift_approve(

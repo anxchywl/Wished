@@ -140,9 +140,9 @@ export function CreateWishlistModal({ open, onClose, onCreate, isPending }: Crea
 
                 <div className="modal-focus-footer border-t border-border mt-2 pt-2 relative overflow-hidden">
                   <div
-                    className={`modal-footer-transition ${
+                    className={`modal-focus-done modal-footer-transition ${
                       focusMode.isFocusMode
-                        ? "opacity-100 max-h-12 scale-100 mt-1"
+                        ? "opacity-100 max-h-12 scale-100"
                         : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
                     }`}
                   >

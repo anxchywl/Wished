@@ -29,6 +29,7 @@ import type {
   WishUpdateInput,
 } from "@/features/wishes/types";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
+import { groupGiftQueryKeys } from "@/features/group-gifts/query-keys";
 import {
   bookedWishesQueryKey,
   reservationQueryKeys,
@@ -289,6 +290,9 @@ export function useUpdateWishMutation(wishlistId: string) {
         queryClient.invalidateQueries({ queryKey: wishQueryKeys.list(variables.input.wishlist_id) });
         queryClient.invalidateQueries({ queryKey: wishlistQueryKeys.all(tgUserId) });
       }
+      queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(data.id) });
+      queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
+      queryClient.invalidateQueries({ queryKey: bookedWishesQueryKey });
     },
   });
 }

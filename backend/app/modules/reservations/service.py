@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -157,13 +157,14 @@ async def get_wish_reservation_status(
     wish = await _get_accessible_wish(db, current_user, wish_id, require_active=False, share_token=share_token, redis=redis)
     is_owner = wish.wishlist.owner_user_id == current_user.id
 
-    gift_count = await db.scalar(
-        select(func.count()).select_from(GroupGift).where(
+    gift_result = await db.execute(
+        select(GroupGift).where(
             GroupGift.wish_id == wish_id,
             GroupGift.status == "active",
         )
     )
-    active_gift_exists = (gift_count or 0) > 0
+    active_gift = gift_result.scalar_one_or_none()
+    active_gift_exists = active_gift is not None
 
     # load owner once; used for visibility checks and group_gift_visibility throughout
     wish_owner: User | None = None
@@ -176,6 +177,13 @@ async def get_wish_reservation_status(
     )
 
     has_active_group_gift = active_gift_exists
+    group_gift_organizer_display_name = None
+    if is_owner and active_gift and current_user.booking_visibility == "names":
+        organizer = await db.get(User, active_gift.organizer_user_id)
+        if organizer is not None:
+            group_gift_organizer_display_name = (
+                f"@{organizer.username}" if organizer.username else organizer.first_name
+            )
 
     result = await db.execute(
         select(Reservation).where(
@@ -194,6 +202,7 @@ async def get_wish_reservation_status(
                 reservation_id=None,
                 owner_booking_visibility=current_user.booking_visibility,
                 owner_group_gift_visibility=getattr(current_user, "group_gift_visibility", "hide"),
+                group_gift_organizer_display_name=group_gift_organizer_display_name,
                 has_active_group_gift=has_active_group_gift,
             )
         return WishReservationStatusResponse(
@@ -226,6 +235,7 @@ async def get_wish_reservation_status(
             owner_booking_visibility=visibility,
             owner_group_gift_visibility=getattr(current_user, "group_gift_visibility", "hide"),
             reserver_display_name=reserver_display_name,
+            group_gift_organizer_display_name=group_gift_organizer_display_name,
             has_active_group_gift=has_active_group_gift,
         )
 

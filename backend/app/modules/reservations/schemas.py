@@ -26,6 +26,7 @@ class WishReservationStatusResponse(BaseModel):
     owner_booking_visibility: str | None = None
     owner_group_gift_visibility: str | None = None
     reserver_display_name: str | None = None
+    group_gift_organizer_display_name: str | None = None
     has_active_group_gift: bool = False
 
 
