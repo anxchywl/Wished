@@ -384,9 +384,12 @@ async def cancel_group_gift(
     db: AsyncSession,
     current_user: User,
     group_gift_id: UUID,
+    redis: Redis | None = None,
 ) -> None:
     result = await db.execute(
-        select(GroupGift).where(GroupGift.id == group_gift_id)
+        select(GroupGift)
+        .options(selectinload(GroupGift.wish))
+        .where(GroupGift.id == group_gift_id)
     )
     gift = result.scalar_one_or_none()
     if not gift:
@@ -395,24 +398,12 @@ async def cancel_group_gift(
     if gift.organizer_user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not the organizer")
 
-    if gift.status != "active":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group gift is not active",
-        )
-
-    gift.status = "cancelled"
-
-    result = await db.execute(
-        select(GroupGiftContribution).where(
-            GroupGiftContribution.group_gift_id == group_gift_id,
-            GroupGiftContribution.status != "cancelled",
-        )
-    )
-    for contrib in result.scalars().all():
-        contrib.status = "cancelled"
-
+    wishlist_id = gift.wish.wishlist_id
+    await db.delete(gift)
     await db.commit()
+
+    if redis is not None:
+        await cache_delete(redis, wishes_cache_key(wishlist_id))
 
 
 async def join_group_gift(

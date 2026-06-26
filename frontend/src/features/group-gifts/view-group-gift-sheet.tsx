@@ -529,6 +529,9 @@ export function ViewGroupGiftContent({
     if (mode === "purchase") {
       return (
         <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted text-center leading-relaxed">
+            {t("confirmMarkGiftPurchased")}
+          </p>
           <div className="flex gap-2">
             <button
               type="button"

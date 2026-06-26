@@ -75,8 +75,9 @@ async def delete_group_gift(
     group_gift_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> Response:
-    await cancel_group_gift(db, current_user, group_gift_id)
+    await cancel_group_gift(db, current_user, group_gift_id, redis=redis)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -1050,7 +1050,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
         onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-handle" />
-        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"} ${groupGiftFocusMode ? "modal-focus-collapsed" : "modal-focus-section"}`}>
+        <div className={`flex items-center justify-between ${removeBookingConfirming ? "mb-0" : "mb-4"} ${groupGiftFocusMode || groupGiftActionMode === "cancel" || groupGiftActionMode === "purchase" ? "modal-focus-collapsed" : "modal-focus-section"}`}>
           {activeView === "viewGroupGift" ? (
             <span className="w-10 h-10" />
           ) : activeView === "createGroupGift" ? (
