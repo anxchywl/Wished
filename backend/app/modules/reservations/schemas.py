@@ -75,6 +75,33 @@ class BookedWishItem(BaseModel):
     group_gift: BookedWishGroupGiftDetail | None = None
 
 
+class FulfilledWishItem(BaseModel):
+    """single wish the current user helped fulfill"""
+    fulfilled_id: UUID
+    wish_id: UUID
+    wish_title: str
+    wish_description: str | None
+    wish_url: str | None
+    wish_price: str | None
+    wish_currency: str | None
+    wish_status: str
+    wishlist_id: UUID
+    wishlist_title: str
+    owner_first_name: str | None
+    owner_username: str | None
+    owner_photo_url: str | None
+    images: list[WishImageResponse]
+    fulfilled_at: datetime
+    source: str
+    organizer_first_name: str | None = None
+    organizer_username: str | None = None
+    contributor_count: int | None = None
+    user_contribution_amount: str | None = None
+    total_collected_amount: str | None = None
+    group_gift_id: UUID | None = None
+
+
 class BookedWishListResponse(BaseModel):
-    """list of wishes the current user has booked"""
+    """discover contribution sections for the current user"""
     items: list[BookedWishItem]
+    fulfilled_items: list[FulfilledWishItem] = []

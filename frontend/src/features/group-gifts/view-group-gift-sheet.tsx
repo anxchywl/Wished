@@ -285,6 +285,10 @@ export function ViewGroupGiftContent({
     leaveMutation.mutate(undefined, { onSuccess: () => changeActionMode("overview") });
   }
 
+  function handleLeaveImmediately() {
+    leaveMutation.mutate(undefined, { onSuccess: () => changeActionMode("overview") });
+  }
+
   function handleJoin() {
     const amount = parseFloat(joinAmount);
     if (!amount || amount < 1) return;
@@ -446,6 +450,11 @@ export function ViewGroupGiftContent({
               ? t("waitingConfirmation")
               : t("transferConfirmedStatus")}
           </p>
+          {contrib.status !== "waiting_transfer" && contrib.status !== "waiting_confirmation" ? (
+            <p className="text-[11px] leading-snug text-muted text-center -mt-1">
+              {t("transferConfirmedHint")}
+            </p>
+          ) : null}
           {renderPaymentDetails()}
         </div>
       );
@@ -455,30 +464,61 @@ export function ViewGroupGiftContent({
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted text-center">{t("waitingTransfer")}</p>
           {renderPaymentDetails()}
-          <button
-            type="button"
-            className="w-full h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-            disabled={reportMutation.isPending}
-            onClick={() => reportMutation.mutate()}
-          >
-            {reportMutation.isPending ? t("saving") : t("iTransferred")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="w-10 h-11 inline-flex items-center justify-center rounded-xl text-muted hover:text-red-500 transition-colors disabled:opacity-50"
+              disabled={leaveMutation.isPending}
+              onClick={handleLeaveImmediately}
+              aria-label={t("leaveGiftButton")}
+              title={t("leaveGiftButton")}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="flex-1 h-11 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+              disabled={reportMutation.isPending || leaveMutation.isPending}
+              onClick={() => reportMutation.mutate()}
+            >
+              {reportMutation.isPending ? t("saving") : t("iTransferred")}
+            </button>
+          </div>
         </div>
       );
     }
     if (gift.is_contributor && contrib?.status === "waiting_confirmation") {
       return (
         <div className="flex flex-col items-center gap-3 py-2">
-          <div className="w-6 h-6 rounded-full border-2 border-muted border-t-primary animate-spin" />
+          <div className="w-8 h-8 rounded-full border-[3px] border-primary/20 border-t-primary animate-spin" />
           <p className="text-sm text-muted text-center">{t("waitingConfirmation")}</p>
+          <button
+            type="button"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-full text-muted hover:text-red-500 transition-colors disabled:opacity-50"
+            disabled={leaveMutation.isPending}
+            onClick={handleLeaveImmediately}
+            aria-label={t("leaveGiftButton")}
+            title={t("leaveGiftButton")}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+            </svg>
+          </button>
         </div>
       );
     }
     if (gift.is_contributor && contrib?.status === "confirmed") {
       return (
-        <p className="text-sm font-semibold text-center" style={{ color: "var(--color-success, #22c55e)" }}>
-          {t("transferConfirmedStatus")}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-semibold text-center" style={{ color: "var(--color-success, #22c55e)" }}>
+            {t("transferConfirmedStatus")}
+          </p>
+          <p className="text-[11px] leading-snug text-muted text-center">
+            {t("transferConfirmedHint")}
+          </p>
+        </div>
       );
     }
     if (gift.is_contributor && contrib?.status === "pledged") {
@@ -774,7 +814,7 @@ export function ViewGroupGiftContent({
   function renderPaymentDetails() {
     if (!gift) return null;
     return (
-      <div className="flex flex-col gap-1.5 bg-muted/5 rounded-xl p-3 border border-border">
+      <div className="flex flex-col gap-2 rounded-xl border border-border/80 bg-background px-3 py-2.5 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {t("organizerRequisites")}
@@ -795,22 +835,22 @@ export function ViewGroupGiftContent({
           ) : null}
         </div>
         {gift.payment_method ? (
-          <p className="text-sm leading-tight text-foreground">{gift.payment_method}</p>
+          <p className="text-sm leading-tight font-semibold text-foreground">{gift.payment_method}</p>
         ) : null}
         {gift.payment_phone ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm leading-tight font-semibold text-foreground">{gift.payment_phone}</p>
-            <button
-              type="button"
-              className="text-xs font-semibold text-primary shrink-0"
-              onClick={handleCopyPhone}
-            >
+          <button
+            type="button"
+            className="w-full text-left rounded-lg bg-muted/5 px-3 py-2 transition-colors hover:bg-muted/10"
+            onClick={handleCopyPhone}
+          >
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted">
               {phoneCopied ? t("phoneCopied") : t("copyPhone")}
-            </button>
-          </div>
+            </span>
+            <span className="block text-sm font-semibold leading-tight text-foreground">{gift.payment_phone}</span>
+          </button>
         ) : null}
         {gift.payment_comment ? (
-          <p className="text-xs leading-snug text-muted">{gift.payment_comment}</p>
+          <p className="rounded-lg bg-muted/5 px-3 py-2 text-xs leading-snug text-muted">{gift.payment_comment}</p>
         ) : null}
       </div>
     );

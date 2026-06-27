@@ -66,8 +66,34 @@ export type BookedWishItem = {
   group_gift: BookedWishGroupGiftDetail | null;
 };
 
+export type FulfilledWishItem = {
+  fulfilled_id: string;
+  wish_id: string;
+  wish_title: string;
+  wish_description: string | null;
+  wish_url: string | null;
+  wish_price: string | null;
+  wish_currency: string | null;
+  wish_status: string;
+  wishlist_id: string;
+  wishlist_title: string;
+  owner_first_name: string | null;
+  owner_username: string | null;
+  owner_photo_url: string | null;
+  images: WishImage[];
+  fulfilled_at: string;
+  source: "booking" | "group_gift";
+  organizer_first_name: string | null;
+  organizer_username: string | null;
+  contributor_count: number | null;
+  user_contribution_amount: string | null;
+  total_collected_amount: string | null;
+  group_gift_id: string | null;
+};
+
 export type BookedWishListResponse = {
   items: BookedWishItem[];
+  fulfilled_items: FulfilledWishItem[];
 };
 
 /**

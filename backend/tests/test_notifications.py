@@ -14,6 +14,7 @@ from app.modules.notifications.handlers import (
     _is_duplicate,
     _text,
     handle_followed,
+    handle_group_gift_created,
     handle_wish_created,
     handle_wish_fulfilled,
     handle_wishlist_created,
@@ -368,6 +369,29 @@ async def test_wish_fulfilled_text_contains_no_reservation_info() -> None:
     text = bot.send_message.call_args.kwargs["text"]
     for forbidden in ["reserved", "reserver", "reservation", "booked", "booking"]:
         assert forbidden not in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_group_gift_created_notification_is_muted() -> None:
+    bot = AsyncMock()
+    db = AsyncMock()
+    redis = AsyncMock()
+
+    await handle_group_gift_created(
+        {
+            "type": "GROUP_GIFT_CREATED",
+            "event_id": str(uuid4()),
+            "wishlist_owner_user_id": str(uuid4()),
+            "wish_title": "Book",
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
+    )
+
+    bot.send_message.assert_not_called()
+    db.execute.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

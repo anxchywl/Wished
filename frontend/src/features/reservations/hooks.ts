@@ -58,23 +58,27 @@ export function useBookedWishesQuery() {
       if (!cached) return response;
 
       const cachedImages = new Map(
-        cached.items.flatMap((item) => item.images.map((image) => [image.id, image] as const)),
+        [...cached.items, ...(cached.fulfilled_items ?? [])].flatMap((item) =>
+          item.images.map((image) => [image.id, image] as const),
+        ),
       );
+      const preserveImages = <T extends { images: typeof response.items[number]["images"] }>(item: T): T => ({
+        ...item,
+        images: item.images.map((image) => {
+          const cachedImage = cachedImages.get(image.id);
+          return cachedImage
+            ? {
+                ...image,
+                url: cachedImage.url,
+                thumbnail_url: cachedImage.thumbnail_url,
+                medium_url: cachedImage.medium_url,
+              }
+            : image;
+        }),
+      });
       return {
-        items: response.items.map((item) => ({
-          ...item,
-          images: item.images.map((image) => {
-            const cachedImage = cachedImages.get(image.id);
-            return cachedImage
-              ? {
-                  ...image,
-                  url: cachedImage.url,
-                  thumbnail_url: cachedImage.thumbnail_url,
-                  medium_url: cachedImage.medium_url,
-                }
-              : image;
-          }),
-        })),
+        items: response.items.map(preserveImages),
+        fulfilled_items: (response.fulfilled_items ?? []).map(preserveImages),
       };
     },
     enabled: Boolean(authStatus === "authenticated" && accessToken),

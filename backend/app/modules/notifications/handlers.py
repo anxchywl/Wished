@@ -30,6 +30,8 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Open Wish",
         "wish_fulfilled_title": "Wish fulfilled",
         "wish_fulfilled_body": "{actor} marked a wish as fulfilled.\n{title}",
+        "fulfilled_booking_body": "Your gift has been marked as fulfilled. Thank you for making it happen!",
+        "fulfilled_group_gift_body": "Your Group Gift has been fulfilled. Thank you for contributing!",
         "gg_transfer_reported_body": "{contributor} reported a transfer.\nAmount: {amount} {currency}\nWish: {wish_title}",
         "gg_confirm_btn": "Confirm",
         "gg_reject_btn": "Reject",
@@ -54,6 +56,8 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Открыть желание",
         "wish_fulfilled_title": "Желание исполнено",
         "wish_fulfilled_body": "{actor} отметил(а) желание как исполненное.\n{title}",
+        "fulfilled_booking_body": "Ваш подарок отмечен как исполненный. Спасибо, что помогли!",
+        "fulfilled_group_gift_body": "Ваш групповой подарок исполнен. Спасибо за участие!",
         "gg_transfer_reported_body": "{contributor} сообщил(а) о переводе.\nСумма: {amount} {currency}\nЖелание: {wish_title}",
         "gg_confirm_btn": "Подтвердить",
         "gg_reject_btn": "Отклонить",
@@ -78,6 +82,8 @@ _TEXT: dict[str, dict[str, str]] = {
         "open_wish": "Тілекті ашу",
         "wish_fulfilled_title": "Тілек орындалды",
         "wish_fulfilled_body": "{actor} тілекті орындалды деп белгіледі.\n{title}",
+        "fulfilled_booking_body": "Сыйлығыңыз орындалды деп белгіленді. Оны жүзеге асырғаныңызға рахмет!",
+        "fulfilled_group_gift_body": "Топтық сыйлығыңыз орындалды. Қатысқаныңызға рахмет!",
         "gg_transfer_reported_body": "{contributor} аударым туралы хабарлады.\nСома: {amount} {currency}\nТілек: {wish_title}",
         "gg_confirm_btn": "Растау",
         "gg_reject_btn": "Қабылдамау",
@@ -325,6 +331,47 @@ async def handle_wish_fulfilled(
             logger.exception("failed to send WISH_FULFILLED notification to telegram_id=%s", follower_tg_id)
 
 
+async def handle_fulfilled_participant(
+    event: dict,
+    db: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    mini_app_url: str,
+) -> None:
+    """notify the participant who helped fulfill a wish"""
+    participant_id = UUID(event["participant_user_id"])
+    event_id = event["event_id"]
+
+    result = await db.execute(select(User).where(User.id == participant_id))
+    participant = result.scalar_one_or_none()
+    if participant is None or participant.telegram_id is None:
+        return
+
+    if await _is_duplicate(redis, event_id, participant.telegram_id):
+        return
+    if not await _check_outbound_rate(redis):
+        logger.warning("outbound Telegram rate limit hit — dropping FULFILLED_PARTICIPANT for telegram_id=%s", participant.telegram_id)
+        return
+
+    t = _text(participant.language_code)
+    text = (
+        t["fulfilled_group_gift_body"]
+        if event.get("source") == "group_gift"
+        else t["fulfilled_booking_body"]
+    )
+    url = wish_url_by_id(
+        mini_app_url,
+        event["owner_user_id"],
+        event["wishlist_id"],
+        event["wish_id"],
+    )
+    try:
+        await _send(bot, participant.telegram_id, text, t["open_wish"], url)
+        logger.info("sent FULFILLED_PARTICIPANT notification to telegram_id=%s", participant.telegram_id)
+    except Exception:
+        logger.exception("failed to send FULFILLED_PARTICIPANT notification to telegram_id=%s", participant.telegram_id)
+
+
 async def _get_followers(db: AsyncSession, owner_id: UUID) -> list[tuple[int, str | None]]:
     """return (telegram_id, language_code) for all followers of owner"""
     result = await db.execute(
@@ -553,29 +600,5 @@ async def handle_group_gift_created(
     redis: Redis,
     mini_app_url: str,
 ) -> None:
-    """notify wish owner when a group gift is started, unless they have opted out"""
-    owner_id = UUID(event["wishlist_owner_user_id"])
-    event_id = event["event_id"]
-
-    result = await db.execute(select(User).where(User.id == owner_id))
-    owner = result.scalar_one_or_none()
-    if owner is None or owner.telegram_id is None:
-        return
-
-    if getattr(owner, "group_gift_visibility", "hide") == "hide":
-        return
-
-    if await _is_duplicate(redis, event_id, owner.telegram_id):
-        return
-
-    if not await _check_outbound_rate(redis):
-        logger.warning("outbound Telegram rate limit hit — dropping GROUP_GIFT_CREATED for telegram_id=%s", owner.telegram_id)
-        return
-
-    t = _text(owner.language_code)
-    text = t["gg_gift_started_body"].format(wish_title=event["wish_title"])
-    try:
-        await bot.send_message(chat_id=owner.telegram_id, text=text)
-        logger.info("sent GROUP_GIFT_CREATED notification to telegram_id=%s", owner.telegram_id)
-    except Exception:
-        logger.exception("failed to send GROUP_GIFT_CREATED notification to telegram_id=%s", owner.telegram_id)
+    """group gift start notifications are intentionally muted"""
+    return

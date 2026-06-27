@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Reservation, User, Wish, Wishlist
+from app.db.models import FulfilledWish, Reservation, User, Wish, Wishlist
 from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
@@ -16,6 +16,7 @@ from app.modules.reservations.schemas import (
     BookedWishGroupGiftDetail,
     BookedWishItem,
     BookedWishListResponse,
+    FulfilledWishItem,
     ReservationResponse,
     WishReservationStatusResponse,
 )
@@ -442,7 +443,97 @@ async def list_my_booked_wishes(
         )
 
     items.sort(key=lambda x: x.reserved_at, reverse=True)
-    return BookedWishListResponse(items=items)
+    fulfilled_items = await _list_my_fulfilled_wishes(db, current_user)
+    return BookedWishListResponse(items=items, fulfilled_items=fulfilled_items)
+
+
+async def _list_my_fulfilled_wishes(
+    db: AsyncSession,
+    current_user: User,
+) -> list[FulfilledWishItem]:
+    from app.integrations.minio import get_presigned_url
+    from app.modules.media.schemas import WishImageResponse
+
+    result = await db.execute(
+        select(FulfilledWish)
+        .join(Wish, Wish.id == FulfilledWish.wish_id)
+        .join(Wishlist, Wishlist.id == Wish.wishlist_id)
+        .options(
+            selectinload(FulfilledWish.wish).options(
+                selectinload(Wish.images),
+                selectinload(Wish.wishlist).options(selectinload(Wishlist.owner)),
+            ),
+            selectinload(FulfilledWish.organizer),
+        )
+        .where(
+            FulfilledWish.participant_user_id == current_user.id,
+            Wishlist.owner_user_id != current_user.id,
+        )
+        .order_by(FulfilledWish.fulfilled_at.desc())
+    )
+
+    def _make_images(wish: Wish) -> list[WishImageResponse]:
+        return [
+            WishImageResponse(
+                id=img.id,
+                wish_id=img.wish_id,
+                url=get_presigned_url(img.bucket, img.object_name),
+                thumbnail_url=(
+                    get_presigned_url(img.bucket, img.thumbnail_object_name)
+                    if img.thumbnail_object_name else None
+                ),
+                medium_url=(
+                    get_presigned_url(img.bucket, img.medium_object_name)
+                    if img.medium_object_name else None
+                ),
+                file_name=img.file_name,
+                content_type=img.content_type,
+                size_bytes=img.size_bytes,
+                status=img.status,
+                created_at=img.created_at,
+            )
+            for img in wish.images
+        ]
+
+    items: list[FulfilledWishItem] = []
+    for record in result.scalars().all():
+        wish = record.wish
+        wishlist = wish.wishlist
+        owner = wishlist.owner
+        organizer = record.organizer
+        items.append(
+            FulfilledWishItem(
+                fulfilled_id=record.id,
+                wish_id=wish.id,
+                wish_title=wish.title,
+                wish_description=wish.description,
+                wish_url=wish.url,
+                wish_price=str(wish.price) if wish.price is not None else None,
+                wish_currency=wish.currency,
+                wish_status=wish.status,
+                wishlist_id=wishlist.id,
+                wishlist_title=wishlist.title,
+                owner_first_name=owner.first_name,
+                owner_username=owner.username,
+                owner_photo_url=owner.photo_url,
+                images=_make_images(wish),
+                fulfilled_at=record.fulfilled_at,
+                source=record.source,
+                organizer_first_name=organizer.first_name if organizer else None,
+                organizer_username=organizer.username if organizer else None,
+                contributor_count=record.contributor_count,
+                user_contribution_amount=(
+                    str(record.user_contribution_amount)
+                    if record.user_contribution_amount is not None else None
+                ),
+                total_collected_amount=(
+                    str(record.total_collected_amount)
+                    if record.total_collected_amount is not None else None
+                ),
+                group_gift_id=record.group_gift_id,
+            )
+        )
+    return items
 
 
 async def _get_accessible_wish(

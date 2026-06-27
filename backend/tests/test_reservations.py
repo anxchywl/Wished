@@ -341,7 +341,9 @@ class TestOwnerCancelReservation:
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         no_rsv = AsyncMock()
         no_rsv.scalar_one_or_none = MagicMock(return_value=None)
-        db.execute = AsyncMock(side_effect=[wish_result, no_rsv])
+        no_gift = AsyncMock()
+        no_gift.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute = AsyncMock(side_effect=[wish_result, no_gift, no_rsv])
 
         client = TestClient(_make_app(db, user))
         resp = client.delete(f"/api/v1/wishes/{uuid4()}/reservation")
@@ -364,7 +366,9 @@ class TestReservationStatus:
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         no_rsv = AsyncMock()
         no_rsv.scalar_one_or_none = MagicMock(return_value=None)
-        db.execute = AsyncMock(side_effect=[wish_result, no_rsv])
+        no_gift = AsyncMock()
+        no_gift.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute = AsyncMock(side_effect=[wish_result, no_gift, no_rsv])
         db.scalar = AsyncMock(return_value=0)
         db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
 
@@ -392,7 +396,9 @@ class TestReservationStatus:
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         rsv_result = AsyncMock()
         rsv_result.scalar_one_or_none = MagicMock(return_value=rsv)
-        db.execute = AsyncMock(side_effect=[wish_result, rsv_result])
+        no_gift = AsyncMock()
+        no_gift.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute = AsyncMock(side_effect=[wish_result, no_gift, rsv_result])
         db.scalar = AsyncMock(return_value=0)
         db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
 
@@ -421,7 +427,9 @@ class TestReservationStatus:
         wish_result.scalar_one_or_none = MagicMock(return_value=wish)
         rsv_result = AsyncMock()
         rsv_result.scalar_one_or_none = MagicMock(return_value=rsv)
-        db.execute = AsyncMock(side_effect=[wish_result, rsv_result])
+        no_gift = AsyncMock()
+        no_gift.scalar_one_or_none = MagicMock(return_value=None)
+        db.execute = AsyncMock(side_effect=[wish_result, no_gift, rsv_result])
         db.scalar = AsyncMock(return_value=0)
 
         client = TestClient(_make_app(db, user))

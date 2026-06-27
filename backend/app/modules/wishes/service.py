@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import Settings
-from app.db.models import Reservation, User, Wish, WishImage, Wishlist
+from app.db.models import FulfilledWish, Reservation, User, Wish, WishImage, Wishlist
 from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.modules.events import publish_event
 from app.integrations.minio import copy_object, delete_object, get_presigned_url
@@ -225,6 +225,7 @@ async def reorder_wishes(
         .options(
             selectinload(Wish.images),
             selectinload(Wish.group_gift).selectinload(GroupGift.contributions),
+            selectinload(Wish.group_gift).selectinload(GroupGift.approvals),
         )
         .where(Wish.wishlist_id == wishlist_id)
     )
@@ -348,15 +349,7 @@ async def complete_wish(
         )
     wishlist_id = wish.wishlist_id
     wish.status = "completed"
-    result = await db.execute(
-        select(Reservation).where(
-            Reservation.wish_id == wish_id,
-            Reservation.status == "active",
-        )
-    )
-    reservation = result.scalar_one_or_none()
-    if reservation is not None:
-        reservation.status = "cancelled"
+    fulfilled_events = await _create_fulfilled_records(db, wish, current_user.id)
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish_id)
 
@@ -367,6 +360,8 @@ async def complete_wish(
             "wishlist_id": wishlist_id,
             "owner_user_id": current_user.id,
         })
+        for event in fulfilled_events:
+            await publish_event(redis, "FULFILLED_PARTICIPANT", event)
 
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
@@ -383,11 +378,107 @@ async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, r
         )
     wishlist_id = wish.wishlist_id
     wish.status = "active"
+    await db.execute(
+        FulfilledWish.__table__.delete().where(FulfilledWish.wish_id == wish_id)
+    )
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish_id)
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
+
+
+async def _create_fulfilled_records(db: AsyncSession, wish: Wish, owner_user_id: UUID) -> list[dict]:
+    events: list[dict] = []
+    gift_result = await db.execute(
+        select(GroupGift)
+        .options(
+            selectinload(GroupGift.contributions),
+            selectinload(GroupGift.approvals),
+        )
+        .where(
+            GroupGift.wish_id == wish.id,
+            GroupGift.status.in_(["active", "completed"]),
+        )
+    )
+    active_gift = gift_result.scalar_one_or_none()
+    if active_gift is not None:
+        non_cancelled = [c for c in active_gift.contributions if c.status != "cancelled"]
+        participant_amounts: dict[UUID, Decimal] = {}
+        for contribution in non_cancelled:
+            participant_amounts[contribution.contributor_user_id] = (
+                participant_amounts.get(contribution.contributor_user_id, Decimal("0")) + contribution.amount
+            )
+        participant_ids = set(participant_amounts)
+        participant_ids.add(active_gift.organizer_user_id)
+        participant_ids.discard(owner_user_id)
+        total_collected = sum(participant_amounts.values(), Decimal("0"))
+        contributor_count = len(participant_amounts)
+        for participant_id in participant_ids:
+            db.add(
+                FulfilledWish(
+                    wish_id=wish.id,
+                    participant_user_id=participant_id,
+                    source="group_gift",
+                    group_gift_id=active_gift.id,
+                    organizer_user_id=active_gift.organizer_user_id,
+                    contributor_count=contributor_count,
+                    user_contribution_amount=participant_amounts.get(participant_id),
+                    total_collected_amount=total_collected,
+                )
+            )
+            events.append({
+                "participant_user_id": participant_id,
+                "wish_id": wish.id,
+                "wishlist_id": wish.wishlist_id,
+                "owner_user_id": owner_user_id,
+                "wish_title": wish.title,
+                "source": "group_gift",
+            })
+        active_gift.status = "archived"
+        for contribution in non_cancelled:
+            contribution.status = "cancelled"
+        for approval in list(active_gift.approvals):
+            await db.delete(approval)
+        result = await db.execute(
+            select(Reservation).where(
+                Reservation.wish_id == wish.id,
+                Reservation.status == "active",
+            )
+        )
+        reservation = result.scalar_one_or_none()
+        if reservation is not None:
+            reservation.status = "cancelled"
+        return events
+
+    result = await db.execute(
+        select(Reservation).where(
+            Reservation.wish_id == wish.id,
+            Reservation.status == "active",
+        )
+    )
+    reservation = result.scalar_one_or_none()
+    if reservation is None or reservation.reserver_user_id == owner_user_id:
+        if reservation is not None:
+            reservation.status = "cancelled"
+        return events
+    db.add(
+        FulfilledWish(
+            wish_id=wish.id,
+            participant_user_id=reservation.reserver_user_id,
+            source="booking",
+        )
+    )
+    events.append({
+        "participant_user_id": reservation.reserver_user_id,
+        "wish_id": wish.id,
+        "wishlist_id": wish.wishlist_id,
+        "owner_user_id": owner_user_id,
+        "wish_title": wish.title,
+        "source": "booking",
+    })
+    reservation.status = "cancelled"
+    return events
 
 
 async def _get_owned_wishlist(

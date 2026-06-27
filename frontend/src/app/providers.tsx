@@ -240,7 +240,8 @@ function PersistentLayout({ children }: { children: ReactNode }) {
 
   const followedUsersCount = followingQuery.data?.items?.length ?? 0;
   const bookedWishesCount = bookedWishesQuery.data?.items?.length ?? 0;
-  const showDiscoverTitle = followedUsersCount >= 1 || bookedWishesCount >= 1;
+  const fulfilledWishesCount = bookedWishesQuery.data?.fulfilled_items?.length ?? 0;
+  const showDiscoverTitle = followedUsersCount >= 1 || bookedWishesCount >= 1 || fulfilledWishesCount >= 1;
 
   if (pathname === "/wishlists" || pathname === "/") {
     title = t("wishlists");

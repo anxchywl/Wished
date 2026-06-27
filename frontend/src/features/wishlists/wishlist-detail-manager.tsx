@@ -874,7 +874,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
       );
     }
     return (
-      <div className="public-nav-content">
+      <div className="public-nav-content pb-8">
         <div
           className={`modal-footer-transition ${
             removeBookingConfirming
@@ -1157,7 +1157,7 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
           )}
         </div>
 
-        <div className="public-nav-viewport">
+        <div className="public-nav-viewport wish-detail-viewport">
           {previousView ? (
             <div className={`public-nav-frame public-nav-exit-${navDirection}`} key={`prev-${previousView}`}>
               {renderViewContent(previousView)}

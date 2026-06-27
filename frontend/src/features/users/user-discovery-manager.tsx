@@ -15,7 +15,7 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import { logStartup } from "@/lib/debug/startup-log";
 import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { BookedWishItem } from "@/features/reservations/api";
+import type { BookedWishItem, FulfilledWishItem } from "@/features/reservations/api";
 import { WishImageThumb } from "@/features/wishlists/wishlist-visuals";
 
 /**
@@ -172,6 +172,7 @@ export function UserDiscoveryManager() {
   const followedUsers = followingQuery.data?.items ?? [];
   const bookedWishesQuery = useBookedWishesQuery();
   const bookedWishes = bookedWishesQuery.data?.items ?? [];
+  const fulfilledWishes = bookedWishesQuery.data?.fulfilled_items ?? [];
   const { t } = useTranslation();
 
   const guardDecision = isAuthPending(authStatus)
@@ -229,11 +230,13 @@ export function UserDiscoveryManager() {
             </button>
           </div>
           <BookedWishesPanel items={bookedWishes} />
+          <FulfilledWishesPanel items={fulfilledWishes} />
           </>
         ) : (
           <>
           <BookedWishesPanel items={bookedWishes} />
-          <section className={`discover-launch ${bookedWishes.length ? "discover-launch-after-bookings" : ""}`}>
+          <FulfilledWishesPanel items={fulfilledWishes} />
+          <section className={`discover-launch ${bookedWishes.length || fulfilledWishes.length ? "discover-launch-after-bookings" : ""}`}>
             <h2>{t("findTelegramFriends")}</h2>
             <button type="button" className="discover-launch-button" onClick={openTelegramFriendPicker}>
               <span>{t("chooseTelegramUsers")}</span>
@@ -257,6 +260,129 @@ export function UserDiscoveryManager() {
 
     </>
   );
+}
+
+function FulfilledWishesPanel({
+  items,
+}: {
+  items: FulfilledWishItem[];
+}) {
+  const { t } = useTranslation();
+  const [selectedWish, setSelectedWish] = useState<BookedWishItem | null>(null);
+
+  if (!items.length) return null;
+
+  return (
+    <>
+      <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
+        <div className="px-4 py-3 border-b-2 border-border">
+          <h3 className="text-sm font-bold text-foreground">{t("fulfilledWishes")}</h3>
+        </div>
+        <div className="flex flex-col">
+          {items.map((item, index) => (
+            <div key={item.fulfilled_id}>
+              <FulfilledWishRow item={item} onOpen={() => setSelectedWish(toBookedWishItem(item))} />
+              {index < items.length - 1 && <div className="h-px bg-border/60 ml-[68px]" />}
+            </div>
+          ))}
+        </div>
+      </div>
+      {selectedWish && (
+        <BookedWishModal
+          item={selectedWish}
+          onClose={() => setSelectedWish(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function FulfilledWishRow({ item, onOpen }: { item: FulfilledWishItem; onOpen: () => void }) {
+  const { t } = useTranslation();
+  const owner = item.owner_first_name || item.owner_username || "—";
+  const fulfilledDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(
+    new Date(item.fulfilled_at),
+  );
+  const amount = item.source === "group_gift" && item.user_contribution_amount
+    ? ` · ${t("yourContribution")}: ${fmtAmount(item.user_contribution_amount)} ${item.wish_currency ?? ""}`.trim()
+    : "";
+
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-3 px-4 text-left w-full min-h-14"
+      style={{ paddingTop: 10, paddingBottom: 10 }}
+      onClick={onOpen}
+    >
+      <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
+        <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.thumbnail_url ?? item.images?.[0]?.medium_url} className="w-full h-full object-cover wish-image-fulfilled" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
+          <span className="text-[10px] font-bold uppercase tracking-normal px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+            {t("wishFulfilled")}
+          </span>
+        </div>
+        <span className="text-xs text-muted block mt-0.5 line-clamp-1">
+          {owner} · {item.source === "group_gift" ? t("groupGift") : t("fulfilledByYou")} · {fulfilledDate}{amount}
+        </span>
+      </div>
+      <svg className="w-4 h-4 text-muted/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
+}
+
+function toBookedWishItem(item: FulfilledWishItem): BookedWishItem {
+  return {
+    reservation_id: null,
+    wish_id: item.wish_id,
+    wish_title: item.wish_title,
+    wish_description: item.wish_description,
+    wish_url: item.wish_url,
+    wish_price: item.wish_price,
+    wish_currency: item.wish_currency,
+    wish_status: item.wish_status,
+    wishlist_id: item.wishlist_id,
+    wishlist_title: item.wishlist_title,
+    owner_first_name: item.owner_first_name,
+    owner_username: item.owner_username,
+    owner_photo_url: item.owner_photo_url,
+    images: item.images,
+    reserved_at: item.fulfilled_at,
+    is_group_gift: item.source === "group_gift",
+    group_gift: item.source === "group_gift"
+      ? {
+          group_gift_id: item.group_gift_id ?? "",
+          status: "archived",
+          organizer_first_name: item.organizer_first_name,
+          organizer_username: item.organizer_username,
+          collected_amount: item.total_collected_amount ?? "0",
+          total_amount: item.wish_price,
+          percent_complete: 100,
+          participant_count: item.contributor_count ?? 0,
+          cancel_approval_count: 0,
+          unbook_approval_count: 0,
+          my_cancel_approval: false,
+          my_unbook_approval: false,
+          contributors: item.user_contribution_amount
+            ? [{
+                first_name: null,
+                username: null,
+                amount: `${fmtAmount(item.user_contribution_amount)} ${item.wish_currency ?? ""}`.trim(),
+                status: "confirmed",
+              }]
+            : [],
+        }
+      : null,
+  };
+}
+
+function fmtAmount(value: string) {
+  const num = Number(value);
+  return Number.isFinite(num) ? (Number.isInteger(num) ? String(num) : num.toFixed(2).replace(".", ",")) : value;
 }
 
 /**
@@ -306,7 +432,6 @@ type BookedWishRowProps = {
  * single booked wish row
  */
 function BookedWishRow({ item, onOpen }: BookedWishRowProps) {
-  const { t } = useTranslation();
   const isDeleted = item.wish_status === "completed";
 
   return (
@@ -395,6 +520,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
     : t("groupGift");
 
   function renderWishView() {
+    const archivedGroupGift = item.group_gift?.status === "archived" ? item.group_gift : null;
     return (
       <div className="public-nav-content">
         <section className="flex flex-col items-center gap-3">
@@ -437,8 +563,8 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
 
           {item.is_group_gift ? (
             <>
-              {(liveGroupGift.data ?? item.group_gift) ? (() => {
-                const gg = liveGroupGift.data ?? item.group_gift!;
+              {(archivedGroupGift ?? liveGroupGift.data ?? item.group_gift) ? (() => {
+                const gg = archivedGroupGift ?? liveGroupGift.data ?? item.group_gift!;
                 return (
                   <button
                     type="button"
@@ -448,7 +574,9 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
                     <div className="flex justify-between items-center text-xs text-muted">
                       <span>{t("groupGift")}</span>
                       <span>
-                        {gg.status === "cancelled"
+                        {gg.status === "archived"
+                          ? t("wishFulfilled")
+                          : gg.status === "cancelled"
                           ? t("giftCancelled")
                           : gg.status === "completed" || gg.percent_complete >= 100
                           ? t("giftComplete")
@@ -502,6 +630,42 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
   }
 
   function renderGroupGiftView() {
+    if (item.group_gift?.status === "archived") {
+      const gg = item.group_gift;
+      const organizer = gg.organizer_first_name || gg.organizer_username || "—";
+      return (
+        <div className="public-nav-content px-1 pb-1">
+          <section className="flex flex-col gap-3 rounded-xl border border-border bg-muted/5 px-3 py-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-bold text-foreground">{t("groupGift")}</span>
+              <span className="text-xs font-bold text-green-600">{t("wishFulfilled")}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <p className="text-muted">{t("groupGiftOrganizer")}</p>
+                <p className="font-semibold text-foreground truncate">{organizer}</p>
+              </div>
+              <div>
+                <p className="text-muted">{t("contributors")}</p>
+                <p className="font-semibold text-foreground">{gg.participant_count}</p>
+              </div>
+              <div>
+                <p className="text-muted">{t("yourContribution")}</p>
+                <p className="font-semibold text-foreground">
+                  {gg.contributors[0]?.amount ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted">{t("groupGiftTotalCollected")}</p>
+                <p className="font-semibold text-foreground">
+                  {fmtAmount(gg.collected_amount)} {item.wish_currency ?? ""}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      );
+    }
     return (
       <div className="public-nav-content px-1 pb-1">
         <ViewGroupGiftContent

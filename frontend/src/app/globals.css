@@ -1430,16 +1430,16 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .modal-sheet.keyboard-focus-mode form {
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .modal-sheet.keyboard-focus-mode .public-nav-frame {
-  gap: 0.35rem;
+  gap: 0.25rem;
 }
 
 .modal-sheet.keyboard-focus-mode .modal-focus-footer {
   margin-top: 0 !important;
-  padding-top: 12px !important;
+  padding-top: 8px !important;
 }
 
 .modal-sheet.keyboard-focus-mode .modal-focus-done {
@@ -1451,7 +1451,7 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .keyboard-focus-mode .flex.flex-col.gap-4 {
-  gap: 0px !important;
+  gap: 0.25rem !important;
 }
 
 .modal-footer-transition {
@@ -1674,6 +1674,12 @@ html[data-theme="dark"] .privacy-option-active {
   flex: 1;
   min-height: 0;
   max-height: none;
+}
+
+.modal-sheet-nav-host .wish-detail-viewport {
+  overflow-y: auto;
+  padding-bottom: 18px;
+  scroll-padding-bottom: 36px;
 }
 
 .public-nav-frame {

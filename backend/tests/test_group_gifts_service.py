@@ -282,6 +282,7 @@ async def test_members_include_creator_and_hide_amounts_from_owner() -> None:
         group_gift_id=gift.id,
         contributor_user_id=contributor_id,
         contributor=_user(user_id=contributor_id, username="friend", first_name="Friend"),
+        status="confirmed",
     )
     db = FakeDb([FakeResult(gift), FakeResult([contribution])])
 
@@ -308,12 +309,33 @@ async def test_members_show_amounts_to_organizer() -> None:
         group_gift_id=gift.id,
         contributor_user_id=contributor_id,
         contributor=_user(user_id=contributor_id),
+        status="confirmed",
     )
     db = FakeDb([FakeResult(gift), FakeResult([contribution])])
 
     response = await get_gift_members(db, _user(user_id=organizer_id), gift.id)
 
     assert response[1].amount == Decimal("25.00")
+
+
+@pytest.mark.asyncio
+async def test_immediate_pending_transfer_is_not_listed_as_contributor() -> None:
+    organizer_id = uuid4()
+    contributor_id = uuid4()
+    wish_id = uuid4()
+    gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
+    contribution = _contribution(
+        group_gift_id=gift.id,
+        contributor_user_id=contributor_id,
+        contributor=_user(user_id=contributor_id),
+        status="waiting_confirmation",
+    )
+    db = FakeDb([FakeResult(gift), FakeResult([contribution])])
+
+    response = await get_gift_members(db, _user(user_id=organizer_id), gift.id)
+
+    assert [member.role for member in response] == ["organizer"]
 
 
 @pytest.mark.asyncio
@@ -473,6 +495,7 @@ async def test_organizer_approval_with_contributor_is_partial() -> None:
     contributor_id = uuid4()
     wish_id = uuid4()
     gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
+    gift.collection_type = "commit"
     contributor = _user(user_id=contributor_id)
     gift.contributions = [
         _contribution(gift.id, contributor_id, contributor, status="pledged")

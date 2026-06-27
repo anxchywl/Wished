@@ -57,7 +57,9 @@ export function useGroupGiftQuery(wishId: string, shareToken?: string | null) {
     queryFn: () => getGroupGift(accessToken, wishId, shareToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && wishId),
     staleTime: 5_000,
-    refetchInterval: 5_000,
+    refetchInterval: (query) => (
+      query.state.data?.my_contribution?.status === "waiting_confirmation" ? 1_000 : 5_000
+    ),
   });
 }
 
@@ -180,6 +182,7 @@ export function useJoinGroupGiftMutation(wishId: string, groupGiftId: string) {
           const nextPercent = current.collection_type === "commit" && current.total_amount
             ? Math.min(100, Math.trunc((Number(nextCollected) / Number(current.total_amount)) * 100))
             : current.percent_complete;
+          const isAcceptedImmediately = current.collection_type === "commit";
           return {
             ...current,
             collected_amount: nextCollected,
@@ -187,7 +190,7 @@ export function useJoinGroupGiftMutation(wishId: string, groupGiftId: string) {
             percent_complete: nextPercent,
             is_contributor: true,
             my_contribution: result,
-            contributor_count: current.contributor_count + 1,
+            contributor_count: isAcceptedImmediately ? current.contributor_count + 1 : current.contributor_count,
           };
         },
       );
@@ -212,6 +215,8 @@ export function useReportTransferMutation(wishId: string, contributionId: string
           return { ...current, my_contribution: result };
         },
       );
+      queryClient.invalidateQueries({ queryKey: groupGiftQueryKeys.gift(wishId) });
+      queryClient.invalidateQueries({ queryKey: ["group-gifts", "members"] });
     },
   });
 }
@@ -227,11 +232,14 @@ export function useLeaveGroupGiftMutation(wishId: string, contributionId: string
         groupGiftQueryKeys.gift(wishId),
         (current) => {
           if (!current) return current;
+          const wasAccepted = current.my_contribution?.status
+            ? ["confirmed", "pledged", "notified"].includes(current.my_contribution.status)
+            : false;
           return {
             ...current,
             my_contribution: null,
             is_contributor: false,
-            contributor_count: Math.max(0, current.contributor_count - 1),
+            contributor_count: wasAccepted ? Math.max(0, current.contributor_count - 1) : current.contributor_count,
           };
         },
       );
@@ -265,5 +273,6 @@ export function useGiftMembersQuery(groupGiftId: string | null | undefined, enab
     queryKey: groupGiftQueryKeys.members(groupGiftId ?? ""),
     queryFn: () => getGiftMembers(accessToken, groupGiftId!),
     enabled: Boolean(groupGiftId && enabled),
+    refetchInterval: enabled ? 5_000 : false,
   });
 }

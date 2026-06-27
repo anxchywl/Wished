@@ -25,6 +25,19 @@ _CONFIRMED_STATUSES = {"confirmed", "pledged", "notified"}
 _TERMINAL_STATUSES = {"confirmed", "notified"}
 
 
+def _is_accepted_contribution(gift: GroupGift, contribution: GroupGiftContribution) -> bool:
+    if gift.collection_type == "immediate":
+        return contribution.status == "confirmed"
+    return contribution.status in _CONFIRMED_STATUSES
+
+
+def _accepted_contributions(
+    gift: GroupGift,
+    contributions: list[GroupGiftContribution],
+) -> list[GroupGiftContribution]:
+    return [c for c in contributions if _is_accepted_contribution(gift, c)]
+
+
 def _organizer_display_name(organizer: User | None) -> str | None:
     if organizer is None:
         return None
@@ -79,6 +92,7 @@ def _build_group_gift_response(
         None,
     )
     is_contributor = my_contrib is not None
+    accepted_contributions = _accepted_contributions(gift, non_cancelled)
     display_status = status_override or (
         "cancelled" if gift.organizer and gift.organizer.is_blocked else gift.status
     )
@@ -116,7 +130,7 @@ def _build_group_gift_response(
         collected_amount=collected_amount,
         remaining_amount=remaining_amount,
         percent_complete=percent_complete,
-        contributor_count=len(non_cancelled),
+        contributor_count=len(accepted_contributions),
         is_organizer=is_organizer,
         is_contributor=is_contributor,
         my_contribution=(
@@ -131,7 +145,7 @@ def _build_group_gift_response(
         ),
         organizer_display_name=organizer_display_name,
         created_at=gift.created_at,
-        participant_count=_participant_count(non_cancelled),
+        participant_count=_participant_count(accepted_contributions),
         cancel_approval_count=len(cancel_approvals),
         unbook_approval_count=len(unbook_approvals),
         my_cancel_approval=any(a.user_id == current_user.id for a in cancel_approvals),
@@ -263,7 +277,7 @@ async def get_group_gift(
             selectinload(GroupGift.organizer),
             selectinload(GroupGift.approvals),
         )
-        .where(GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed"]))
+        .where(GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed", "archived"]))
     )
     gift = result.scalar_one_or_none()
 
@@ -894,6 +908,7 @@ async def get_gift_members(
         )
     )
     contributions = result.scalars().all()
+    accepted_contributions = _accepted_contributions(gift, contributions)
 
     is_contributor = any(c.contributor_user_id == current_user.id for c in contributions)
 
@@ -919,7 +934,7 @@ async def get_gift_members(
             status=c.status,
             created_at=c.created_at,
         )
-        for c in contributions
+        for c in accepted_contributions
     )
     return members
 
