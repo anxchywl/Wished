@@ -60,4 +60,8 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: cd ${{ secrets.SSH_PATH }} && make deploy
+          script: |
+            cd ${{ secrets.SSH_PATH }}
+            git stash push --include-untracked -m "pre-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
+            git pull --ff-only
+            bash scripts/deploy.sh
