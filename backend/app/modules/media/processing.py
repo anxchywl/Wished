@@ -13,6 +13,10 @@ THUMBNAIL_MAX_DIM = 300
 MEDIUM_MAX_DIM = 1200
 WEBP_QUALITY = 88
 
+# decompression-bomb guard: refuse images whose decoded pixel count is absurd.
+# Pillow raises DecompressionBombError above this; well below the default 178 MP.
+Image.MAX_IMAGE_PIXELS = 50_000_000  # 50 megapixels
+
 
 def _resize_if_larger(img: Image.Image, max_dim: int) -> Image.Image:
     """return a proportionally resized copy when either side exceeds max_dim, else unchanged"""

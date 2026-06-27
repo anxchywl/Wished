@@ -1,12 +1,9 @@
 """link preview service — server-side metadata extraction from product URLs"""
 
-import asyncio
 import hashlib
-import ipaddress
 import json
 import logging
-import socket
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from uuid import UUID
 
 import httpx
@@ -16,11 +13,18 @@ from redis.asyncio import Redis
 from app.core.config import Settings
 from app.modules.link_preview.schemas import LinkPreviewResponse
 from app.modules.marketplace.parsers import truncate_to_sentences
+from app.modules.url_safety import (
+    assert_host_public,
+    make_event_hooks,
+    validate_outbound_url,
+)
 
 logger = logging.getLogger(__name__)
 
 _FETCH_TIMEOUT = 10.0
-_MAX_RESPONSE_BYTES = 512 * 1024  # 512 KB of HTML is enough for metadata
+# generous upper bound: real marketplace product pages (Amazon, Ozon) are large,
+# but this caps a malicious server from streaming unbounded HTML into memory
+_MAX_RESPONSE_BYTES = 5 * 1024 * 1024  # 5 MB
 _CACHE_TTL = 86400  # 24 hours
 _RATE_LIMIT_WINDOW = 3600  # 1 hour
 
@@ -101,6 +105,22 @@ _LAMODA_HOSTS = frozenset({"lamoda.ru", "www.lamoda.ru", "lamoda.kz", "www.lamod
 _DNS_HOSTS = frozenset({"dns-shop.ru", "www.dns-shop.ru", "dns-shop.kz", "www.dns-shop.kz"})
 _MVIDEO_HOSTS = frozenset({"mvideo.ru", "www.mvideo.ru"})
 
+# union of every supported marketplace host — only these may be fetched.
+# unknown hosts are rejected (no open-proxy / generic fallback over the network).
+PREVIEW_ALLOWED_HOSTS: frozenset[str] = frozenset(
+    _WB_HOSTS
+    | _OZON_HOSTS
+    | _KASPI_HOSTS
+    | _AMAZON_HOSTS
+    | _TEMU_HOSTS
+    | _EBAY_HOSTS
+    | _ALIBABA_HOSTS
+    | _OLX_HOSTS
+    | _LAMODA_HOSTS
+    | _DNS_HOSTS
+    | _MVIDEO_HOSTS
+)
+
 _USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -109,69 +129,31 @@ _USER_AGENT = (
 
 
 def validate_preview_url(url: str) -> tuple[str, str]:
-    """validate URL scheme and format; returns (normalized_url, hostname)"""
-    url = url.strip()
-    if len(url) > 2048:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="URL too long",
-        )
+    """validate scheme/credentials/port and enforce the supported-host allowlist.
+
+    Returns (normalized_url, hostname). Unknown hosts are rejected — there is no
+    open generic fetch over the network.
+    """
+    return validate_outbound_url(url, allowed_hosts=PREVIEW_ALLOWED_HOSTS)
+
+
+# kept for callers in this module; delegates to the shared SSRF check
+_check_host_not_private = assert_host_public
+
+
+def _normalize_url_for_cache(url: str) -> str:
+    """lowercase scheme+host so equivalent URLs map to a single cache entry"""
     try:
-        parsed = urlparse(url)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="invalid URL",
-        ) from exc
-
-    if parsed.scheme not in ("http", "https"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="URL must use http or https scheme",
+        p = urlparse(url)
+        return urlunparse(
+            p._replace(scheme=p.scheme.lower(), netloc=(p.netloc or "").lower())
         )
-
-    hostname = (parsed.hostname or "").lower()
-    if not hostname:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="invalid URL",
-        )
-
-    # reject obvious loopback and private hostnames before DNS resolution
-    if hostname in ("localhost", "127.0.0.1", "::1"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="requests to private or reserved addresses are not allowed",
-        )
-
-    return url, hostname
-
-
-async def _check_host_not_private(hostname: str) -> None:
-    """resolve hostname and reject private/loopback/reserved IPs"""
-    try:
-        results = await asyncio.to_thread(socket.getaddrinfo, hostname, None)
-    except socket.gaierror as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="could not resolve hostname",
-        ) from exc
-
-    for _family, _type, _proto, _canonname, sockaddr in results:
-        ip_str = sockaddr[0]
-        try:
-            addr = ipaddress.ip_address(ip_str)
-            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="requests to private or reserved addresses are not allowed",
-                )
-        except ValueError:
-            continue
+    except Exception:
+        return url
 
 
 def _cache_key(url: str) -> str:
-    digest = hashlib.sha256(url.encode()).hexdigest()[:32]
+    digest = hashlib.sha256(_normalize_url_for_cache(url).encode()).hexdigest()[:32]
     return f"link_preview:{digest}"
 
 
@@ -195,9 +177,13 @@ async def _set_cached(redis: Redis, url: str, result: LinkPreviewResponse) -> No
 async def _check_rate_limit(redis: Redis, user_id: UUID, settings: Settings) -> None:
     key = f"link_preview:rl:{user_id}"
     try:
-        count = await redis.incr(key)
-        if count == 1:
-            await redis.expire(key, _RATE_LIMIT_WINDOW)
+        # atomic incr+expire so the key always carries a TTL (avoids a permanently
+        # stuck counter if the EXPIRE is ever skipped or lost)
+        async with redis.pipeline(transaction=False) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, _RATE_LIMIT_WINDOW)
+            results = await pipe.execute()
+        count = results[0]
         if count > settings.link_preview_rate_per_hour:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -258,13 +244,11 @@ async def store_preview_image(
     from app.modules.marketplace.service import _download_and_process_image, _image_meta_cache_key
     from app.integrations.minio import get_presigned_url
 
-    parsed = urlparse(image_url)
-    if parsed.scheme not in ("http", "https"):
+    try:
+        image_url, hostname = validate_outbound_url(image_url)
+        await assert_host_public(hostname)
+    except HTTPException:
         return None
-    hostname = (parsed.hostname or "").lower()
-    if not hostname:
-        return None
-    await _check_host_not_private(hostname)
 
     result = await _download_and_process_image(image_url, user_id, settings)
     if result is None:
@@ -327,6 +311,7 @@ async def fetch_link_preview(
         max_redirects=5,
         headers=headers,
         proxy=proxy or None,
+        event_hooks=make_event_hooks(_MAX_RESPONSE_BYTES),
     ) as client:
         result = await extractor.extract(url, hostname, client)
 

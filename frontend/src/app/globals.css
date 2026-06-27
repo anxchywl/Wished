@@ -1238,7 +1238,7 @@ html[data-theme="dark"] .birthday-picker-wheel::after {
   align-items: center;
   justify-content: space-around;
   height: 54px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.45);
@@ -1249,7 +1249,7 @@ html[data-theme="dark"] .birthday-picker-wheel::after {
 }
 
 html[data-theme="dark"] .bottom-nav {
-  background: rgba(20, 20, 33, 0.55);
+  background: rgba(20, 20, 33, 0.88);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-color: rgba(255, 255, 255, 0.08);

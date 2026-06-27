@@ -9,14 +9,10 @@ For Wildberries, the backend also calls the public WB card API as a server-side
 enhancement — this API is accessible from datacenter IPs without restrictions.
 """
 
-import asyncio
-import ipaddress
 import json
 import logging
 import re
-import socket
 from decimal import Decimal, InvalidOperation
-from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 import httpx
@@ -26,6 +22,12 @@ from redis.asyncio import Redis
 from app.core.config import Settings
 from app.integrations.minio import get_presigned_url, upload_object
 from app.modules.marketplace.schemas import ImportClientPayload, ImportResult
+from app.modules.media.validation import detect_image_mime
+from app.modules.url_safety import (
+    assert_host_public,
+    make_event_hooks,
+    validate_outbound_url,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,67 +66,13 @@ _WB_HOSTS: frozenset[str] = frozenset({
     "wildberries.kz", "www.wildberries.kz",
 })
 
-_PRIVATE_NETWORKS = [
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("100.64.0.0/10"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-    ipaddress.ip_network("fe80::/10"),
-]
-
-
 def validate_import_url(url: str) -> tuple[str, str]:
-    """validate URL scheme and hostname allowlist — returns (url, hostname)"""
-    url = url.strip()
-    try:
-        parsed = urlparse(url)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid URL") from exc
-
-    if parsed.scheme not in ("http", "https"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="URL must use http or https scheme",
-        )
-
-    hostname = (parsed.hostname or "").lower()
-    if not hostname:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid URL")
-
-    if hostname not in ALLOWED_HOSTS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="unsupported marketplace",
-        )
-
-    return url, hostname
+    """validate scheme/credentials/port and enforce the marketplace host allowlist"""
+    return validate_outbound_url(url, allowed_hosts=ALLOWED_HOSTS)
 
 
-async def _check_host_not_private(hostname: str) -> None:
-    """resolve hostname and reject private/loopback/reserved IPs (SSRF protection)"""
-    try:
-        results = await asyncio.to_thread(socket.getaddrinfo, hostname, None)
-    except socket.gaierror as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="could not resolve hostname",
-        ) from exc
-
-    for _family, _type, _proto, _canonname, sockaddr in results:
-        ip_str = sockaddr[0]
-        try:
-            addr = ipaddress.ip_address(ip_str)
-            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    detail="requests to private or reserved addresses are not allowed",
-                )
-        except ValueError:
-            continue
+# delegates to the shared SSRF check (resolve + reject private/reserved IPs)
+_check_host_not_private = assert_host_public
 
 
 async def _check_import_rate_limit(redis: Redis, user_id: UUID, settings: Settings) -> None:
@@ -199,7 +147,11 @@ async def _fetch_wb_card_api(url: str, redis: Redis | None = None) -> dict | Non
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
         }
-        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=8.0,
+            follow_redirects=True,
+            event_hooks=make_event_hooks(_MAX_IMAGE_BYTES),
+        ) as client:
             resp = await client.get(api_url, headers=headers)
             resp.raise_for_status()
             data = resp.json()
@@ -251,15 +203,31 @@ async def _download_and_process_image(
             timeout=_FETCH_TIMEOUT,
             follow_redirects=True,
             max_redirects=4,
+            event_hooks=make_event_hooks(_MAX_IMAGE_BYTES),
         ) as client:
-            response = await client.get(image_url)
-            response.raise_for_status()
-            content = response.content
+            # stream + cap so an oversized response is aborted, not fully buffered
+            async with client.stream("GET", image_url) as response:
+                response.raise_for_status()
+                chunks: list[bytes] = []
+                total = 0
+                async for chunk in response.aiter_bytes(65536):
+                    total += len(chunk)
+                    if total > _MAX_IMAGE_BYTES:
+                        logger.warning("marketplace image exceeded size limit")
+                        return None
+                    chunks.append(chunk)
+                content = b"".join(chunks)
     except Exception as exc:
         logger.warning("marketplace image download failed: %s", exc)
         return None
 
-    if not content or len(content) > _MAX_IMAGE_BYTES:
+    if not content:
+        return None
+
+    # verify real image bytes before handing to Pillow — reject anything that
+    # isn't a supported image format (defends Pillow's wider decoder surface)
+    if detect_image_mime(content) is None:
+        logger.warning("marketplace image rejected: unrecognised format")
         return None
 
     try:
@@ -326,14 +294,11 @@ async def import_product(
                 currency = currency or wb_data.get("currency")
                 image_url = image_url or wb_data.get("image_url")
 
-    # SSRF check on image URL before downloading
+    # SSRF check on image URL before downloading (scheme/creds/port + IP)
     if image_url:
         try:
-            parsed_img = urlparse(image_url)
-            if parsed_img.scheme not in ("http", "https"):
-                image_url = None
-            elif parsed_img.hostname:
-                await _check_host_not_private(parsed_img.hostname)
+            image_url, img_host = validate_outbound_url(image_url)
+            await assert_host_public(img_host)
         except HTTPException:
             image_url = None
         except Exception:

@@ -629,7 +629,13 @@ function PublicWishRow({ wish, shareToken, onOpen, onPrefetch }: PublicWishRowPr
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-border">
-          <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url} className="w-full h-full object-cover" hideIcon={isLockedBooked || isGroupGifted} />
+          <WishImageThumb
+            id={wish.id}
+            title={wish.title}
+            imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url}
+            className={`w-full h-full object-cover ${isCompleted ? "wish-image-fulfilled" : ""}`}
+            hideIcon={isLockedBooked || isGroupGifted}
+          />
           {isCompleted ? (
             <div className="wish-fulfilled-check">
               <svg fill="currentColor" viewBox="0 0 24 24">

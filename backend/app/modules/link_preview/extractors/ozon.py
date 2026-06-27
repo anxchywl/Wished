@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 
 _PRODUCT_SLUG_RE = re.compile(r"/product/([a-z0-9][a-z0-9-]*?)-(\d{5,})/?", re.IGNORECASE)
 
+# hosts an og:url is permitted to point at before we follow it (defense-in-depth)
+_OZON_HOSTS = frozenset({"ozon.ru", "www.ozon.ru", "ozon.kz", "www.ozon.kz"})
+
 
 def _title_from_slug(url: str) -> str | None:
     """derive a human-readable title from an Ozon product URL slug"""
@@ -50,9 +53,20 @@ class OzonExtractor:
             # teaser pages (short URL landing) have title/image but no price;
             # try the canonical og:url to get the full product page with JSON-LD
             if data.price is None:
+                from urllib.parse import urlparse
                 from app.modules.marketplace.parsers import _meta_content
                 og_url = _meta_content(html, "og:url")
-                if og_url and og_url != final_url and "/product/" in og_url:
+                # only follow an og:url that is itself a valid Ozon product URL —
+                # never trust HTML to hand us an arbitrary outbound target
+                og_parsed = urlparse(og_url) if og_url else None
+                og_host = (og_parsed.hostname or "").lower() if og_parsed else ""
+                if (
+                    og_parsed
+                    and og_parsed.scheme == "https"
+                    and og_host in _OZON_HOSTS
+                    and og_url != final_url
+                    and "/product/" in og_parsed.path
+                ):
                     try:
                         resp2 = await client.get(og_url)
                         if resp2.status_code == 200 and "Antibot Challenge" not in resp2.text:

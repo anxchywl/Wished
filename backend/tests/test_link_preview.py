@@ -32,21 +32,23 @@ def test_validate_preview_url_accepts_kaspi() -> None:
     assert hostname == "kaspi.kz"
 
 
-def test_validate_preview_url_accepts_generic_https() -> None:
+def test_validate_preview_url_rejects_unsupported_host() -> None:
+    # generic/unknown hosts are no longer fetched — only the marketplace allowlist
     from app.modules.link_preview.service import validate_preview_url
-    url, hostname = validate_preview_url("https://example.com/product")
-    assert hostname == "example.com"
+    with pytest.raises(HTTPException) as exc_info:
+        validate_preview_url("https://example.com/product")
+    assert exc_info.value.status_code == 422
 
 
 def test_validate_preview_url_accepts_http() -> None:
     from app.modules.link_preview.service import validate_preview_url
-    _, hostname = validate_preview_url("http://example.com/product")
-    assert hostname == "example.com"
+    _, hostname = validate_preview_url("http://ozon.ru/product/something-123/")
+    assert hostname == "ozon.ru"
 
 
 def test_validate_preview_url_strips_whitespace() -> None:
     from app.modules.link_preview.service import validate_preview_url
-    url, _ = validate_preview_url("  https://example.com/product  ")
+    url, _ = validate_preview_url("  https://ozon.ru/product/something-123/  ")
     assert not url.startswith(" ")
     assert not url.endswith(" ")
 
@@ -112,14 +114,14 @@ def _addr(ip: str) -> list:
 @pytest.mark.asyncio
 async def test_ssrf_check_allows_public_ip() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
         await _check_host_not_private("example.com")  # must not raise
 
 
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_loopback() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("example.com")
         assert exc_info.value.status_code == 422
@@ -128,7 +130,7 @@ async def test_ssrf_check_blocks_loopback() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_10_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -136,7 +138,7 @@ async def test_ssrf_check_blocks_private_10_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_172_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -144,7 +146,7 @@ async def test_ssrf_check_blocks_private_172_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_192_168_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", return_value=_addr("192.168.1.1")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -152,7 +154,7 @@ async def test_ssrf_check_blocks_private_192_168_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_raises_on_dns_failure() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.link_preview.service.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")):
+    with patch("app.modules.url_safety.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("doesnotexist.example.com")
         assert exc_info.value.status_code == 422
@@ -163,9 +165,18 @@ async def test_ssrf_check_raises_on_dns_failure() -> None:
 # ---------------------------------------------------------------------------
 
 def _fake_redis_incr(count: int) -> MagicMock:
+    """mock redis whose pipeline.execute() returns [incr_count, expire_ok]"""
+    pipe = MagicMock()
+    pipe.incr = MagicMock()
+    pipe.expire = MagicMock()
+    pipe.execute = AsyncMock(return_value=[count, True])
+
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=pipe)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+
     redis = MagicMock()
-    redis.incr = AsyncMock(return_value=count)
-    redis.expire = AsyncMock(return_value=True)
+    redis.pipeline = MagicMock(return_value=ctx)
     return redis
 
 

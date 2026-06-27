@@ -1,6 +1,5 @@
 """Kaspi marketplace product metadata extractor"""
 
-import asyncio
 import logging
 import re
 from urllib.parse import urlparse, urlencode, parse_qs, urlunparse
@@ -41,10 +40,9 @@ class KaspiExtractor:
         html: str | None = None
         try:
             resp = await client.get(fetch_url)
-            if resp.status_code == 429:
-                retry_after = int(resp.headers.get("Retry-After", "3"))
-                await asyncio.sleep(min(retry_after, 5))
-                resp = await client.get(fetch_url)
+            # do NOT honour a remote Retry-After sleep — a hostile/throttling server
+            # could pin our worker tasks for seconds each (slowloris-style). Treat a
+            # 429 as a transient miss and fall back to the URL-slug title below.
             if resp.status_code == 200:
                 html = resp.text
             else:

@@ -18,12 +18,26 @@ export type ExtractedProduct = {
   marketplace?: string;
 };
 
+// exact host → marketplace label. Substring matching is avoided so spoof hosts
+// like "kaspi.evil.com" or "notkaspi.com" are not misclassified. This label is
+// cosmetic only; the backend re-derives the marketplace from its own allowlist.
+const MARKETPLACE_BY_HOST: Record<string, string> = {
+  "kaspi.kz": "kaspi",
+  "www.kaspi.kz": "kaspi",
+  "wildberries.ru": "wildberries",
+  "www.wildberries.ru": "wildberries",
+  "wildberries.kz": "wildberries",
+  "www.wildberries.kz": "wildberries",
+  "ozon.ru": "ozon",
+  "www.ozon.ru": "ozon",
+  "ozon.kz": "ozon",
+  "www.ozon.kz": "ozon",
+};
+
 export function detectMarketplace(url: string): string | undefined {
   try {
     const { hostname } = new URL(url);
-    if (hostname.includes("kaspi")) return "kaspi";
-    if (hostname.includes("wildberries")) return "wildberries";
-    if (hostname.includes("ozon")) return "ozon";
+    return MARKETPLACE_BY_HOST[hostname.toLowerCase()];
   } catch {}
   return undefined;
 }
