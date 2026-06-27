@@ -64,6 +64,7 @@ export type BookedWishItem = {
   reserved_at: string;
   is_group_gift: boolean;
   group_gift: BookedWishGroupGiftDetail | null;
+  is_fulfilled_history?: boolean;
 };
 
 export type FulfilledWishItem = {

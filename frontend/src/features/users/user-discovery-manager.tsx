@@ -318,14 +318,9 @@ function FulfilledWishRow({ item, onOpen }: { item: FulfilledWishItem; onOpen: (
         <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.thumbnail_url ?? item.images?.[0]?.medium_url} className="w-full h-full object-cover wish-image-fulfilled" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
-          <span className="text-[10px] font-bold uppercase tracking-normal px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
-            {t("wishFulfilled")}
-          </span>
-        </div>
+        <span className="font-semibold text-sm text-foreground line-clamp-1">{item.wish_title}</span>
         <span className="text-xs text-muted block mt-0.5 line-clamp-1">
-          {owner} · {item.source === "group_gift" ? t("groupGift") : t("fulfilledByYou")} · {fulfilledDate}{amount}
+          {owner} · {item.source === "group_gift" ? `${t("groupGift")} · ` : ""}{fulfilledDate}{amount}
         </span>
       </div>
       <svg className="w-4 h-4 text-muted/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
@@ -353,6 +348,7 @@ function toBookedWishItem(item: FulfilledWishItem): BookedWishItem {
     images: item.images,
     reserved_at: item.fulfilled_at,
     is_group_gift: item.source === "group_gift",
+    is_fulfilled_history: true,
     group_gift: item.source === "group_gift"
       ? {
           group_gift_id: item.group_gift_id ?? "",
@@ -593,7 +589,7 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
                 );
               })() : null}
             </>
-          ) : (
+          ) : item.is_fulfilled_history ? null : (
             <button
               type="button"
               className="theme-confirm-danger w-full h-12 rounded-xl text-sm font-bold"
