@@ -197,9 +197,10 @@ export function UserDiscoveryManager() {
         ) : followedUsers.length > 0 ? (
           <>
           <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-            <div className="px-4 py-3 border-b-2 border-border">
+            <div className="px-4 py-3">
               <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
             </div>
+            <div className="mx-4 h-0.5 bg-border" />
             <div className="discover-following">
               {followedUsers.map((user, index) => (
                 <div key={user.user_id}>
@@ -275,9 +276,10 @@ function FulfilledWishesPanel({
   return (
     <>
       <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-        <div className="px-4 py-3 border-b-2 border-border">
+        <div className="px-4 py-3">
           <h3 className="text-sm font-bold text-foreground">{t("fulfilledWishes")}</h3>
         </div>
+        <div className="mx-4 h-0.5 bg-border" />
         <div className="flex flex-col">
           {items.map((item, index) => (
             <div key={item.fulfilled_id}>
@@ -402,9 +404,10 @@ function BookedWishesPanel({
   return (
     <>
       <div className="panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-        <div className="px-4 py-3 border-b-2 border-border">
+        <div className="px-4 py-3">
           <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
+        <div className="mx-4 h-0.5 bg-border" />
         <div className="flex flex-col">
           {items.map((item, index) => (
             <div key={item.reservation_id}>
@@ -533,14 +536,10 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
               imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.thumbnail_url}
               className={`w-full h-full object-cover ${item.is_fulfilled_history ? "wish-image-fulfilled" : ""}`}
             />
-            {item.is_fulfilled_history ? (
-              <div className="wish-fulfilled-check">
-                <svg fill="currentColor" viewBox="0 0 24 24">
-                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
-                </svg>
-              </div>
-            ) : null}
           </div>
+          {item.is_fulfilled_history ? (
+            <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
+          ) : null}
           <p className="text-xs text-muted text-center">
             {ownerWishlistLine}
           </p>
@@ -560,11 +559,28 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
           ) : null}
         </section>
 
+        {item.is_fulfilled_history && item.wish_price ? (
+          <p className="text-xl font-extrabold text-primary text-center">
+            {fmtPrice(item.wish_price)} {item.wish_currency ?? ""}
+          </p>
+        ) : null}
+
         {item.wish_description ? (
-          <section className="mt-3">
-            <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
-              {item.wish_description}
-            </p>
+          <section className={item.is_fulfilled_history ? "px-4 mt-2" : "mt-3"}>
+            {item.is_fulfilled_history ? (
+              <div className="rounded-xl border border-border bg-muted/5 px-3 py-2.5 text-left">
+                <h4 className="text-[10px] font-extrabold uppercase tracking-wider text-muted mb-1.5">
+                  {t("descriptionLabel")}
+                </h4>
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/60">
+                  {item.wish_description}
+                </p>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/80 text-center">
+                {item.wish_description}
+              </p>
+            )}
           </section>
         ) : null}
 
