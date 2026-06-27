@@ -1390,7 +1390,8 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .wish-image-fulfilled {
-  filter: none;
+  filter: grayscale(0.65) saturate(0.55);
+  opacity: 0.72;
 }
 
 .wish-fulfilled-check {
