@@ -161,10 +161,10 @@ export function ViewGroupGiftContent({
   const collectedValueScale = interpolate(0.82, 1.08, normalizedProgress);
   const collectedWeight = Math.round(interpolate(600, 800, normalizedProgress));
   const collectedOpacity = interpolate(0.62, 1, normalizedProgress);
-  const targetLabelScale = interpolate(1, 0.92, normalizedProgress);
-  const targetValueScale = interpolate(1.15, 0.96, normalizedProgress);
-  const targetWeight = Math.round(interpolate(760, 650, normalizedProgress));
-  const targetOpacity = interpolate(1, 0.74, normalizedProgress);
+  const targetLabelScale = interpolate(1, 0.88, normalizedProgress);
+  const targetValueScale = interpolate(1.15, 0.82, normalizedProgress);
+  const targetWeight = Math.round(interpolate(760, 600, normalizedProgress));
+  const targetOpacity = interpolate(1, 0.62, normalizedProgress);
   const isCollectedState = Boolean(
     gift?.status === "active" &&
     gift.total_amount &&
@@ -632,8 +632,10 @@ export function ViewGroupGiftContent({
     if (mode === "contribute") {
       return (
         <div className="flex flex-col gap-2.5">
-          {renderPaymentDetails({ showEdit: false, compact: true })}
-          <div className="flex flex-col gap-1.5">
+          <div className={focusMode.sectionClass("paymentDetails")}>
+            {renderPaymentDetails({ showEdit: false, compact: true })}
+          </div>
+          <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("amount")}`}>
             <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
               {t("amountLabel")}
             </label>
@@ -645,6 +647,8 @@ export function ViewGroupGiftContent({
               placeholder={t("amountPlaceholder")}
               value={joinAmount}
               onChange={(e) => setJoinAmount(e.currentTarget.value)}
+              onBlur={focusMode.onFieldBlur}
+              {...focusMode.fieldFocusProps("amount")}
             />
             {remainingAmount !== null ? (
               <p className="text-xs text-muted">
@@ -652,27 +656,39 @@ export function ViewGroupGiftContent({
               </p>
             ) : null}
           </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
-              onClick={() => changeActionMode("overview")}
-            >
-              {t("cancelButton")}
-            </button>
-            <button
-              type="button"
-              className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
-              disabled={
-                joinMutation.isPending ||
-                !joinAmount ||
-                parseFloat(joinAmount) < 1 ||
-                (remainingAmount !== null && parseFloat(joinAmount) > remainingAmount)
-              }
-              onClick={handleJoin}
-            >
-              {joinMutation.isPending ? t("saving") : t("confirmJoin")}
-            </button>
+          <div className="modal-focus-footer border-t border-border pt-3 flex gap-2">
+            {focusMode.isFocusMode ? (
+              <button
+                type="button"
+                className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold"
+                onClick={focusMode.clearFocus}
+              >
+                {t("done")}
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="flex-1 h-10 rounded-xl bg-muted/10 text-muted text-sm font-medium"
+                  onClick={() => changeActionMode("overview")}
+                >
+                  {t("cancelButton")}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-60"
+                  disabled={
+                    joinMutation.isPending ||
+                    !joinAmount ||
+                    parseFloat(joinAmount) < 1 ||
+                    (remainingAmount !== null && parseFloat(joinAmount) > remainingAmount)
+                  }
+                  onClick={handleJoin}
+                >
+                  {joinMutation.isPending ? t("saving") : t("confirmJoin")}
+                </button>
+              </>
+            )}
           </div>
         </div>
       );

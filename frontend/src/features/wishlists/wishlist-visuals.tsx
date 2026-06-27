@@ -27,6 +27,7 @@ type WishlistCoverStyleInput = {
 
 const imageObjectUrlCache = new Map<string, string>();
 const imageObjectUrlRequests = new Map<string, Promise<string>>();
+const revealedImageKeys = new Set<string>();
 const PERSISTENT_IMAGE_CACHE = "wished-images-v1";
 
 function stableImageCacheKey(url: string, accountId: number | null): string {
@@ -37,6 +38,13 @@ function stableImageCacheKey(url: string, accountId: number | null): string {
   } catch {
     return `${accountId ?? "anonymous"}:${resolvedUrl.split("?")[0]}`;
   }
+}
+
+function imageRevealKey(url: string, accountId: number | null): string {
+  if (url.startsWith("data:") || url.startsWith("blob:")) {
+    return `${accountId ?? "anonymous"}:${url}`;
+  }
+  return stableImageCacheKey(url, accountId);
 }
 
 async function loadCachedImage(url: string, accountId: number | null): Promise<string> {
@@ -177,13 +185,21 @@ export function WishImageThumb({ id, title, imageUrl, className = "", hideIcon =
   const accountId = useAuthStore((state) => state.tgUserId);
   const [failed, setFailed] = useState(false);
   const [displayUrl, setDisplayUrl] = useState("");
+  const [revealKey, setRevealKey] = useState("");
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     setFailed(false);
     if (!imageUrl) {
       setDisplayUrl("");
+      setRevealKey("");
+      setImgLoaded(false);
       return;
     }
+
+    const nextRevealKey = imageRevealKey(imageUrl, accountId);
+    setRevealKey(nextRevealKey);
+    setImgLoaded(revealedImageKeys.has(nextRevealKey));
 
     if (imageUrl.startsWith("data:") || imageUrl.startsWith("blob:")) {
       setDisplayUrl(imageUrl);
@@ -219,6 +235,14 @@ export function WishImageThumb({ id, title, imageUrl, className = "", hideIcon =
       src={displayUrl}
       alt={title}
       className={className}
+      style={{
+        opacity: imgLoaded ? 1 : 0,
+        transition: revealedImageKeys.has(revealKey) ? undefined : "opacity 200ms ease",
+      }}
+      onLoad={() => {
+        if (revealKey) revealedImageKeys.add(revealKey);
+        setImgLoaded(true);
+      }}
       onError={() => setFailed(true)}
     />
   );

@@ -8,6 +8,12 @@ from app.modules.profiles.schemas import (
 )
 
 
+def _supported_wishlist_visibility(value: str) -> str:
+    if value in ("private", "public"):
+        return value
+    return "public"
+
+
 def build_profile_response(user: User) -> ProfileResponse:
     """build profile response"""
     return ProfileResponse(
@@ -23,7 +29,7 @@ def build_profile_response(user: User) -> ProfileResponse:
         privacy=PrivacySettingsResponse(
             profile_visibility=user.profile_visibility,
             birthday_visibility=user.birthday_visibility,
-            wishlist_visibility=user.wishlist_visibility,
+            wishlist_visibility=_supported_wishlist_visibility(user.wishlist_visibility),
             booking_visibility=user.booking_visibility,
             group_gift_visibility=user.group_gift_visibility,
         ),
