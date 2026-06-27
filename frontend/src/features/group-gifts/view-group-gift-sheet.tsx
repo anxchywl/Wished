@@ -455,7 +455,7 @@ export function ViewGroupGiftContent({
               {t("transferConfirmedHint")}
             </p>
           ) : null}
-          {renderPaymentDetails()}
+          {renderPaymentDetails({ showEdit: false, compact: true })}
         </div>
       );
     }
@@ -463,7 +463,7 @@ export function ViewGroupGiftContent({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted text-center">{t("waitingTransfer")}</p>
-          {renderPaymentDetails()}
+          {renderPaymentDetails({ showEdit: false, compact: true })}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -536,7 +536,7 @@ export function ViewGroupGiftContent({
               {t("amountLabel")}: <span className="font-semibold text-foreground">{formatAmount(contrib.amount)}</span>
             </p>
           ) : null}
-          {renderPaymentDetails()}
+          {renderPaymentDetails({ showEdit: false, compact: true })}
         </div>
       );
     }
@@ -812,15 +812,16 @@ export function ViewGroupGiftContent({
 
   // ── Shared sub-renders ──
 
-  function renderPaymentDetails() {
+  function renderPaymentDetails(options: { showEdit?: boolean; compact?: boolean } = {}) {
     if (!gift) return null;
+    const showEdit = options.showEdit ?? gift.is_organizer;
     return (
-      <div className="flex flex-col gap-2 rounded-xl border border-border/80 bg-background px-3 py-2.5 shadow-sm">
+      <div className={options.compact ? "flex flex-col gap-1.5 rounded-xl bg-muted/5 px-3 py-2.5" : "flex flex-col gap-2 rounded-xl border border-border/80 bg-background px-3 py-2.5 shadow-sm"}>
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
             {t("organizerRequisites")}
           </p>
-          {gift.is_organizer ? (
+          {showEdit ? (
             <button
               type="button"
               className="w-7 h-7 inline-flex items-center justify-center text-primary"
@@ -841,17 +842,23 @@ export function ViewGroupGiftContent({
         {gift.payment_phone ? (
           <button
             type="button"
-            className="w-full text-left rounded-lg bg-muted/5 px-3 py-2 transition-colors hover:bg-muted/10"
+            className={options.compact ? "w-full text-left text-sm font-semibold leading-tight text-foreground transition-opacity hover:opacity-80" : "w-full text-left rounded-lg bg-muted/5 px-3 py-2 transition-colors hover:bg-muted/10"}
             onClick={handleCopyPhone}
           >
-            <span className="block text-[10px] font-bold uppercase tracking-wider text-muted">
-              {phoneCopied ? t("phoneCopied") : t("copyPhone")}
-            </span>
-            <span className="block text-sm font-semibold leading-tight text-foreground">{gift.payment_phone}</span>
+            {options.compact ? (
+              <span>{phoneCopied ? t("phoneCopied") : gift.payment_phone}</span>
+            ) : (
+              <>
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-muted">
+                  {phoneCopied ? t("phoneCopied") : t("copyPhone")}
+                </span>
+                <span className="block text-sm font-semibold leading-tight text-foreground">{gift.payment_phone}</span>
+              </>
+            )}
           </button>
         ) : null}
         {gift.payment_comment ? (
-          <p className="rounded-lg bg-muted/5 px-3 py-2 text-xs leading-snug text-muted">{gift.payment_comment}</p>
+          <p className={options.compact ? "text-xs leading-snug text-muted" : "rounded-lg bg-muted/5 px-3 py-2 text-xs leading-snug text-muted"}>{gift.payment_comment}</p>
         ) : null}
       </div>
     );
@@ -1063,29 +1070,31 @@ export function ViewGroupGiftContent({
             return (
               <div key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}>
                 <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {displayName}
-                      {isOrganizer ? (
-                        <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
-                      ) : null}
-                    </p>
-                    {member.username ? (
-                      <button
-                        type="button"
-                        className="truncate text-xs text-muted pressable-link text-left"
-                        onClick={() => navigator.clipboard.writeText(`@${member.username}`).catch(() => {})}
-                      >
-                        @{member.username}
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0 min-w-[5rem] justify-end">
+                  <div className="flex min-w-0 items-center gap-2">
                     {displayAmount ? (
-                      <p className="min-w-[2.5rem] text-right text-sm font-semibold text-foreground">
+                      <p className="shrink-0 text-sm font-semibold text-foreground">
                         {formatAmount(displayAmount)}
                       </p>
                     ) : null}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {displayName}
+                        {isOrganizer ? (
+                          <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
+                        ) : null}
+                      </p>
+                      {member.username ? (
+                        <button
+                          type="button"
+                          className="truncate text-xs text-muted pressable-link text-left"
+                          onClick={() => navigator.clipboard.writeText(`@${member.username}`).catch(() => {})}
+                        >
+                          @{member.username}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end">
                     {canRemoveContribution ? (
                       <button
                         type="button"

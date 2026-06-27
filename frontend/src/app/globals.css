@@ -1403,8 +1403,8 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .wish-fulfilled-check svg {
-  width: 28%;
-  height: 28%;
+  width: 20px;
+  height: 20px;
   min-width: 20px;
   min-height: 20px;
   color: #22c55e;
