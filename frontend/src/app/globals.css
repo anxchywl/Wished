@@ -2106,7 +2106,6 @@ html[data-theme="dark"] .privacy-option-btn {
 body:has(.modal-backdrop.visible) .app-route-transition,
 body:has(.birthday-picker-backdrop.visible) .app-route-transition {
   position: relative;
-  z-index: 200;
 }
 
 body:has(.modal-backdrop.visible) .cover-profile-row,

@@ -40,6 +40,9 @@ docker compose "${COMPOSE_ARGS[@]}" pull --quiet 2>/dev/null || true
 log "Building application images..."
 docker compose "${COMPOSE_ARGS[@]}" build
 
+log "Running database migrations..."
+docker compose "${COMPOSE_ARGS[@]}" run --rm backend alembic upgrade head
+
 log "Bringing services up (preserving all volumes)..."
 # --remove-orphans cleans renamed services; -d is detached; no -v anywhere
 docker compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
