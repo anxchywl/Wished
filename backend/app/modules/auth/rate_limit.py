@@ -16,14 +16,18 @@ async def check_auth_rate_limit(redis: Redis, request: Request, trust_proxy_head
     """increment auth counters per client IP and raise 429 if either limit is exceeded
 
     trust_proxy_headers must only be True when the backend sits behind a trusted
-    reverse proxy that sanitises X-Forwarded-For. When False (default), the direct
-    TCP connection address is used so that clients cannot bypass the limit by
-    forging the header.
+    reverse proxy that appends the real client IP to X-Forwarded-For. When False
+    (default), the direct TCP connection address is used so that clients cannot
+    bypass the limit by forging the header.
     """
     if trust_proxy_headers:
+        # the trusted proxy appends the real client to any client-supplied XFF,
+        # so the rightmost entry is the only value the client cannot forge
+        forwarded = [p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
         client_ip = (
-            request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-            or (request.client.host if request.client else "unknown")
+            forwarded[-1]
+            if forwarded
+            else (request.client.host if request.client else "unknown")
         )
     else:
         client_ip = request.client.host if request.client else "unknown"

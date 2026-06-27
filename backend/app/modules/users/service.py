@@ -190,7 +190,7 @@ def build_user_profile_response(
     current_user: User | None = None,
     is_following: bool = False,
 ) -> UserProfileResponse:
-    """build user profile response"""
+    """build user profile response — birthday is shown to anyone who can view the profile"""
     is_owner = current_user is not None and current_user.id == user.id
     return UserProfileResponse(
         user_id=str(user.id),
@@ -198,7 +198,7 @@ def build_user_profile_response(
         first_name=user.first_name,
         last_name=user.last_name,
         photo_url=user.photo_url,
-        birthday=user.birthday if is_owner or user.birthday_visibility == "public" or (is_following and user.birthday_visibility == "friends") else None,
+        birthday=user.birthday,
         is_self=is_owner,
         is_following=False if is_owner else is_following,
     )

@@ -4,6 +4,9 @@
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
         Referrer-Policy "strict-origin-when-cross-origin"
+        # conservative CSP: blocks plugins and <base>-tag/href injection without
+        # constraining script/style sources, so the Next.js app is unaffected
+        Content-Security-Policy "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
         -Server
     }
 

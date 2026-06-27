@@ -308,9 +308,10 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
 
   // share wishlist — for private wishlists, embed a share token so recipients can view it
   async function handleShare() {
-    const username = profileQuery.data?.username;
+    // the deep link resolves the owner by internal id, so encode the UUID (not the username)
+    const ownerId = currentUserId ?? wishlist?.owner_user_id;
     const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, "");
-    if (!username || !botUsername) return;
+    if (!ownerId || !botUsername) return;
     const accessToken = useAuthStore.getState().accessToken;
     let shareToken: string | undefined;
     if (wishlist?.visibility === "private" && accessToken) {
@@ -321,7 +322,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         // proceed without token — recipient will see 404 for private wishlist
       }
     }
-    const startParam = encodeWishlistStartParam(username, wishlistId, shareToken);
+    const startParam = encodeWishlistStartParam(ownerId, wishlistId, shareToken);
     const miniAppUrl = `https://t.me/${botUsername}/wished?startapp=${encodeURIComponent(startParam)}`;
     const shareText = t("shareWishlistText").replace("{wishlist}", wishlist?.title ?? "");
     const tgShareUrl =

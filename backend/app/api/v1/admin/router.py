@@ -179,7 +179,7 @@ async def list_wishlists(
 ) -> list[AdminWishlistItem]:
     """list all wishlists for moderation"""
     stmt = select(Wishlist, User).join(User, Wishlist.owner_user_id == User.id).order_by(Wishlist.created_at.desc()).limit(limit).offset(offset)
-    if visibility in ("public", "private", "friends"):
+    if visibility in ("public", "private"):
         stmt = stmt.where(Wishlist.visibility == visibility)
     rows = list((await db.execute(stmt)).all())
 

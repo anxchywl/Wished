@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 ProfileVisibility = Literal["private", "public", "friends"]
 BirthdayVisibility = Literal["private", "public", "friends", "hidden"]
-WishlistVisibility = Literal["private", "public", "friends"]
+WishlistVisibility = Literal["private", "public"]
 BookingVisibility = Literal["hide", "anonymous", "names"]
 GroupGiftVisibility = Literal["hide", "anonymous", "names"]
 

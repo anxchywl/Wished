@@ -23,7 +23,7 @@ class User(Base):
     birthday: Mapped[date | None] = mapped_column(Date, nullable=True)
     profile_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="public")
     birthday_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
-    wishlist_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="friends")
+    wishlist_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="public")
     booking_visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="hide")
     group_gift_visibility: Mapped[str] = mapped_column(
         String(20), nullable=False, default="hide", server_default="hide"

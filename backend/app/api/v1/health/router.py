@@ -13,6 +13,11 @@ from app.integrations.minio.client import get_minio_client
 
 router = APIRouter()
 
+# cap how often unauthenticated /health probes hit the dependencies, so the
+# endpoint cannot be used as a cheap resource-amplification vector
+_HEALTH_CACHE_KEY = "health:status"
+_HEALTH_CACHE_TTL = 10
+
 
 class DependencyHealth(BaseModel):
     """dependency health"""
@@ -38,20 +43,41 @@ async def health(
     redis_status: Literal["ok", "error"] = "ok"
     minio_status: Literal["ok", "error"] = "ok"
 
+    cached = None
     try:
-        await db.execute(text("SELECT 1"))
+        cached = await redis.get(_HEALTH_CACHE_KEY)
     except Exception:
-        database_status = "error"
+        cached = None
+    if isinstance(cached, (str, bytes)):
+        raw = cached.decode() if isinstance(cached, bytes) else cached
+        db_c, redis_c, minio_c = (raw.split(",") + ["error", "error", "error"])[:3]
+        database_status = "ok" if db_c == "ok" else "error"
+        redis_status = "ok" if redis_c == "ok" else "error"
+        minio_status = "ok" if minio_c == "ok" else "error"
+    else:
+        try:
+            await db.execute(text("SELECT 1"))
+        except Exception:
+            database_status = "error"
 
-    try:
-        await redis.ping()
-    except Exception:
-        redis_status = "error"
+        try:
+            await redis.ping()
+        except Exception:
+            redis_status = "error"
 
-    try:
-        await run_in_threadpool(get_minio_client().list_buckets)
-    except Exception:
-        minio_status = "error"
+        try:
+            await run_in_threadpool(get_minio_client().list_buckets)
+        except Exception:
+            minio_status = "error"
+
+        try:
+            await redis.setex(
+                _HEALTH_CACHE_KEY,
+                _HEALTH_CACHE_TTL,
+                f"{database_status},{redis_status},{minio_status}",
+            )
+        except Exception:
+            pass
 
     overall_status: Literal["ok", "degraded"] = (
         "ok"

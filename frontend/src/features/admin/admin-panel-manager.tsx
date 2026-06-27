@@ -420,7 +420,6 @@ function WishlistRow({ item }: { item: AdminWishlistItem }) {
   const visibilityMap: Record<string, string> = {
     public: t("adminVisibilityPublic"),
     private: t("adminVisibilityPrivate"),
-    friends: t("adminVisibilityFriends"),
   };
   return (
     <article className="admin-list-card">

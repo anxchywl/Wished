@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-WishlistVisibility = Literal["private", "public", "friends"]
+WishlistVisibility = Literal["private", "public"]
 
 
 class WishlistCreateRequest(BaseModel):

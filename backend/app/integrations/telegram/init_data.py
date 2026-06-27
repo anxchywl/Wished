@@ -61,6 +61,10 @@ def validate_telegram_init_data(
     age_seconds = (datetime.now(UTC) - auth_date).total_seconds()
     if age_seconds > max_age_seconds:
         raise TelegramInitDataError("Telegram init data is expired")
+    # reject timestamps from the future (small skew allowed) so a forged auth_date
+    # cannot produce a never-expiring payload
+    if age_seconds < -60:
+        raise TelegramInitDataError("Telegram auth_date is in the future")
 
     user_raw = parsed.get("user")
     if not user_raw:

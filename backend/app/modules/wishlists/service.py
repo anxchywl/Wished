@@ -288,7 +288,7 @@ async def upload_wishlist_cover(
     )
 
     try:
-        thumbnail_bytes, medium_bytes, full_bytes = process_image(content)
+        thumbnail_bytes, medium_bytes = process_image(content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -297,7 +297,6 @@ async def upload_wishlist_cover(
 
     image_id = uuid4()
     bucket = settings.minio_media_bucket
-    full_name = f"wishlists/{wishlist_id}/{image_id}"
     thumb_name = f"wishlists/{wishlist_id}/{image_id}-t"
     medium_name = f"wishlists/{wishlist_id}/{image_id}-m"
     # remember old objects to delete after commit
@@ -309,11 +308,11 @@ async def upload_wishlist_cover(
     ]:
         if wishlist.cover_image_bucket and obj_name:
             old_objects.append((wishlist.cover_image_bucket, obj_name))
-    upload_object(bucket, full_name, full_bytes, "image/webp")
     upload_object(bucket, thumb_name, thumbnail_bytes, "image/webp")
     upload_object(bucket, medium_name, medium_bytes, "image/webp")
+    # no separate full-size variant — medium is the canonical cover object
     wishlist.cover_image_bucket = bucket
-    wishlist.cover_image_object_name = full_name
+    wishlist.cover_image_object_name = medium_name
     wishlist.cover_image_thumbnail_object_name = thumb_name
     wishlist.cover_image_medium_object_name = medium_name
     await db.commit()
