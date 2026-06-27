@@ -214,11 +214,11 @@ export function UserDiscoveryManager() {
                     <UserAvatar user={user} />
                     <span>{user.first_name || user.username}</span>
                   </button>
-                  {index < followedUsers.length - 1 && <div className="h-px bg-border" />}
+                  {index < followedUsers.length - 1 && <div className="mx-4 h-px bg-border" />}
                 </div>
               ))}
             </div>
-            <div className="h-0.5 bg-border" />
+            <div className="mx-4 h-0.5 bg-border" />
             <button
               type="button"
               className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"

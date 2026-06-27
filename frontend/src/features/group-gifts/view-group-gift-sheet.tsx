@@ -50,6 +50,21 @@ function formatAmount(amount: string | null | undefined): string {
   }).format(numeric);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getGiftProgress(collectedAmount: string | null | undefined, totalAmount: string | null | undefined): number {
+  const collected = Number(collectedAmount);
+  const target = Number(totalAmount);
+  if (!Number.isFinite(collected) || !Number.isFinite(target) || target <= 0) return 0;
+  return clamp(collected / target, 0, 1);
+}
+
+function interpolate(min: number, max: number, progress: number): number {
+  return min + (max - min) * progress;
+}
+
 export function ViewGroupGiftSheet({ wishId, shareToken, onClose }: Props) {
   const [active, setActive] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
@@ -140,10 +155,20 @@ export function ViewGroupGiftContent({
     remainingAmount !== null
       ? Math.max(0, remainingAmount - (Number.isFinite(enteredContributionAmount) ? enteredContributionAmount : 0))
       : null;
+  const normalizedProgress = getGiftProgress(gift?.collected_amount, gift?.total_amount);
+  const progressPercent = Math.round(normalizedProgress * 100);
+  const collectedLabelScale = interpolate(0.88, 1.04, normalizedProgress);
+  const collectedValueScale = interpolate(0.82, 1.08, normalizedProgress);
+  const collectedWeight = Math.round(interpolate(600, 800, normalizedProgress));
+  const collectedOpacity = interpolate(0.62, 1, normalizedProgress);
+  const targetLabelScale = interpolate(1, 0.92, normalizedProgress);
+  const targetValueScale = interpolate(1.15, 0.96, normalizedProgress);
+  const targetWeight = Math.round(interpolate(760, 650, normalizedProgress));
+  const targetOpacity = interpolate(1, 0.74, normalizedProgress);
   const isCollectedState = Boolean(
     gift?.status === "active" &&
     gift.total_amount &&
-    (gift.percent_complete >= 100 || remainingAmount === 0),
+    (normalizedProgress >= 1 || remainingAmount === 0),
   );
 
   function changeActionMode(mode: ActionMode) {
@@ -200,19 +225,6 @@ export function ViewGroupGiftContent({
   const [paymentPhone, setPaymentPhone] = useState("");
   const [paymentComment, setPaymentComment] = useState("");
   const [paymentPhoneError, setPaymentPhoneError] = useState("");
-
-  const prevPercent = useRef(gift?.percent_complete ?? 0);
-  const [percentOpacity, setPercentOpacity] = useState(1);
-
-  useEffect(() => {
-    if (!gift) return;
-    if (gift.percent_complete !== prevPercent.current) {
-      setPercentOpacity(0);
-      const timer = window.setTimeout(() => setPercentOpacity(1), 50);
-      prevPercent.current = gift.percent_complete;
-      return () => window.clearTimeout(timer);
-    }
-  }, [gift?.percent_complete]);
 
   useEffect(() => {
     if (!gift || actionMode === "editPayment") return;
@@ -340,34 +352,61 @@ export function ViewGroupGiftContent({
             <div ref={overviewPanelRef} className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
                 <div className="flex items-end justify-between gap-3">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("collected")}</span>
-                    <span className="text-2xl font-bold text-foreground leading-none transition-all duration-500">{formatAmount(gift.collected_amount)}</span>
+                  <div className="flex min-h-12 flex-col justify-end gap-0.5">
+                    <span
+                      className="origin-bottom-left text-[10px] font-extrabold text-muted uppercase tracking-wider transition-[transform,opacity] duration-300 ease-out will-change-transform"
+                      style={{ transform: `scale(${collectedLabelScale})`, opacity: collectedOpacity }}
+                    >
+                      {t("collected")}
+                    </span>
+                    <span
+                      className="origin-bottom-left text-2xl text-foreground leading-none transition-[transform,font-weight,opacity] duration-300 ease-out will-change-transform"
+                      style={{
+                        transform: `scale(${collectedValueScale})`,
+                        fontWeight: collectedWeight,
+                        opacity: collectedOpacity,
+                      }}
+                    >
+                      {formatAmount(gift.collected_amount)}
+                    </span>
                   </div>
                   {gift.total_amount ? (
-                    <div className="flex flex-col gap-0.5 items-end">
-                      <span className="text-[10px] font-extrabold text-muted uppercase tracking-wider">{t("target")}</span>
-                      <span className="text-lg font-semibold text-muted leading-none">{formatAmount(gift.total_amount)}</span>
+                    <div className="flex min-h-12 flex-col items-end justify-end gap-0.5">
+                      <span
+                        className="origin-bottom-right text-[10px] font-extrabold text-muted uppercase tracking-wider transition-[transform,opacity] duration-300 ease-out will-change-transform"
+                        style={{ transform: `scale(${targetLabelScale})`, opacity: targetOpacity }}
+                      >
+                        {t("target")}
+                      </span>
+                      <span
+                        className="origin-bottom-right text-2xl text-muted leading-none transition-[transform,font-weight,opacity] duration-300 ease-out will-change-transform"
+                        style={{
+                          transform: `scale(${targetValueScale})`,
+                          fontWeight: targetWeight,
+                          opacity: targetOpacity,
+                        }}
+                      >
+                        {formatAmount(gift.total_amount)}
+                      </span>
                     </div>
                   ) : null}
                 </div>
 
                 <div className="w-full h-2.5 rounded-full bg-muted/20 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-                    style={{ width: `${Math.min(100, gift.percent_complete)}%` }}
+                    className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                    style={{ width: `${progressPercent}%` }}
                   />
                 </div>
 
                 <span
                   className="text-xs text-muted transition-opacity duration-300 text-center"
-                  style={{ opacity: percentOpacity }}
                 >
                   {isCollectedState
                     ? t("collectedState")
-                    : gift.percent_complete >= 100
+                    : normalizedProgress >= 1
                     ? t("giftComplete")
-                    : t("giftProgress").replace("{percent}", String(gift.percent_complete))}
+                    : t("giftProgress").replace("{percent}", String(progressPercent))}
                 </span>
               </div>
 
