@@ -593,7 +593,7 @@ export function ViewGroupGiftContent({
     if (mode === "contribute") {
       return (
         <div className="flex flex-col gap-2.5">
-          {renderPaymentDetails()}
+          {renderPaymentDetails({ showEdit: false, compact: true })}
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
               {t("amountLabel")}
@@ -1070,31 +1070,29 @@ export function ViewGroupGiftContent({
             return (
               <div key={`${member.role}-${member.user_id}-${member.contribution_id ?? "creator"}`}>
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {displayName}
+                      {isOrganizer ? (
+                        <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
+                      ) : null}
+                    </p>
+                    {member.username ? (
+                      <button
+                        type="button"
+                        className="truncate text-xs text-muted pressable-link text-left"
+                        onClick={() => navigator.clipboard.writeText(`@${member.username}`).catch(() => {})}
+                      >
+                        @{member.username}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 justify-end">
                     {displayAmount ? (
-                      <p className="shrink-0 text-sm font-semibold text-foreground">
+                      <p className="min-w-[2.5rem] text-right text-sm font-semibold text-foreground">
                         {formatAmount(displayAmount)}
                       </p>
                     ) : null}
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {displayName}
-                        {isOrganizer ? (
-                          <span className="text-xs font-normal text-muted"> ({t("groupGiftCreator")})</span>
-                        ) : null}
-                      </p>
-                      {member.username ? (
-                        <button
-                          type="button"
-                          className="truncate text-xs text-muted pressable-link text-left"
-                          onClick={() => navigator.clipboard.writeText(`@${member.username}`).catch(() => {})}
-                        >
-                          @{member.username}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0 justify-end">
                     {canRemoveContribution ? (
                       <button
                         type="button"

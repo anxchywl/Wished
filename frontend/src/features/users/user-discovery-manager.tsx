@@ -314,7 +314,7 @@ function FulfilledWishRow({ item, onOpen }: { item: FulfilledWishItem; onOpen: (
       style={{ paddingTop: 10, paddingBottom: 10 }}
       onClick={onOpen}
     >
-      <div className="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border">
+      <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-border">
         <WishImageThumb id={item.wish_id} title={item.wish_title} imageUrl={item.images?.[0]?.thumbnail_url ?? item.images?.[0]?.medium_url} className="w-full h-full object-cover wish-image-fulfilled" />
         <div className="wish-fulfilled-check">
           <svg fill="currentColor" viewBox="0 0 24 24">
