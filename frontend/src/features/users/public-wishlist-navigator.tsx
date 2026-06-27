@@ -631,8 +631,8 @@ function PublicWishRow({ wish, shareToken, onOpen, onPrefetch }: PublicWishRowPr
         <div className="relative w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-border">
           <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.thumbnail_url ?? wish.images?.[0]?.medium_url} className="w-full h-full object-cover" hideIcon={isLockedBooked || isGroupGifted} />
           {isCompleted ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/30">
-              <svg className="w-5 h-5 text-green-300" fill="currentColor" viewBox="0 0 24 24">
+            <div className="wish-fulfilled-check">
+              <svg fill="currentColor" viewBox="0 0 24 24">
                 <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
               </svg>
             </div>
@@ -727,6 +727,13 @@ function PublicWishView({
       <section className="flex flex-col items-center gap-3">
         <div className="public-wish-gallery relative">
           <WishImageThumb id={wish.id} title={wish.title} imageUrl={wish.images?.[0]?.medium_url ?? wish.images?.[0]?.thumbnail_url} className={`w-full h-full object-cover ${isCompleted ? "wish-image-fulfilled" : ""}`} />
+          {isCompleted ? (
+            <div className="wish-fulfilled-check">
+              <svg fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+              </svg>
+            </div>
+          ) : null}
         </div>
         {isCompleted ? (
           <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>

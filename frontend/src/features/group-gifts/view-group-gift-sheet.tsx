@@ -593,6 +593,7 @@ export function ViewGroupGiftContent({
     if (mode === "contribute") {
       return (
         <div className="flex flex-col gap-2.5">
+          {renderPaymentDetails()}
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
               {t("amountLabel")}

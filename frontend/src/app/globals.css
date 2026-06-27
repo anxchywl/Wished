@@ -1360,7 +1360,7 @@ html[data-theme="dark"] .bottom-nav {
 .modal-sheet {
   width: 100%;
   max-width: 480px;
-  max-height: min(80dvh, 760px);
+  max-height: min(86dvh, 760px);
   margin: 0 auto;
   background: #ffffff;
   border-radius: 22px 22px 0 0;
@@ -1390,7 +1390,25 @@ html[data-theme="dark"] .modal-sheet {
 }
 
 .wish-image-fulfilled {
-  filter: saturate(0.82) brightness(0.82) sepia(0.12) hue-rotate(72deg);
+  filter: none;
+}
+
+.wish-fulfilled-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.wish-fulfilled-check svg {
+  width: 28%;
+  height: 28%;
+  min-width: 20px;
+  min-height: 20px;
+  color: #22c55e;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
 }
 
 @keyframes wish-booking-pane-in {
@@ -1655,7 +1673,7 @@ html[data-theme="dark"] .privacy-option-active {
   max-height: min(72dvh, 620px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 2px 8px;
+  padding: 2px;
   -webkit-overflow-scrolling: touch;
   will-change: transform, opacity;
   transform: translateZ(0);
@@ -1674,6 +1692,7 @@ html[data-theme="dark"] .privacy-option-active {
   flex: 1;
   min-height: 0;
   max-height: none;
+  padding-bottom: 2px;
 }
 
 .modal-sheet-nav-host .wish-detail-viewport {
@@ -1713,8 +1732,8 @@ html[data-theme="dark"] .privacy-option-active {
 .public-nav-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-height: 100%;
+  gap: 10px;
+  min-height: auto;
 }
 
 .public-profile-card {
@@ -1794,7 +1813,7 @@ html[data-theme="dark"] .public-list-panel {
 }
 
 .public-wish-gallery {
-  width: min(250px, 74vw);
+  width: min(220px, 68vw);
   aspect-ratio: 1;
   border: 1px solid rgb(var(--color-border));
   border-radius: 28px;
