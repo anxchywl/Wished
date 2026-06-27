@@ -1677,6 +1677,7 @@ html[data-theme="dark"] .privacy-option-active {
 }
 
 .modal-sheet-nav-host .wish-detail-viewport {
+  flex: 0 1 auto;
   overflow-y: auto;
   padding-bottom: 18px;
   scroll-padding-bottom: 36px;
