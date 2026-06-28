@@ -35,3 +35,28 @@
         format json
     }
 }
+
+# NU Events Telegram Mini App (separate compose project: events_bot).
+# This single Caddy instance fronts both apps. events_bot_web joins Wished's
+# proxy network (wished_wished-app) for ingress only — its DB/Redis stay
+# isolated on the events_bot_default network.
+events.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    request_body {
+        max_size 10MB
+    }
+
+    reverse_proxy events_bot_web:8000
+
+    log {
+        output stderr
+        format json
+    }
+}
