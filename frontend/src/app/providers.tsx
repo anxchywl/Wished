@@ -186,17 +186,23 @@ function PersistentLayout({ children }: { children: ReactNode }) {
 
     if (wishlistsQuery.isSuccess && !initialWishesLoaded) {
       const items = wishlistsQuery.data?.items ?? [];
+      // Use staleTime: Infinity so prefetchQuery resolves immediately if data is
+      // already in cache (even stale). This gates the loading screen on "do we
+      // have ANY data to show" rather than "is the data fresh", which prevents
+      // returning users (cache > 2 min old) from seeing a long loading screen
+      // while wish counts refresh. useWishesQuery has its own staleTime and will
+      // background-refresh stale counts once the panel is visible.
       const wishPrefetches = items.map((wl) =>
         queryClient.prefetchQuery({
           queryKey: wishQueryKeys.list(wl.id),
           queryFn: () => listWishes(accessToken, wl.id),
-          staleTime: 2 * 60 * 1000,
+          staleTime: Infinity,
         })
       );
       const followingPrefetch = queryClient.prefetchQuery({
         queryKey: userQueryKeys.following(tgUserId),
         queryFn: () => listFollowing(accessToken),
-        staleTime: 3 * 60 * 1000,
+        staleTime: Infinity,
       });
       Promise.all([...wishPrefetches, followingPrefetch]).finally(() => {
         setInitialWishesLoaded(true);
