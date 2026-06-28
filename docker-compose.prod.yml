@@ -11,6 +11,12 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: /api/v1
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    pids_limit: 256
     networks:
       - wished-app
 
@@ -36,9 +42,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-wished}
-      POSTGRES_USER: ${POSTGRES_USER:-wished}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wished}
+      POSTGRES_USER: ${APP_DB_USER:-wished_app}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}
+      DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:-wished_app}:${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-wished}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
@@ -62,6 +68,12 @@ services:
       minio:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 768m
+    pids_limit: 512
     networks:
       - wished-app
       - wished-data
@@ -83,6 +95,10 @@ services:
       - backend
       - frontend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
     networks:
       - wished-app
       - wished-data
@@ -102,6 +118,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 512
     networks:
       - wished-data
 
@@ -117,6 +137,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 384m
+    pids_limit: 256
     networks:
       - wished-data
 
@@ -135,6 +159,10 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    pids_limit: 256
     networks:
       - wished-data
 
@@ -154,9 +182,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:-wished}
-      POSTGRES_USER: ${POSTGRES_USER:-wished}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-wished}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-wished}
+      POSTGRES_USER: ${APP_DB_USER:-wished_app}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}
+      DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:-wished_app}:${APP_DB_PASSWORD:?APP_DB_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-wished}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: ${REDIS_DB:-0}
@@ -168,6 +196,12 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 512m
+    pids_limit: 256
     networks:
       - wished-app
       - wished-data
@@ -216,6 +250,10 @@ services:
       minio:
         condition: service_healthy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
     networks:
       - wished-data
 
