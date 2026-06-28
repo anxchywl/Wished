@@ -206,13 +206,21 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     }
   }, [accessToken, tgUserId, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
 
-  // warm sessions initialize synchronously and do not wait for telegram sdk startup
+  // warm sessions initialize synchronously and do not wait for telegram sdk startup.
+  // once a session exists (or is synchronously expected), hold the loading screen
+  // until the wishlist list settles so the header and the panel appear together.
+  // keying off accessToken alone would let the screen drop during the brief window
+  // where authStatus is "authenticated" but the persisted token has not rehydrated
+  // yet (or vice versa), making the panel pop in after the title.
+  // also wait for the per-wishlist wish counts to be prefetched so the rows show
+  // their real count instead of "..." popping in after the panel renders.
+  const initialWishlistsReady = initialWishlistsSettled && initialWishesLoaded;
+  const hasSession = Boolean(accessToken) || authStatus === "authenticated";
   const isLoading =
     !gateExpired &&
-    (authStatus !== "authenticated"
-      ? ((!isReady && !accessToken) ||
-        (isAuthPending(authStatus) && !accessToken))
-      : Boolean(accessToken) && isWishlistsRoute && !initialWishlistsSettled);
+    (hasSession
+      ? isWishlistsRoute && !initialWishlistsReady
+      : !isReady || isAuthPending(authStatus));
 
   if (isLoading) {
     return (
