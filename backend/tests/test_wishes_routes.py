@@ -53,7 +53,9 @@ def test_create_wish_accepts_price_currency_and_priority(monkeypatch) -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
     app.dependency_overrides[get_redis] = _rate_limit_redis
 
-    async def fake_create_wish(db, current_user, requested_wishlist_id, payload, settings=None, redis=None):
+    async def fake_create_wish(
+        db, current_user, requested_wishlist_id, payload, settings=None, redis=None
+    ):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         assert payload.title == "Keyboard"
@@ -125,7 +127,12 @@ def test_patch_wish_reorder_uses_payload(monkeypatch) -> None:
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         assert payload.wish_ids == wish_ids
-        return {"items": [_wish(wishlist_id=wishlist_id, wish_id=wish_id, position=index) for index, wish_id in enumerate(wish_ids)]}
+        return {
+            "items": [
+                _wish(wishlist_id=wishlist_id, wish_id=wish_id, position=index)
+                for index, wish_id in enumerate(wish_ids)
+            ]
+        }
 
     monkeypatch.setattr("app.api.v1.wishes.router.reorder_wishes", fake_reorder_wishes)
 
@@ -135,7 +142,9 @@ def test_patch_wish_reorder_uses_payload(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()["items"]] == [str(wish_id) for wish_id in wish_ids]
+    assert [item["id"] for item in response.json()["items"]] == [
+        str(wish_id) for wish_id in wish_ids
+    ]
     assert response.json()["items"][2]["position"] == 2
 
 

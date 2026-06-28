@@ -14,6 +14,7 @@ from app.db.base import Base
 
 class AuditLog(Base):
     """record of admin actions for audit trail"""
+
     __tablename__ = "audit_logs"
     __table_args__ = (
         Index("ix_audit_logs_actor_user_id", "actor_user_id"),

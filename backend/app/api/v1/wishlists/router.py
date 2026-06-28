@@ -77,7 +77,8 @@ async def post_wishlist(
 ) -> WishlistResponse:
     """create wishlist"""
     await check_wishlist_create_limit(
-        redis, current_user.id,
+        redis,
+        current_user.id,
         settings.wishlist_create_per_hour,
         settings.wishlist_create_per_day,
     )

@@ -1,5 +1,4 @@
-
-content = open('app/main.py').read()
+content = open("app/main.py").read()
 replacement = """
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -12,5 +11,5 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 """
 if "RequestValidationError" not in content:
-    content = content.replace('app = FastAPI(', 'app = FastAPI(\n\n' + replacement + '\n\n')
-    open('app/main.py', 'w').read() # oops wait...
+    content = content.replace("app = FastAPI(", "app = FastAPI(\n\n" + replacement + "\n\n")
+    open("app/main.py", "w").read()  # oops wait...

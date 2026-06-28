@@ -50,13 +50,17 @@ async def list_current_user_wishlists(
     return await _fetch_current_user_wishlists(db, current_user)
 
 
-async def _fetch_current_user_wishlists(db: AsyncSession, current_user: User) -> WishlistListResponse:
+async def _fetch_current_user_wishlists(
+    db: AsyncSession, current_user: User
+) -> WishlistListResponse:
     result = await db.execute(
         select(Wishlist)
         .where(Wishlist.owner_user_id == current_user.id)
         .order_by(Wishlist.position.asc())
     )
-    return WishlistListResponse(items=[_to_response(wishlist) for wishlist in result.scalars().all()])
+    return WishlistListResponse(
+        items=[_to_response(wishlist) for wishlist in result.scalars().all()]
+    )
 
 
 async def list_user_wishlists(
@@ -66,7 +70,9 @@ async def list_user_wishlists(
     allow_profile_access: bool = False,
 ) -> WishlistListResponse:
     """list visible user wishlists"""
-    user_result = await db.execute(select(User).where(User.username.ilike(username.strip().removeprefix("@"))))
+    user_result = await db.execute(
+        select(User).where(User.username.ilike(username.strip().removeprefix("@")))
+    )
     owner = user_result.scalar_one_or_none()
     if owner is None or (owner.is_blocked and owner.id != current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -81,12 +87,10 @@ async def list_user_wishlists(
     if owner.id != current_user.id:
         conditions.append(Wishlist.visibility == "public")
 
-    result = await db.execute(
-        select(Wishlist)
-        .where(*conditions)
-        .order_by(Wishlist.position.asc())
+    result = await db.execute(select(Wishlist).where(*conditions).order_by(Wishlist.position.asc()))
+    return WishlistListResponse(
+        items=[_to_response(wishlist) for wishlist in result.scalars().all()]
     )
-    return WishlistListResponse(items=[_to_response(wishlist) for wishlist in result.scalars().all()])
 
 
 async def list_user_wishlists_by_id(
@@ -116,12 +120,10 @@ async def list_user_wishlists_by_id(
     if owner.id != current_user.id:
         conditions.append(Wishlist.visibility == "public")
 
-    result = await db.execute(
-        select(Wishlist)
-        .where(*conditions)
-        .order_by(Wishlist.position.asc())
+    result = await db.execute(select(Wishlist).where(*conditions).order_by(Wishlist.position.asc()))
+    return WishlistListResponse(
+        items=[_to_response(wishlist) for wishlist in result.scalars().all()]
     )
-    return WishlistListResponse(items=[_to_response(wishlist) for wishlist in result.scalars().all()])
 
 
 async def get_wishlist(
@@ -132,7 +134,9 @@ async def get_wishlist(
     redis: Redis | None = None,
 ) -> WishlistResponse:
     """get visible wishlist"""
-    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    wishlist = await get_accessible_wishlist(
+        db, current_user, wishlist_id, share_token=share_token, redis=redis
+    )
     return _to_response(wishlist)
 
 
@@ -157,10 +161,14 @@ async def create_wishlist(
 
     if redis is not None:
         await cache_delete(redis, wishlists_cache_key(current_user.id))
-        await publish_event(redis, "WISHLIST_CREATED", {
-            "wishlist_id": wishlist.id,
-            "owner_user_id": current_user.id,
-        })
+        await publish_event(
+            redis,
+            "WISHLIST_CREATED",
+            {
+                "wishlist_id": wishlist.id,
+                "owner_user_id": current_user.id,
+            },
+        )
 
     return _to_response(wishlist)
 
@@ -172,14 +180,14 @@ async def reorder_wishlists(
     redis: Redis | None = None,
 ) -> WishlistListResponse:
     """reorder wishlists"""
-    result = await db.execute(
-        select(Wishlist).where(Wishlist.owner_user_id == current_user.id)
-    )
+    result = await db.execute(select(Wishlist).where(Wishlist.owner_user_id == current_user.id))
     wishlists = result.scalars().all()
     wishlists_by_id = {wishlist.id: wishlist for wishlist in wishlists}
 
     if set(payload.wishlist_ids) != set(wishlists_by_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wishlist ids do not match")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Wishlist ids do not match"
+        )
 
     for position, wishlist_id in enumerate(payload.wishlist_ids):
         wishlists_by_id[wishlist_id].position = position
@@ -274,7 +282,9 @@ async def upload_wishlist_cover(
 
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="uploaded file is empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="uploaded file is empty"
+        )
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -388,7 +398,9 @@ async def _get_owned_wishlist(
 async def _next_wishlist_position(db: AsyncSession, current_user: User) -> int:
     """find next position"""
     result = await db.execute(
-        select(func.coalesce(func.min(Wishlist.position), 0)).where(Wishlist.owner_user_id == current_user.id)
+        select(func.coalesce(func.min(Wishlist.position), 0)).where(
+            Wishlist.owner_user_id == current_user.id
+        )
     )
     return int(result.scalar_one()) - 1
 
@@ -419,11 +431,17 @@ def _to_response(wishlist: Wishlist) -> WishlistResponse:
     cover_thumbnail_url = None
     cover_medium_url = None
     if wishlist.cover_image_bucket and wishlist.cover_image_object_name:
-        cover_image_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_object_name)
+        cover_image_url = get_presigned_url(
+            wishlist.cover_image_bucket, wishlist.cover_image_object_name
+        )
     if wishlist.cover_image_bucket and wishlist.cover_image_thumbnail_object_name:
-        cover_thumbnail_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_thumbnail_object_name)
+        cover_thumbnail_url = get_presigned_url(
+            wishlist.cover_image_bucket, wishlist.cover_image_thumbnail_object_name
+        )
     if wishlist.cover_image_bucket and wishlist.cover_image_medium_object_name:
-        cover_medium_url = get_presigned_url(wishlist.cover_image_bucket, wishlist.cover_image_medium_object_name)
+        cover_medium_url = get_presigned_url(
+            wishlist.cover_image_bucket, wishlist.cover_image_medium_object_name
+        )
     return WishlistResponse(
         id=wishlist.id,
         owner_user_id=wishlist.owner_user_id,

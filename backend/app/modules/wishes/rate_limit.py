@@ -18,7 +18,11 @@ async def check_wish_create_limit(redis: Redis, user_id: UUID, per_hour: int, pe
 async def check_wish_edit_limit(redis: Redis, user_id: UUID, per_hour: int) -> None:
     uid = str(user_id)
     await check_rate_limit(
-        redis, "rate:wish:edit:hr", uid, 3600, per_hour,
+        redis,
+        "rate:wish:edit:hr",
+        uid,
+        3600,
+        per_hour,
         detail="wish edit rate limit exceeded — try again later",
     )
 
@@ -26,7 +30,11 @@ async def check_wish_edit_limit(redis: Redis, user_id: UUID, per_hour: int) -> N
 async def check_wish_delete_limit(redis: Redis, user_id: UUID, per_hour: int) -> None:
     uid = str(user_id)
     await check_rate_limit(
-        redis, "rate:wish:delete:hr", uid, 3600, per_hour,
+        redis,
+        "rate:wish:delete:hr",
+        uid,
+        3600,
+        per_hour,
         detail="wish delete rate limit exceeded — try again later",
     )
 
@@ -34,6 +42,10 @@ async def check_wish_delete_limit(redis: Redis, user_id: UUID, per_hour: int) ->
 async def check_wish_complete_limit(redis: Redis, user_id: UUID) -> None:
     uid = str(user_id)
     await check_rate_limit(
-        redis, "rate:wish:complete:hr", uid, 3600, 60,
+        redis,
+        "rate:wish:complete:hr",
+        uid,
+        3600,
+        60,
         detail="wish complete rate limit exceeded — try again later",
     )

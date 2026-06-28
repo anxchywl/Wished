@@ -98,12 +98,14 @@ def _user() -> SimpleNamespace:
 # C2 — CORS middleware
 # ---------------------------------------------------------------------------
 
+
 class TestCORS:
     def test_cors_allows_configured_origin(self, monkeypatch) -> None:
         # CORS middleware is configured at create_app() time using the settings object,
         # so we must set the env var and clear the lru_cache before creating the app
         monkeypatch.setenv("ALLOWED_ORIGINS", '["https://example.com"]')
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         app = create_app()
@@ -119,6 +121,7 @@ class TestCORS:
     def test_cors_does_not_reflect_disallowed_origin(self, monkeypatch) -> None:
         monkeypatch.setenv("ALLOWED_ORIGINS", '["https://allowed.example.com"]')
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         app = create_app()
@@ -145,6 +148,7 @@ class TestCORS:
 # H1 — insecure JWT secret rejected in production
 # ---------------------------------------------------------------------------
 
+
 class TestJWTSecretValidation:
     def test_create_app_raises_in_production_with_default_secret(self, monkeypatch) -> None:
         monkeypatch.setenv("APP_ENV", "production")
@@ -152,6 +156,7 @@ class TestJWTSecretValidation:
 
         # reset cached settings so the patched env takes effect
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
@@ -164,6 +169,7 @@ class TestJWTSecretValidation:
         monkeypatch.setenv("JWT_SECRET_KEY", "")
 
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
@@ -187,6 +193,7 @@ class TestJWTSecretValidation:
         monkeypatch.setenv("POSTGRES_PASSWORD", "wished")
 
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         with pytest.raises(RuntimeError, match="POSTGRES_PASSWORD"):
@@ -206,6 +213,7 @@ class TestJWTSecretValidation:
         monkeypatch.setenv("TELEGRAM_INIT_DATA_MAX_AGE_SECONDS", "86400")
 
         from app.core.config import get_settings as _gs
+
         _gs.cache_clear()
 
         with pytest.raises(RuntimeError, match="TELEGRAM_INIT_DATA_MAX_AGE_SECONDS"):
@@ -218,9 +226,11 @@ class TestJWTSecretValidation:
 # H3 — Telegram initData replay window
 # ---------------------------------------------------------------------------
 
+
 class TestTelegramInitDataMaxAge:
     def test_default_max_age_is_300_seconds(self) -> None:
         from app.core.config import Settings
+
         s = Settings()
         assert s.telegram_init_data_max_age_seconds == 300
 
@@ -258,6 +268,7 @@ class TestTelegramInitDataMaxAge:
 # ---------------------------------------------------------------------------
 # H4 — auth endpoint rate limiting
 # ---------------------------------------------------------------------------
+
 
 class TestAuthRateLimiting:
     def test_telegram_auth_returns_429_when_rate_limited(self, monkeypatch) -> None:
@@ -369,6 +380,7 @@ async def test_auth_rate_limit_passes_within_limits() -> None:
 # M3 — wish URL scheme validation
 # ---------------------------------------------------------------------------
 
+
 class TestWishURLValidation:
     def test_rejects_javascript_url(self) -> None:
         from app.modules.wishes.schemas import WishCreateRequest
@@ -432,6 +444,7 @@ class TestWishURLValidation:
 # M4 — reservation race condition returns 409
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_reservation_integrity_error_raises_409() -> None:
     from sqlalchemy.exc import IntegrityError
@@ -474,6 +487,7 @@ async def test_reservation_integrity_error_raises_409() -> None:
 # ---------------------------------------------------------------------------
 # M5 — non-active wish cannot be reserved
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_cannot_reserve_completed_wish() -> None:
@@ -554,6 +568,7 @@ async def test_can_reserve_active_wish() -> None:
 # media access authorization (C1 regression)
 # ---------------------------------------------------------------------------
 
+
 class TestMediaAccessAuthorization:
     def test_media_endpoint_requires_authentication(self) -> None:
         """GET /media/{id} must return 401 without a token, not redirect to MinIO"""
@@ -561,9 +576,7 @@ class TestMediaAccessAuthorization:
         # do not override get_current_user — let auth dependency enforce itself
         app.dependency_overrides[get_db_session] = lambda: None
 
-        response = TestClient(app, raise_server_exceptions=False).get(
-            f"/api/v1/media/{uuid4()}"
-        )
+        response = TestClient(app, raise_server_exceptions=False).get(f"/api/v1/media/{uuid4()}")
         assert response.status_code == 401
 
     def test_wish_images_endpoint_requires_authentication(self) -> None:
@@ -581,7 +594,12 @@ class TestMediaAccessAuthorization:
 
         caddyfile_path = os.path.join(
             os.path.dirname(__file__),
-            "..", "..", "..", "infra", "caddy", "Caddyfile",
+            "..",
+            "..",
+            "..",
+            "infra",
+            "caddy",
+            "Caddyfile",
         )
         if not os.path.exists(caddyfile_path):
             pytest.skip("Caddyfile not found at expected path")
@@ -601,6 +619,7 @@ class TestMediaAccessAuthorization:
 # ---------------------------------------------------------------------------
 # S2 — rate limit X-Forwarded-For bypass prevention
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_uses_direct_ip_by_default() -> None:

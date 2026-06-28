@@ -25,13 +25,15 @@ def _title_from_url(url: str) -> str | None:
     # find position after first word-group (category ends at first "-")
     dash_idx = segment.find("-")
     if dash_idx != -1:
-        segment = segment[dash_idx + 1:]
+        segment = segment[dash_idx + 1 :]
     title = segment.replace("-", " ").strip()
     return title[:1].upper() + title[1:] if title else None
 
 
 class LamodaExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html = ""
         try:
             resp = await client.get(url)

@@ -5,6 +5,7 @@ non-admins cannot access admin routes or apis.
 admins can access admin routes and apis.
 privilege escalation and direct api bypass are impossible.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

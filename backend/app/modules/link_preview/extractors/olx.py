@@ -26,13 +26,23 @@ _PRICE_RE = re.compile(
 _SPACE_NORM = re.compile(r"[\s  ]+")
 
 _CURRENCY_MAP = {
-    "тг": "KZT", "тенге": "KZT", "kzt": "KZT", "₸": "KZT",
-    "руб": "RUB", "rub": "RUB", "₽": "RUB",
-    "usd": "USD", "$": "USD",
-    "eur": "EUR", "€": "EUR",
-    "pln": "PLN", "zł": "PLN",
-    "uah": "UAH", "₴": "UAH",
-    "uzs": "UZS", "сум": "UZS",
+    "тг": "KZT",
+    "тенге": "KZT",
+    "kzt": "KZT",
+    "₸": "KZT",
+    "руб": "RUB",
+    "rub": "RUB",
+    "₽": "RUB",
+    "usd": "USD",
+    "$": "USD",
+    "eur": "EUR",
+    "€": "EUR",
+    "pln": "PLN",
+    "zł": "PLN",
+    "uah": "UAH",
+    "₴": "UAH",
+    "uzs": "UZS",
+    "сум": "UZS",
 }
 
 
@@ -50,7 +60,9 @@ def _parse_price(description: str) -> tuple[str | None, str | None]:
 
 
 class OlxExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html: str | None = None
         try:
             resp = await client.get(url)
@@ -63,8 +75,12 @@ class OlxExtractor:
 
         if not html:
             return LinkPreviewResponse(
-                title=None, description=None, image_url=None,
-                price=None, currency=None, source="olx",
+                title=None,
+                description=None,
+                image_url=None,
+                price=None,
+                currency=None,
+                source="olx",
             )
 
         title = _meta_content(html, "og:title")

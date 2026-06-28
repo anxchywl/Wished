@@ -10,6 +10,7 @@ from app.db.base import Base
 
 class DiscoveryToken(Base):
     """temporary profile-access token issued by the Telegram bot"""
+
     __tablename__ = "discovery_tokens"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

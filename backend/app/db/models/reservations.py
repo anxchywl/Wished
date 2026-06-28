@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class Reservation(Base):
     """reservation record"""
+
     __tablename__ = "reservations"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

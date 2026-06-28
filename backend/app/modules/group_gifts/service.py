@@ -161,9 +161,7 @@ async def create_group_gift(
     redis: Redis | None = None,
 ) -> GroupGiftResponse:
     result = await db.execute(
-        select(Wish)
-        .options(selectinload(Wish.wishlist))
-        .where(Wish.id == wish_id)
+        select(Wish).options(selectinload(Wish.wishlist)).where(Wish.id == wish_id)
     )
     wish = result.scalar_one_or_none()
     if not wish:
@@ -227,13 +225,17 @@ async def create_group_gift(
     await db.refresh(gift)
 
     if redis:
-        await publish_event(redis, "GROUP_GIFT_CREATED", {
-            "wish_id": str(wish_id),
-            "group_gift_id": str(gift.id),
-            "organizer_user_id": str(current_user.id),
-            "wish_title": wish.title,
-            "wishlist_owner_user_id": str(wish.wishlist.owner_user_id),
-        })
+        await publish_event(
+            redis,
+            "GROUP_GIFT_CREATED",
+            {
+                "wish_id": str(wish_id),
+                "group_gift_id": str(gift.id),
+                "organizer_user_id": str(current_user.id),
+                "wish_title": wish.title,
+                "wishlist_owner_user_id": str(wish.wishlist.owner_user_id),
+            },
+        )
 
     return GroupGiftResponse(
         id=gift.id,
@@ -262,9 +264,7 @@ async def get_group_gift(
     wish_id: UUID,
 ) -> GroupGiftResponse | None:
     result = await db.execute(
-        select(Wish)
-        .options(selectinload(Wish.wishlist))
-        .where(Wish.id == wish_id)
+        select(Wish).options(selectinload(Wish.wishlist)).where(Wish.id == wish_id)
     )
     wish = result.scalar_one_or_none()
     if not wish:
@@ -277,7 +277,9 @@ async def get_group_gift(
             selectinload(GroupGift.organizer),
             selectinload(GroupGift.approvals),
         )
-        .where(GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed", "archived"]))
+        .where(
+            GroupGift.wish_id == wish_id, GroupGift.status.in_(["active", "completed", "archived"])
+        )
     )
     gift = result.scalar_one_or_none()
 
@@ -461,13 +463,21 @@ async def toggle_group_gift_approval(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a participant")
 
     if approval_type == "cancel" and gift.status not in ("active", "completed"):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Group gift cannot be cancelled")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Group gift cannot be cancelled"
+        )
     if approval_type == "unbook" and gift.status != "completed":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Group gift is not completed")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Group gift is not completed"
+        )
 
     # Mutate approvals in-session (no extra round-trip)
     existing = next(
-        (a for a in gift.approvals if a.user_id == current_user.id and a.approval_type == approval_type),
+        (
+            a
+            for a in gift.approvals
+            if a.user_id == current_user.id and a.approval_type == approval_type
+        ),
         None,
     )
 
@@ -507,7 +517,9 @@ async def toggle_group_gift_approval(
             )
             gift = result.scalar_one_or_none()
             if not gift:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Group gift not found"
+                )
             non_cancelled = [c for c in gift.contributions if c.status != "cancelled"]
     else:
         await db.commit()
@@ -624,9 +636,7 @@ async def join_group_gift(
             detail=f"Contribution exceeds remaining amount: {remaining_amount}",
         )
 
-    initial_status = (
-        "waiting_transfer" if gift.collection_type == "immediate" else "pledged"
-    )
+    initial_status = "waiting_transfer" if gift.collection_type == "immediate" else "pledged"
     contrib = GroupGiftContribution(
         group_gift_id=group_gift_id,
         contributor_user_id=current_user.id,
@@ -689,16 +699,22 @@ async def report_transfer(
         )
         gift = result.scalar_one_or_none()
         if gift:
-            await publish_event(redis, "TRANSFER_REPORTED", {
-                "contribution_id": str(contribution_id),
-                "group_gift_id": str(contrib.group_gift_id),
-                "contributor_user_id": str(current_user.id),
-                "contributor_first_name": current_user.first_name or current_user.username or "Someone",
-                "amount": str(contrib.amount),
-                "currency": gift.wish.currency or "",
-                "wish_title": gift.wish.title,
-                "organizer_user_id": str(gift.organizer_user_id),
-            })
+            await publish_event(
+                redis,
+                "TRANSFER_REPORTED",
+                {
+                    "contribution_id": str(contribution_id),
+                    "group_gift_id": str(contrib.group_gift_id),
+                    "contributor_user_id": str(current_user.id),
+                    "contributor_first_name": current_user.first_name
+                    or current_user.username
+                    or "Someone",
+                    "amount": str(contrib.amount),
+                    "currency": gift.wish.currency or "",
+                    "wish_title": gift.wish.title,
+                    "organizer_user_id": str(gift.organizer_user_id),
+                },
+            )
 
     return ContributionSummary(
         id=contrib.id,
@@ -718,7 +734,9 @@ async def confirm_transfer(
     result = await db.execute(
         select(GroupGiftContribution)
         .options(
-            selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish).selectinload(Wish.wishlist)
+            selectinload(GroupGiftContribution.group_gift)
+            .selectinload(GroupGift.wish)
+            .selectinload(Wish.wishlist)
         )
         .where(GroupGiftContribution.id == contribution_id)
     )
@@ -753,26 +771,34 @@ async def confirm_transfer(
         await _maybe_notify_goal_reached(db, gift, redis, committed_before=collected_before)
 
         if redis:
-            await publish_event(redis, "TRANSFER_CONFIRMED", {
-                "contribution_id": str(contribution_id),
-                "contributor_user_id": str(contrib.contributor_user_id),
-                "wish_title": gift.wish.title,
-                "wish_id": str(gift.wish_id),
-                "wishlist_id": str(gift.wish.wishlist_id),
-                "owner_user_id": str(gift.wish.wishlist.owner_user_id),
-                "percent_complete": percent_complete,
-            })
+            await publish_event(
+                redis,
+                "TRANSFER_CONFIRMED",
+                {
+                    "contribution_id": str(contribution_id),
+                    "contributor_user_id": str(contrib.contributor_user_id),
+                    "wish_title": gift.wish.title,
+                    "wish_id": str(gift.wish_id),
+                    "wishlist_id": str(gift.wish.wishlist_id),
+                    "owner_user_id": str(gift.wish.wishlist.owner_user_id),
+                    "percent_complete": percent_complete,
+                },
+            )
     else:
         contrib.status = "waiting_transfer"
         await db.commit()
         await db.refresh(contrib)
 
         if redis:
-            await publish_event(redis, "TRANSFER_REJECTED", {
-                "contribution_id": str(contribution_id),
-                "contributor_user_id": str(contrib.contributor_user_id),
-                "wish_title": gift.wish.title,
-            })
+            await publish_event(
+                redis,
+                "TRANSFER_REJECTED",
+                {
+                    "contribution_id": str(contribution_id),
+                    "contributor_user_id": str(contrib.contributor_user_id),
+                    "wish_title": gift.wish.title,
+                },
+            )
 
     return ContributionSummary(
         id=contrib.id,
@@ -790,9 +816,7 @@ async def leave_group_gift(
 ) -> None:
     result = await db.execute(
         select(GroupGiftContribution)
-        .options(
-            selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish)
-        )
+        .options(selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish))
         .where(GroupGiftContribution.id == contribution_id)
     )
     contrib = result.scalar_one_or_none()
@@ -837,9 +861,7 @@ async def organizer_remove_contribution(
 ) -> None:
     result = await db.execute(
         select(GroupGiftContribution)
-        .options(
-            selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish)
-        )
+        .options(selectinload(GroupGiftContribution.group_gift).selectinload(GroupGift.wish))
         .where(
             GroupGiftContribution.id == contribution_id,
             GroupGiftContribution.group_gift_id == group_gift_id,
@@ -965,19 +987,23 @@ async def _notify_goal_reached(db: AsyncSession, gift: GroupGift, redis: Redis |
     await db.commit()
 
     if redis and gift.wish:
-        await publish_event(redis, "GROUP_GIFT_COMPLETED", {
-            "group_gift_id": str(gift.id),
-            "wish_id": str(gift.wish_id),
-            "wish_title": gift.wish.title,
-            "collection_type": gift.collection_type,
-            "organizer_user_id": str(gift.organizer_user_id),
-            "contributor_user_ids": [str(c.contributor_user_id) for c in active_contributions],
-            "total_collected": str(collected_amount),
-            "currency": gift.wish.currency or "",
-            "payment_method": gift.payment_method,
-            "payment_phone": gift.payment_phone,
-            "payment_comment": gift.payment_comment or "",
-        })
+        await publish_event(
+            redis,
+            "GROUP_GIFT_COMPLETED",
+            {
+                "group_gift_id": str(gift.id),
+                "wish_id": str(gift.wish_id),
+                "wish_title": gift.wish.title,
+                "collection_type": gift.collection_type,
+                "organizer_user_id": str(gift.organizer_user_id),
+                "contributor_user_ids": [str(c.contributor_user_id) for c in active_contributions],
+                "total_collected": str(collected_amount),
+                "currency": gift.wish.currency or "",
+                "payment_method": gift.payment_method,
+                "payment_phone": gift.payment_phone,
+                "payment_comment": gift.payment_comment or "",
+            },
+        )
 
 
 async def _maybe_notify_goal_reached(

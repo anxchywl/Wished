@@ -33,12 +33,12 @@ _ALLOWED_PORTS = frozenset({80, 443})
 
 # ranges not reliably covered by ipaddress.is_private/is_reserved across versions
 _EXTRA_BLOCKED_V4 = (
-    ipaddress.ip_network("100.64.0.0/10"),    # CGNAT / carrier-grade NAT
-    ipaddress.ip_network("192.0.0.0/24"),     # IETF protocol assignments
-    ipaddress.ip_network("198.18.0.0/15"),    # network benchmarking
-    ipaddress.ip_network("192.0.2.0/24"),     # TEST-NET-1
+    ipaddress.ip_network("100.64.0.0/10"),  # CGNAT / carrier-grade NAT
+    ipaddress.ip_network("192.0.0.0/24"),  # IETF protocol assignments
+    ipaddress.ip_network("198.18.0.0/15"),  # network benchmarking
+    ipaddress.ip_network("192.0.2.0/24"),  # TEST-NET-1
     ipaddress.ip_network("198.51.100.0/24"),  # TEST-NET-2
-    ipaddress.ip_network("203.0.113.0/24"),   # TEST-NET-3
+    ipaddress.ip_network("203.0.113.0/24"),  # TEST-NET-3
 )
 
 _PRIVATE_DETAIL = "requests to private or reserved addresses are not allowed"
@@ -183,9 +183,7 @@ def _make_size_hook(max_bytes: int):
             except ValueError:
                 return
             if declared > max_bytes:
-                raise httpx.RequestError(
-                    f"response too large: {declared} > {max_bytes}"
-                )
+                raise httpx.RequestError(f"response too large: {declared} > {max_bytes}")
 
     return _enforce_response_size
 

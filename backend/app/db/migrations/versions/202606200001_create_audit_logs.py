@@ -23,12 +23,16 @@ def upgrade() -> None:
         sa.Column("target_type", sa.String(length=255), nullable=True),
         sa.Column("target_id", sa.String(length=255), nullable=True),
         sa.Column("metadata_json", sa.JSON(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["actor_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_audit_logs_actor_user_id", "audit_logs", ["actor_user_id"])
-    op.create_index("ix_audit_logs_target_type_target_id", "audit_logs", ["target_type", "target_id"])
+    op.create_index(
+        "ix_audit_logs_target_type_target_id", "audit_logs", ["target_type", "target_id"]
+    )
     op.create_index("ix_audit_logs_action", "audit_logs", ["action"])
     op.create_index("ix_audit_logs_created_at", "audit_logs", ["created_at"])
 

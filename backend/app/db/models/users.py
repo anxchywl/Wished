@@ -10,6 +10,7 @@ from app.db.base import Base
 
 class User(Base):
     """telegram user record"""
+
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -40,10 +41,14 @@ class User(Base):
         nullable=False,
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    is_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_blocked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     blocked_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     blocked_by: Mapped[UUID | None] = mapped_column(PostgresUUID(as_uuid=True), nullable=True)
 
-    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
     wishlists = relationship("Wishlist", back_populates="owner", cascade="all, delete-orphan")

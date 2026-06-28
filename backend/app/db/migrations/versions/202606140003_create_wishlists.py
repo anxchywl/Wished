@@ -21,13 +21,19 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=120), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("visibility", sa.String(length=32), server_default="public", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["owner_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.CheckConstraint("visibility IN ('private', 'public')", name="ck_wishlists_visibility"),
     )
-    op.create_index(op.f("ix_wishlists_owner_user_id"), "wishlists", ["owner_user_id"], unique=False)
+    op.create_index(
+        op.f("ix_wishlists_owner_user_id"), "wishlists", ["owner_user_id"], unique=False
+    )
 
 
 def downgrade() -> None:

@@ -93,7 +93,12 @@ def test_patch_wishlist_reorder_uses_payload(monkeypatch) -> None:
     async def fake_reorder_wishlists(db, current_user, payload, redis=None):
         assert current_user is user
         assert payload.wishlist_ids == wishlist_ids
-        return {"items": [_wishlist(owner_user_id=user.id, wishlist_id=wishlist_id, position=index) for index, wishlist_id in enumerate(wishlist_ids)]}
+        return {
+            "items": [
+                _wishlist(owner_user_id=user.id, wishlist_id=wishlist_id, position=index)
+                for index, wishlist_id in enumerate(wishlist_ids)
+            ]
+        }
 
     monkeypatch.setattr("app.api.v1.wishlists.router.reorder_wishlists", fake_reorder_wishlists)
 
@@ -103,7 +108,9 @@ def test_patch_wishlist_reorder_uses_payload(monkeypatch) -> None:
     )
 
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()["items"]] == [str(wishlist_id) for wishlist_id in wishlist_ids]
+    assert [item["id"] for item in response.json()["items"]] == [
+        str(wishlist_id) for wishlist_id in wishlist_ids
+    ]
     assert response.json()["items"][1]["position"] == 1
 
 

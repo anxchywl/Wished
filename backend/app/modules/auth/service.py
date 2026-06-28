@@ -15,6 +15,7 @@ from app.modules.auth.schemas import RefreshResponse, TokenResponse, UserRespons
 
 class AuthError(Exception):
     """authentication error"""
+
     pass
 
 
@@ -29,7 +30,9 @@ async def authenticate_telegram_user(
     user.last_login_at = datetime.now(UTC)
 
     access_token, access_expires_at = create_access_token(user.id, settings)
-    refresh_token_value, refresh_token, refresh_expires_at = _create_refresh_token(user.id, settings)
+    refresh_token_value, refresh_token, refresh_expires_at = _create_refresh_token(
+        user.id, settings
+    )
     db.add(refresh_token)
 
     await db.commit()

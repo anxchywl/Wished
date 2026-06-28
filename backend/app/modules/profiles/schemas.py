@@ -13,6 +13,7 @@ GroupGiftVisibility = Literal["hide", "anonymous", "names"]
 
 class PrivacySettingsResponse(BaseModel):
     """privacy settings response"""
+
     profile_visibility: ProfileVisibility
     birthday_visibility: BirthdayVisibility
     wishlist_visibility: WishlistVisibility
@@ -22,6 +23,7 @@ class PrivacySettingsResponse(BaseModel):
 
 class ProfileResponse(BaseModel):
     """profile response"""
+
     id: UUID
     telegram_id: int
     username: str | None
@@ -39,6 +41,7 @@ class ProfileResponse(BaseModel):
 
 class PrivacySettingsUpdate(BaseModel):
     """privacy settings update"""
+
     model_config = ConfigDict(extra="forbid")
 
     profile_visibility: ProfileVisibility | None = None
@@ -50,6 +53,7 @@ class PrivacySettingsUpdate(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     """profile update request"""
+
     model_config = ConfigDict(extra="forbid")
 
     birthday: date | None = Field(default=None)

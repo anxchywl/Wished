@@ -9,12 +9,14 @@ from urllib.parse import parse_qsl
 
 class TelegramInitDataError(Exception):
     """telegram auth error"""
+
     pass
 
 
 @dataclass(frozen=True)
 class TelegramUserData:
     """telegram user payload"""
+
     telegram_id: int
     username: str | None
     first_name: str | None

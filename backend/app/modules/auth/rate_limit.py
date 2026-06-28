@@ -12,7 +12,9 @@ AUTH_PER_TG_ID_PER_MINUTE = 5
 logger = logging.getLogger(__name__)
 
 
-async def check_auth_rate_limit(redis: Redis, request: Request, trust_proxy_headers: bool = False) -> None:
+async def check_auth_rate_limit(
+    redis: Redis, request: Request, trust_proxy_headers: bool = False
+) -> None:
     """increment auth counters per client IP and raise 429 if either limit is exceeded
 
     trust_proxy_headers must only be True when the backend sits behind a trusted
@@ -23,11 +25,11 @@ async def check_auth_rate_limit(redis: Redis, request: Request, trust_proxy_head
     if trust_proxy_headers:
         # the trusted proxy appends the real client to any client-supplied XFF,
         # so the rightmost entry is the only value the client cannot forge
-        forwarded = [p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()]
+        forwarded = [
+            p.strip() for p in request.headers.get("X-Forwarded-For", "").split(",") if p.strip()
+        ]
         client_ip = (
-            forwarded[-1]
-            if forwarded
-            else (request.client.host if request.client else "unknown")
+            forwarded[-1] if forwarded else (request.client.host if request.client else "unknown")
         )
     else:
         client_ip = request.client.host if request.client else "unknown"
@@ -72,7 +74,9 @@ async def check_auth_rate_limit_by_telegram_id(redis: Redis, telegram_id: int) -
 
     count: int = results[0]
     if count > AUTH_PER_TG_ID_PER_MINUTE:
-        logger.warning("auth rate limit (TG ID/min) hit telegram_id=%d count=%d", telegram_id, count)
+        logger.warning(
+            "auth rate limit (TG ID/min) hit telegram_id=%d count=%d", telegram_id, count
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="too many authentication requests — try again in a minute",

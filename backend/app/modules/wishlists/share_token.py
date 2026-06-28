@@ -1,4 +1,5 @@
 """wishlist share token — Redis-backed, 30-day TTL"""
+
 import secrets
 from uuid import UUID
 

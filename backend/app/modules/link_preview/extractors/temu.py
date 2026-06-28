@@ -58,17 +58,27 @@ def _image_from_url(url: str) -> str | None:
 
 
 def _title_from_og(html: str) -> str | None:
-    m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta[^>]+property=["\']og:title["\'][^>]*content=["\']([^"\']+)["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         return m.group(1).strip() or None
-    m = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*property=["\']og:title["\']', html, re.IGNORECASE)
+    m = re.search(
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]*property=["\']og:title["\']',
+        html,
+        re.IGNORECASE,
+    )
     if m:
         return m.group(1).strip() or None
     return None
 
 
 class TemuExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         final_url = url
         html = ""
         try:

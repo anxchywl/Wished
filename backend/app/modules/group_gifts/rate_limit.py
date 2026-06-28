@@ -15,6 +15,10 @@ async def check_gift_create_limit(redis: Redis, user_id: UUID) -> None:
 async def check_contribution_create_limit(redis: Redis, user_id: UUID) -> None:
     uid = str(user_id)
     await check_rate_limit(
-        redis, "rate:gg:join:hr", uid, 3600, 40,
+        redis,
+        "rate:gg:join:hr",
+        uid,
+        3600,
+        40,
         detail="contribution rate limit exceeded — try again later",
     )

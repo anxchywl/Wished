@@ -1,4 +1,5 @@
 """image processing pipeline tests"""
+
 import io
 
 import pytest
@@ -34,6 +35,7 @@ def _make_jpeg_with_exif(width: int = 400, height: int = 300) -> bytes:
 # output format
 # ---------------------------------------------------------------------------
 
+
 def test_process_image_returns_two_webp_variants() -> None:
     from app.modules.media.processing import process_image
 
@@ -58,6 +60,7 @@ def test_process_image_accepts_png_with_alpha() -> None:
 # ---------------------------------------------------------------------------
 # size constraints
 # ---------------------------------------------------------------------------
+
 
 def test_process_image_thumbnail_max_dim() -> None:
     from app.modules.media.processing import THUMBNAIL_MAX_DIM, process_image
@@ -105,6 +108,7 @@ def test_process_image_preserves_aspect_ratio() -> None:
 # metadata stripping
 # ---------------------------------------------------------------------------
 
+
 def test_process_image_strips_exif_metadata() -> None:
     from app.modules.media.processing import process_image
 
@@ -120,6 +124,7 @@ def test_process_image_strips_exif_metadata() -> None:
 # ---------------------------------------------------------------------------
 # error handling
 # ---------------------------------------------------------------------------
+
 
 def test_process_image_raises_value_error_on_garbage_input() -> None:
     from app.modules.media.processing import process_image

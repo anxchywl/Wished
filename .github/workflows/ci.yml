@@ -34,8 +34,11 @@ jobs:
       - name: Lint (ruff)
         run: .venv/bin/ruff check backend/
 
+      - name: Formatting check
+        run: .venv/bin/ruff format --check backend/
+
       - name: Run tests
-        run: .venv/bin/pytest backend/tests/ -v
+        run: .venv/bin/pytest backend/tests/ --cov=backend/app --cov-report=term-missing:skip-covered --cov-fail-under=55 -q
 
   migration-safety:
     name: Migration Safety Check

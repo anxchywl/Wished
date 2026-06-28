@@ -128,6 +128,7 @@ class GroupGiftResponse(BaseModel):
 
 class GroupGiftSummary(BaseModel):
     """lightweight group gift summary embedded in WishResponse"""
+
     id: UUID
     status: str
     collection_type: str

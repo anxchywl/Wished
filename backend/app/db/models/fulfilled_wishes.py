@@ -11,9 +11,12 @@ from app.db.base import Base
 
 class FulfilledWish(Base):
     """wish fulfillment history for participants"""
+
     __tablename__ = "fulfilled_wishes"
     __table_args__ = (
-        UniqueConstraint("wish_id", "participant_user_id", name="uq_fulfilled_wishes_wish_participant"),
+        UniqueConstraint(
+            "wish_id", "participant_user_id", name="uq_fulfilled_wishes_wish_participant"
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -43,8 +46,12 @@ class FulfilledWish(Base):
     contributor_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_contribution_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_collected_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    fulfilled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    fulfilled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     wish = relationship("Wish")
     participant = relationship("User", foreign_keys=[participant_user_id])

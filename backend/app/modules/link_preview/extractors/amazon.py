@@ -93,7 +93,9 @@ def _extract_price(html: str) -> tuple[str | None, str | None]:
 
 
 class AmazonExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html: str | None = None
         try:
             resp = await client.get(url)
@@ -106,8 +108,12 @@ class AmazonExtractor:
 
         if not html:
             return LinkPreviewResponse(
-                title=None, description=None, image_url=None,
-                price=None, currency=None, source="amazon",
+                title=None,
+                description=None,
+                image_url=None,
+                price=None,
+                currency=None,
+                source="amazon",
             )
 
         title = _extract_title(html)

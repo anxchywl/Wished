@@ -10,6 +10,7 @@ from app.modules.group_gifts.schemas import GroupGiftSummary
 
 class WishCreateRequest(BaseModel):
     """wish create request"""
+
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=160)
@@ -63,6 +64,7 @@ class WishCreateRequest(BaseModel):
 
 class WishUpdateRequest(BaseModel):
     """wish update request"""
+
     model_config = ConfigDict(extra="forbid")
 
     wishlist_id: UUID | None = None
@@ -123,6 +125,7 @@ class WishUpdateRequest(BaseModel):
 
 class WishCopyRequest(BaseModel):
     """wish copy request"""
+
     model_config = ConfigDict(extra="forbid")
 
     wishlist_id: UUID
@@ -130,6 +133,7 @@ class WishCopyRequest(BaseModel):
 
 class WishReorderRequest(BaseModel):
     """wish reorder request"""
+
     model_config = ConfigDict(extra="forbid")
 
     wish_ids: list[UUID] = Field(min_length=1)
@@ -145,6 +149,7 @@ class WishReorderRequest(BaseModel):
 
 class WishResponse(BaseModel):
     """wish response"""
+
     id: UUID
     wishlist_id: UUID
     title: str
@@ -165,4 +170,5 @@ class WishResponse(BaseModel):
 
 class WishListResponse(BaseModel):
     """wish list response"""
+
     items: list[WishResponse]

@@ -9,6 +9,7 @@ Run standalone:
     python -m app.workers.media_cleanup --dry-run
     python -m app.workers.media_cleanup --grace-hours 2
 """
+
 import argparse
 import asyncio
 import logging

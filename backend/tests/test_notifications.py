@@ -1,4 +1,5 @@
 """notification system tests"""
+
 import asyncio
 import json
 from types import SimpleNamespace
@@ -26,24 +27,35 @@ from app.modules.notifications.worker import run_notification_worker
 # deep link generation
 # ---------------------------------------------------------------------------
 
+
 def test_profile_url() -> None:
-    assert profile_url("https://app.example.com", "alice") == "https://app.example.com/users?profile=alice"
+    assert (
+        profile_url("https://app.example.com", "alice")
+        == "https://app.example.com/users?profile=alice"
+    )
 
 
 def test_wishlist_url() -> None:
     wid = uuid4()
-    assert wishlist_url("https://app.example.com", "alice", wid) == f"https://app.example.com/users?profile=alice&wishlist={wid}"
+    assert (
+        wishlist_url("https://app.example.com", "alice", wid)
+        == f"https://app.example.com/users?profile=alice&wishlist={wid}"
+    )
 
 
 def test_wish_url() -> None:
     wid = uuid4()
     wish = uuid4()
-    assert wish_url("https://app.example.com", "alice", wid, wish) == f"https://app.example.com/users?profile=alice&wishlist={wid}&wish={wish}"
+    assert (
+        wish_url("https://app.example.com", "alice", wid, wish)
+        == f"https://app.example.com/users?profile=alice&wishlist={wid}&wish={wish}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # localization
 # ---------------------------------------------------------------------------
+
 
 def test_text_defaults_to_english() -> None:
     t = _text(None)
@@ -69,6 +81,7 @@ def test_text_falls_back_for_unknown_lang() -> None:
 # actor name
 # ---------------------------------------------------------------------------
 
+
 def test_actor_name_full_name() -> None:
     user = SimpleNamespace(first_name="Alice", last_name="Smith", username="asmith")
     assert _actor_name(user) == "Alice Smith"
@@ -93,10 +106,13 @@ def test_actor_name_no_info() -> None:
 # event publisher
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_publish_event_pushes_to_queue() -> None:
     redis = AsyncMock()
-    await publish_event(redis, "FOLLOWED", {"follower_user_id": uuid4(), "followed_user_id": uuid4()})
+    await publish_event(
+        redis, "FOLLOWED", {"follower_user_id": uuid4(), "followed_user_id": uuid4()}
+    )
     redis.rpush.assert_called_once()
     call_args = redis.rpush.call_args
     assert call_args[0][0] == QUEUE_KEY
@@ -118,6 +134,7 @@ async def test_publish_event_survives_redis_failure() -> None:
 # deduplication
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_is_duplicate_first_call_returns_false() -> None:
     redis = AsyncMock()
@@ -138,13 +155,16 @@ async def test_is_duplicate_second_call_returns_true() -> None:
 # FOLLOWED handler
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_handle_followed_sends_notification() -> None:
     follower_id = uuid4()
     followed_id = uuid4()
     event_id = str(uuid4())
 
-    follower = SimpleNamespace(id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en")
+    follower = SimpleNamespace(
+        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+    )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
     db = _fake_db_for_users({follower_id: follower, followed_id: followed})
@@ -154,8 +174,16 @@ async def test_handle_followed_sends_notification() -> None:
     redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_followed(
-        {"type": "FOLLOWED", "event_id": event_id, "follower_user_id": str(follower_id), "followed_user_id": str(followed_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "FOLLOWED",
+            "event_id": event_id,
+            "follower_user_id": str(follower_id),
+            "followed_user_id": str(followed_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_called_once()
@@ -169,7 +197,9 @@ async def test_handle_followed_skips_duplicate() -> None:
     follower_id = uuid4()
     followed_id = uuid4()
 
-    follower = SimpleNamespace(id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en")
+    follower = SimpleNamespace(
+        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+    )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
     db = _fake_db_for_users({follower_id: follower, followed_id: followed})
@@ -178,8 +208,16 @@ async def test_handle_followed_skips_duplicate() -> None:
     redis.set.return_value = None  # duplicate
 
     await handle_followed(
-        {"type": "FOLLOWED", "event_id": str(uuid4()), "follower_user_id": str(follower_id), "followed_user_id": str(followed_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "FOLLOWED",
+            "event_id": str(uuid4()),
+            "follower_user_id": str(follower_id),
+            "followed_user_id": str(followed_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_not_called()
@@ -190,7 +228,9 @@ async def test_handle_followed_survives_telegram_failure() -> None:
     follower_id = uuid4()
     followed_id = uuid4()
 
-    follower = SimpleNamespace(id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en")
+    follower = SimpleNamespace(
+        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+    )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
     db = _fake_db_for_users({follower_id: follower, followed_id: followed})
@@ -201,8 +241,16 @@ async def test_handle_followed_survives_telegram_failure() -> None:
 
     # must not raise
     await handle_followed(
-        {"type": "FOLLOWED", "event_id": str(uuid4()), "follower_user_id": str(follower_id), "followed_user_id": str(followed_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "FOLLOWED",
+            "event_id": str(uuid4()),
+            "follower_user_id": str(follower_id),
+            "followed_user_id": str(followed_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
 
@@ -214,8 +262,16 @@ async def test_handle_followed_missing_follower_is_noop() -> None:
     redis = AsyncMock()
 
     await handle_followed(
-        {"type": "FOLLOWED", "event_id": str(uuid4()), "follower_user_id": str(uuid4()), "followed_user_id": str(followed_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "FOLLOWED",
+            "event_id": str(uuid4()),
+            "follower_user_id": str(uuid4()),
+            "followed_user_id": str(followed_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_not_called()
@@ -225,13 +281,16 @@ async def test_handle_followed_missing_follower_is_noop() -> None:
 # WISHLIST_CREATED handler
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_handle_wishlist_created_notifies_followers() -> None:
     owner_id = uuid4()
     wishlist_id = uuid4()
     follower_tg_id = 777
 
-    owner = SimpleNamespace(id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en")
+    owner = SimpleNamespace(
+        id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en"
+    )
     wishlist = SimpleNamespace(id=wishlist_id, title="My Birthday List", visibility="public")
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(follower_tg_id, "en")])
@@ -241,8 +300,16 @@ async def test_handle_wishlist_created_notifies_followers() -> None:
     redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wishlist_created(
-        {"type": "WISHLIST_CREATED", "event_id": str(uuid4()), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "WISHLIST_CREATED",
+            "event_id": str(uuid4()),
+            "wishlist_id": str(wishlist_id),
+            "owner_user_id": str(owner_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_called_once()
@@ -256,7 +323,9 @@ async def test_handle_wishlist_created_skips_private_wishlist() -> None:
     owner_id = uuid4()
     wishlist_id = uuid4()
 
-    owner = SimpleNamespace(id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en")
+    owner = SimpleNamespace(
+        id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en"
+    )
     wishlist = SimpleNamespace(id=wishlist_id, title="Secret List", visibility="private")
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(888, "en")])
@@ -264,8 +333,16 @@ async def test_handle_wishlist_created_skips_private_wishlist() -> None:
     redis = AsyncMock()
 
     await handle_wishlist_created(
-        {"type": "WISHLIST_CREATED", "event_id": str(uuid4()), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "WISHLIST_CREATED",
+            "event_id": str(uuid4()),
+            "wishlist_id": str(wishlist_id),
+            "owner_user_id": str(owner_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_not_called()
@@ -275,6 +352,7 @@ async def test_handle_wishlist_created_skips_private_wishlist() -> None:
 # WISH_CREATED handler
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_handle_wish_created_notifies_followers() -> None:
     owner_id = uuid4()
@@ -282,7 +360,9 @@ async def test_handle_wish_created_notifies_followers() -> None:
     wish_id = uuid4()
     follower_tg_id = 555
 
-    owner = SimpleNamespace(id=owner_id, first_name="Carol", last_name=None, username="carol", language_code="en")
+    owner = SimpleNamespace(
+        id=owner_id, first_name="Carol", last_name=None, username="carol", language_code="en"
+    )
     wishlist = SimpleNamespace(id=wishlist_id, title="Wishlist", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="New Sneakers", wishlist_id=wishlist_id)
 
@@ -293,8 +373,17 @@ async def test_handle_wish_created_notifies_followers() -> None:
     redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_created(
-        {"type": "WISH_CREATED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "WISH_CREATED",
+            "event_id": str(uuid4()),
+            "wish_id": str(wish_id),
+            "wishlist_id": str(wishlist_id),
+            "owner_user_id": str(owner_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_called_once()
@@ -310,6 +399,7 @@ async def test_handle_wish_created_notifies_followers() -> None:
 # WISH_FULFILLED handler
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_handle_wish_fulfilled_notifies_followers() -> None:
     owner_id = uuid4()
@@ -317,7 +407,9 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
     wish_id = uuid4()
     follower_tg_id = 444
 
-    owner = SimpleNamespace(id=owner_id, first_name="Dave", last_name=None, username="dave", language_code="en")
+    owner = SimpleNamespace(
+        id=owner_id, first_name="Dave", last_name=None, username="dave", language_code="en"
+    )
     wishlist = SimpleNamespace(id=wishlist_id, title="Dave's List", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="Guitar", wishlist_id=wishlist_id)
 
@@ -328,8 +420,17 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
     redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_fulfilled(
-        {"type": "WISH_FULFILLED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "WISH_FULFILLED",
+            "event_id": str(uuid4()),
+            "wish_id": str(wish_id),
+            "wishlist_id": str(wishlist_id),
+            "owner_user_id": str(owner_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     bot.send_message.assert_called_once()
@@ -345,13 +446,16 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
 # privacy: no reservation info leaks
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_wish_fulfilled_text_contains_no_reservation_info() -> None:
     owner_id = uuid4()
     wishlist_id = uuid4()
     wish_id = uuid4()
 
-    owner = SimpleNamespace(id=owner_id, first_name="Eve", last_name=None, username="eve", language_code="en")
+    owner = SimpleNamespace(
+        id=owner_id, first_name="Eve", last_name=None, username="eve", language_code="en"
+    )
     wishlist = SimpleNamespace(id=wishlist_id, title="List", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="Book", wishlist_id=wishlist_id)
 
@@ -362,8 +466,17 @@ async def test_wish_fulfilled_text_contains_no_reservation_info() -> None:
     redis.incr.return_value = 1  # outbound rate check passes
 
     await handle_wish_fulfilled(
-        {"type": "WISH_FULFILLED", "event_id": str(uuid4()), "wish_id": str(wish_id), "wishlist_id": str(wishlist_id), "owner_user_id": str(owner_id)},
-        db, bot, redis, "https://app.example.com",
+        {
+            "type": "WISH_FULFILLED",
+            "event_id": str(uuid4()),
+            "wish_id": str(wish_id),
+            "wishlist_id": str(wishlist_id),
+            "owner_user_id": str(owner_id),
+        },
+        db,
+        bot,
+        redis,
+        "https://app.example.com",
     )
 
     text = bot.send_message.call_args.kwargs["text"]
@@ -397,6 +510,7 @@ async def test_group_gift_created_notification_is_muted() -> None:
 # ---------------------------------------------------------------------------
 # worker dispatch
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_worker_dispatches_followed_event() -> None:
@@ -472,6 +586,7 @@ async def test_worker_skips_unknown_event_type() -> None:
 # ---------------------------------------------------------------------------
 # helper fakes
 # ---------------------------------------------------------------------------
+
 
 def _make_result(scalar=None, rows=None):
     """build a sync-compatible result mock"""

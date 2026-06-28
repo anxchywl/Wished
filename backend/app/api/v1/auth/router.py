@@ -95,14 +95,18 @@ async def refresh_auth_token(
             detail="No refresh token",
         )
     try:
-        refresh_response, new_refresh_token = await refresh_tokens(db, refresh_token_value, settings)
+        refresh_response, new_refresh_token = await refresh_tokens(
+            db, refresh_token_value, settings
+        )
     except AuthError as exc:
         _clear_refresh_cookie(response, settings)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
         ) from exc
-    _set_refresh_cookie(response, new_refresh_token, refresh_response.refresh_token_expires_at, settings)
+    _set_refresh_cookie(
+        response, new_refresh_token, refresh_response.refresh_token_expires_at, settings
+    )
     return refresh_response
 
 

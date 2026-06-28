@@ -1,4 +1,5 @@
 """group gifts module"""
+
 from app.modules.group_gifts.service import (
     cancel_group_gift,
     confirm_transfer,

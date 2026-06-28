@@ -1,4 +1,5 @@
 """telegram bot tests"""
+
 from types import SimpleNamespace
 
 import pytest
@@ -16,7 +17,9 @@ async def _allow_request(telegram_id: int) -> bool:
     return True
 
 
-async def _create_discovery_token(redis, requester_telegram_id: int, target_telegram_id: int, db=None) -> str:
+async def _create_discovery_token(
+    redis, requester_telegram_id: int, target_telegram_id: int, db=None
+) -> str:
     return "test-token"
 
 
@@ -34,8 +37,6 @@ class FakeMessage:
 
     async def delete(self) -> None:
         self.deleted = True
-
-
 
 
 class FakeSession:
@@ -130,7 +131,11 @@ async def test_language_text_handler_shows_english_welcome(monkeypatch) -> None:
     """language_text_handler shows English welcome after tapping English"""
     message = _lang_message("English")
     monkeypatch.setattr(bot, "get_redis_client", lambda: FakeRedis())
-    monkeypatch.setattr(bot, "async_session_factory", lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)))
+    monkeypatch.setattr(
+        bot,
+        "async_session_factory",
+        lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)),
+    )
     monkeypatch.setattr(
         bot,
         "get_settings",
@@ -151,7 +156,11 @@ async def test_language_text_handler_shows_russian_welcome(monkeypatch) -> None:
     """language_text_handler shows Russian welcome after tapping Русский"""
     message = _lang_message("Русский")
     monkeypatch.setattr(bot, "get_redis_client", lambda: FakeRedis())
-    monkeypatch.setattr(bot, "async_session_factory", lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)))
+    monkeypatch.setattr(
+        bot,
+        "async_session_factory",
+        lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)),
+    )
     monkeypatch.setattr(
         bot,
         "get_settings",
@@ -171,7 +180,11 @@ async def test_language_text_handler_shows_kazakh_welcome(monkeypatch) -> None:
     """language_text_handler shows Kazakh welcome after tapping Қазақша"""
     message = _lang_message("Қазақша")
     monkeypatch.setattr(bot, "get_redis_client", lambda: FakeRedis())
-    monkeypatch.setattr(bot, "async_session_factory", lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)))
+    monkeypatch.setattr(
+        bot,
+        "async_session_factory",
+        lambda: FakeSession(user=SimpleNamespace(telegram_id=999, language_code=None)),
+    )
     monkeypatch.setattr(
         bot,
         "get_settings",
@@ -414,6 +427,7 @@ async def test_users_shared_handler_matches_selected_users(monkeypatch) -> None:
 
     class MultiSession:
         """returns lang-lookup result first, then registered user list"""
+
         call_count = 0
 
         async def __aenter__(self):
@@ -449,7 +463,10 @@ async def test_users_shared_handler_matches_selected_users(monkeypatch) -> None:
     assert message.answers[0]["message_effect_id"] == "5046509860389126442"
     assert message.deleted is False
     button = message.answers[0]["reply_markup"].inline_keyboard[0][0]
-    assert button.web_app.url == "https://example.com/users?profile_id=00000000-0000-0000-0000-000000000001&profile_token=test-token"
+    assert (
+        button.web_app.url
+        == "https://example.com/users?profile_id=00000000-0000-0000-0000-000000000001&profile_token=test-token"
+    )
 
 
 @pytest.mark.asyncio

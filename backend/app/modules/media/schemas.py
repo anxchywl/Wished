@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 class WishImageResponse(BaseModel):
     """wish image response"""
+
     id: UUID
     wish_id: UUID
     url: str
@@ -20,4 +21,5 @@ class WishImageResponse(BaseModel):
 
 class WishImageListResponse(BaseModel):
     """wish image list response"""
+
     items: list[WishImageResponse]

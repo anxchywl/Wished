@@ -10,6 +10,7 @@ from app.db.base import Base
 
 class RefreshToken(Base):
     """refresh token record"""
+
     __tablename__ = "refresh_tokens"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

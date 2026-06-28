@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
 
+
 async def check_upload_rate_limit(
     redis: Redis,
     user_id: UUID,

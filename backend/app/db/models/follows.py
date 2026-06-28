@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class Follow(Base):
     """follow record"""
+
     __tablename__ = "follows"
     __table_args__ = (
         UniqueConstraint("follower_user_id", "followed_user_id", name="uq_follows_pair"),

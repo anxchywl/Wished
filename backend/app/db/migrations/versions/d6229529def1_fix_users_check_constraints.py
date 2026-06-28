@@ -5,9 +5,8 @@ from collections.abc import Sequence
 from alembic import op
 
 
-
-revision: str = 'd6229529def1'
-down_revision: str | None = '202606190003'
+revision: str = "d6229529def1"
+down_revision: str | None = "202606190003"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

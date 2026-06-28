@@ -9,6 +9,7 @@ from app.modules.media.schemas import WishImageResponse
 
 class ReservationResponse(BaseModel):
     """reservation response for the reserver"""
+
     id: UUID
     wish_id: UUID
     reserver_user_id: UUID
@@ -19,6 +20,7 @@ class ReservationResponse(BaseModel):
 
 class WishReservationStatusResponse(BaseModel):
     """viewer-safe reservation status — never leaks reserver identity to owner"""
+
     wish_id: UUID
     is_reserved: bool
     is_mine: bool
@@ -32,6 +34,7 @@ class WishReservationStatusResponse(BaseModel):
 
 class BookedWishGroupGiftDetail(BaseModel):
     """group gift details shown to organizer and contributors on booked wish"""
+
     group_gift_id: UUID
     status: str
     organizer_first_name: str | None
@@ -56,6 +59,7 @@ class BookedWishContributorSummary(BaseModel):
 
 class BookedWishItem(BaseModel):
     """single wish the current user has booked"""
+
     reservation_id: UUID | None
     wish_id: UUID
     wish_title: str
@@ -77,6 +81,7 @@ class BookedWishItem(BaseModel):
 
 class FulfilledWishItem(BaseModel):
     """single wish the current user helped fulfill"""
+
     fulfilled_id: UUID
     wish_id: UUID
     wish_title: str
@@ -103,5 +108,6 @@ class FulfilledWishItem(BaseModel):
 
 class BookedWishListResponse(BaseModel):
     """discover contribution sections for the current user"""
+
     items: list[BookedWishItem]
     fulfilled_items: list[FulfilledWishItem] = []

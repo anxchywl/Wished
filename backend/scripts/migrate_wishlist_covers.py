@@ -6,6 +6,7 @@ and skips wishlists whose description contains no embedded [cover:data:...].
 Run inside the backend container:
   docker compose exec backend python scripts/migrate_wishlist_covers.py
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -34,14 +35,16 @@ async def migrate() -> None:
     engine = create_async_engine(settings.sqlalchemy_database_url)
 
     async with engine.begin() as conn:
-        rows = (await conn.execute(
-            text(
-                "SELECT id, description, cover_image_object_name "
-                "FROM wishlists "
-                "WHERE description LIKE '%[cover:data:%' "
-                "  AND cover_image_object_name IS NULL"
+        rows = (
+            await conn.execute(
+                text(
+                    "SELECT id, description, cover_image_object_name "
+                    "FROM wishlists "
+                    "WHERE description LIKE '%[cover:data:%' "
+                    "  AND cover_image_object_name IS NULL"
+                )
             )
-        )).fetchall()
+        ).fetchall()
 
     log.info("found %d wishlists with embedded base64 cover", len(rows))
 

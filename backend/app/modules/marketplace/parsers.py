@@ -78,7 +78,11 @@ def _parse_price(text: str) -> Decimal | None:
 
 def _extract_next_data_product(html: str) -> dict | None:
     """extract a Product-like dict from Next.js __NEXT_DATA__ script tag"""
-    m = re.search(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
+    m = re.search(
+        r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
+        html,
+        re.DOTALL | re.IGNORECASE,
+    )
     if not m:
         return None
     try:
@@ -197,15 +201,21 @@ def _parse_og_into(html: str, result: ProductData, default_currency: str) -> boo
     if not og_title:
         return False
     result.title = og_title.strip() or result.title
-    result.image_url = result.image_url or _meta_content(html, "og:image") or _meta_content(html, "og:image:url")
+    result.image_url = (
+        result.image_url or _meta_content(html, "og:image") or _meta_content(html, "og:image:url")
+    )
     og_desc = _meta_content(html, "og:description")
     if og_desc and not result.description:
         result.description = og_desc.strip() or None
-    price_str = _meta_content(html, "product:price:amount") or _meta_content(html, "og:price:amount")
+    price_str = _meta_content(html, "product:price:amount") or _meta_content(
+        html, "og:price:amount"
+    )
     if price_str and result.price is None:
         result.price = _parse_price(price_str)
         if result.price is not None:
-            cur = _meta_content(html, "product:price:currency") or _meta_content(html, "og:price:currency")
+            cur = _meta_content(html, "product:price:currency") or _meta_content(
+                html, "og:price:currency"
+            )
             result.currency = (cur or default_currency).upper()[:3]
     return True
 
@@ -347,10 +357,9 @@ class LamodaParser:
             or _element_text_by_class(html, "product-title")
             or _h1_text(html)
         )
-        price_text = (
-            _element_text_by_class(html, "x-atomo-pdp-price__price-current")
-            or _element_text_by_class(html, "price-block__price")
-        )
+        price_text = _element_text_by_class(
+            html, "x-atomo-pdp-price__price-current"
+        ) or _element_text_by_class(html, "price-block__price")
         if price_text:
             result.price = _parse_price(price_text)
             if result.price is not None:
@@ -378,10 +387,7 @@ class DnsParser:
             if result.title:
                 return result
 
-        result.title = (
-            _element_text_by_class(html, "product-card-top__title")
-            or _h1_text(html)
-        )
+        result.title = _element_text_by_class(html, "product-card-top__title") or _h1_text(html)
         price_text = _element_text_by_class(html, "product-buy__price")
         if price_text:
             result.price = _parse_price(price_text)
@@ -409,13 +415,9 @@ class MVideoParser:
             if result.title:
                 return result
 
-        result.title = (
-            _element_text_by_class(html, "product-page-title__title")
-            or _h1_text(html)
-        )
-        price_text = (
-            _element_text_by_class(html, "price__main-value")
-            or _element_text_by_class(html, "price-block__price")
+        result.title = _element_text_by_class(html, "product-page-title__title") or _h1_text(html)
+        price_text = _element_text_by_class(html, "price__main-value") or _element_text_by_class(
+            html, "price-block__price"
         )
         if price_text:
             result.price = _parse_price(price_text)
@@ -446,7 +448,9 @@ _PARSER_BY_HOST: dict[str, type] = {
 }
 
 
-def get_parser(hostname: str) -> KaspiParser | WildberriesParser | OzonParser | LamodaParser | DnsParser | MVideoParser | None:
+def get_parser(
+    hostname: str,
+) -> KaspiParser | WildberriesParser | OzonParser | LamodaParser | DnsParser | MVideoParser | None:
     """return the appropriate HTML parser for the given hostname, or None"""
     cls = _PARSER_BY_HOST.get(hostname)
     return cls() if cls else None

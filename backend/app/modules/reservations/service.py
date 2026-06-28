@@ -46,10 +46,12 @@ async def create_reservation(
 
     # check for existing active reservation inside a transaction
     result = await db.execute(
-        select(Reservation).where(
+        select(Reservation)
+        .where(
             Reservation.wish_id == wish_id,
             Reservation.status == "active",
-        ).with_for_update()
+        )
+        .with_for_update()
     )
     existing = result.scalar_one_or_none()
 
@@ -120,9 +122,7 @@ async def cancel_wish_reservation_as_owner(
 ) -> None:
     """wish owner removes any active reservation on their wish"""
     result = await db.execute(
-        select(Wish)
-        .options(selectinload(Wish.wishlist))
-        .where(Wish.id == wish_id)
+        select(Wish).options(selectinload(Wish.wishlist)).where(Wish.id == wish_id)
     )
     wish = result.scalar_one_or_none()
     if not wish:
@@ -155,7 +155,9 @@ async def get_wish_reservation_status(
     redis: Redis | None = None,
 ) -> WishReservationStatusResponse:
     """return viewer-safe reservation status, respecting the wish owner's booking_visibility setting"""
-    wish = await _get_accessible_wish(db, current_user, wish_id, require_active=False, share_token=share_token, redis=redis)
+    wish = await _get_accessible_wish(
+        db, current_user, wish_id, require_active=False, share_token=share_token, redis=redis
+    )
     is_owner = wish.wishlist.owner_user_id == current_user.id
 
     gift_result = await db.execute(
@@ -173,8 +175,8 @@ async def get_wish_reservation_status(
         wish_owner = await db.get(User, wish.wishlist.owner_user_id)
     owner_gg_visibility: str = (
         getattr(wish_owner, "group_gift_visibility", "hide")
-        if wish_owner else
-        getattr(current_user, "group_gift_visibility", "hide")
+        if wish_owner
+        else getattr(current_user, "group_gift_visibility", "hide")
     )
 
     has_active_group_gift = active_gift_exists
@@ -224,9 +226,7 @@ async def get_wish_reservation_status(
             reserver = await db.get(User, reservation.reserver_user_id)
             if reserver is not None:
                 reserver_display_name = (
-                    f"@{reserver.username}"
-                    if reserver.username
-                    else reserver.first_name
+                    f"@{reserver.username}" if reserver.username else reserver.first_name
                 )
         return WishReservationStatusResponse(
             wish_id=wish_id,
@@ -320,11 +320,13 @@ async def list_my_booked_wishes(
                 url=get_presigned_url(img.bucket, img.object_name),
                 thumbnail_url=(
                     get_presigned_url(img.bucket, img.thumbnail_object_name)
-                    if img.thumbnail_object_name else None
+                    if img.thumbnail_object_name
+                    else None
                 ),
                 medium_url=(
                     get_presigned_url(img.bucket, img.medium_object_name)
-                    if img.medium_object_name else None
+                    if img.medium_object_name
+                    else None
                 ),
                 file_name=img.file_name,
                 content_type=img.content_type,
@@ -378,6 +380,7 @@ async def list_my_booked_wishes(
         participant_count = 1 + len(non_cancelled)
 
         from decimal import Decimal as D
+
         _CONFIRMED = {"confirmed", "pledged", "notified"}
         collected = sum((c.amount for c in non_cancelled if c.status in _CONFIRMED), D("0"))
 
@@ -400,8 +403,7 @@ async def list_my_booked_wishes(
             collected_amount=str(collected),
             total_amount=str(wish.price) if wish.price is not None else None,
             percent_complete=(
-                min(100, int(collected / wish.price * 100))
-                if wish.price and wish.price > 0 else 0
+                min(100, int(collected / wish.price * 100)) if wish.price and wish.price > 0 else 0
             ),
             participant_count=participant_count,
             cancel_approval_count=len(cancel_approvals),
@@ -480,11 +482,13 @@ async def _list_my_fulfilled_wishes(
                 url=get_presigned_url(img.bucket, img.object_name),
                 thumbnail_url=(
                     get_presigned_url(img.bucket, img.thumbnail_object_name)
-                    if img.thumbnail_object_name else None
+                    if img.thumbnail_object_name
+                    else None
                 ),
                 medium_url=(
                     get_presigned_url(img.bucket, img.medium_object_name)
-                    if img.medium_object_name else None
+                    if img.medium_object_name
+                    else None
                 ),
                 file_name=img.file_name,
                 content_type=img.content_type,
@@ -524,11 +528,13 @@ async def _list_my_fulfilled_wishes(
                 contributor_count=record.contributor_count,
                 user_contribution_amount=(
                     str(record.user_contribution_amount)
-                    if record.user_contribution_amount is not None else None
+                    if record.user_contribution_amount is not None
+                    else None
                 ),
                 total_collected_amount=(
                     str(record.total_collected_amount)
-                    if record.total_collected_amount is not None else None
+                    if record.total_collected_amount is not None
+                    else None
                 ),
                 group_gift_id=record.group_gift_id,
             )
@@ -546,9 +552,7 @@ async def _get_accessible_wish(
 ) -> Wish:
     """find wish accessible to the user; share_token grants access to private wishlists"""
     result = await db.execute(
-        select(Wish)
-        .options(selectinload(Wish.wishlist))
-        .where(Wish.id == wish_id)
+        select(Wish).options(selectinload(Wish.wishlist)).where(Wish.id == wish_id)
     )
     wish = result.scalar_one_or_none()
     if not wish:

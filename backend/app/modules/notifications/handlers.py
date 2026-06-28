@@ -8,7 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow, User, Wish, Wishlist
-from app.modules.notifications.deep_links import profile_url_by_id, wish_url_by_id, wishlist_url_by_id
+from app.modules.notifications.deep_links import (
+    profile_url_by_id,
+    wish_url_by_id,
+    wishlist_url_by_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +127,9 @@ async def _is_duplicate(redis: Redis, event_id: str, telegram_id: int) -> bool:
     return result is None
 
 
-async def _is_batched(redis: Redis, category: str, actor_id: str, recipient_tg_id: int, window: int) -> bool:
+async def _is_batched(
+    redis: Redis, category: str, actor_id: str, recipient_tg_id: int, window: int
+) -> bool:
     """return True if a notification for this category+actor was already sent to this recipient recently
 
     sets the key on first call so subsequent calls within `window` seconds return True.
@@ -144,9 +150,7 @@ async def _check_outbound_rate(redis: Redis) -> bool:
 async def _send(bot: Bot, telegram_id: int, text: str, button_text: str, url: str) -> None:
     """send telegram DM with a single mini app button"""
     keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=button_text, web_app=WebAppInfo(url=url))]
-        ]
+        inline_keyboard=[[InlineKeyboardButton(text=button_text, web_app=WebAppInfo(url=url))]]
     )
     await bot.send_message(chat_id=telegram_id, text=text, reply_markup=keyboard)
 
@@ -178,13 +182,15 @@ async def handle_followed(
 
     t = _text(followed.language_code)
     actor = _actor_name(follower)
-    text = t['followed_body'].format(actor=actor)
+    text = t["followed_body"].format(actor=actor)
     url = profile_url_by_id(mini_app_url, follower_id)
     try:
         await _send(bot, followed.telegram_id, text, t["open_profile"], url)
         logger.info("sent FOLLOWED notification to telegram_id=%s", followed.telegram_id)
     except Exception:
-        logger.exception("failed to send FOLLOWED notification to telegram_id=%s", followed.telegram_id)
+        logger.exception(
+            "failed to send FOLLOWED notification to telegram_id=%s", followed.telegram_id
+        )
 
 
 async def handle_wishlist_created(
@@ -216,19 +222,26 @@ async def handle_wishlist_created(
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
-        if await _is_batched(redis, "wishlist_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+        if await _is_batched(
+            redis, "wishlist_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS
+        ):
             logger.debug("batched WISHLIST_CREATED notification for telegram_id=%s", follower_tg_id)
             continue
         if not await _check_outbound_rate(redis):
-            logger.warning("outbound Telegram rate limit hit — dropping WISHLIST_CREATED for telegram_id=%s", follower_tg_id)
+            logger.warning(
+                "outbound Telegram rate limit hit — dropping WISHLIST_CREATED for telegram_id=%s",
+                follower_tg_id,
+            )
             continue
         t = _text(language_code)
-        text = t['wishlist_created_body'].format(actor=actor, title=wishlist.title)
+        text = t["wishlist_created_body"].format(actor=actor, title=wishlist.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wishlist"], url)
             logger.info("sent WISHLIST_CREATED notification to telegram_id=%s", follower_tg_id)
         except Exception:
-            logger.exception("failed to send WISHLIST_CREATED notification to telegram_id=%s", follower_tg_id)
+            logger.exception(
+                "failed to send WISHLIST_CREATED notification to telegram_id=%s", follower_tg_id
+            )
 
 
 async def handle_wish_created(
@@ -266,19 +279,26 @@ async def handle_wish_created(
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
-        if await _is_batched(redis, "wish_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+        if await _is_batched(
+            redis, "wish_created", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS
+        ):
             logger.debug("batched WISH_CREATED notification for telegram_id=%s", follower_tg_id)
             continue
         if not await _check_outbound_rate(redis):
-            logger.warning("outbound Telegram rate limit hit — dropping WISH_CREATED for telegram_id=%s", follower_tg_id)
+            logger.warning(
+                "outbound Telegram rate limit hit — dropping WISH_CREATED for telegram_id=%s",
+                follower_tg_id,
+            )
             continue
         t = _text(language_code)
-        text = t['wish_created_body'].format(actor=actor, title=wish.title)
+        text = t["wish_created_body"].format(actor=actor, title=wish.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wish"], url)
             logger.info("sent WISH_CREATED notification to telegram_id=%s", follower_tg_id)
         except Exception:
-            logger.exception("failed to send WISH_CREATED notification to telegram_id=%s", follower_tg_id)
+            logger.exception(
+                "failed to send WISH_CREATED notification to telegram_id=%s", follower_tg_id
+            )
 
 
 async def handle_wish_fulfilled(
@@ -316,19 +336,26 @@ async def handle_wish_fulfilled(
     for follower_tg_id, language_code in followers:
         if await _is_duplicate(redis, event_id, follower_tg_id):
             continue
-        if await _is_batched(redis, "wish_fulfilled", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS):
+        if await _is_batched(
+            redis, "wish_fulfilled", str(owner_id), follower_tg_id, BATCH_WINDOW_SECONDS
+        ):
             logger.debug("batched WISH_FULFILLED notification for telegram_id=%s", follower_tg_id)
             continue
         if not await _check_outbound_rate(redis):
-            logger.warning("outbound Telegram rate limit hit — dropping WISH_FULFILLED for telegram_id=%s", follower_tg_id)
+            logger.warning(
+                "outbound Telegram rate limit hit — dropping WISH_FULFILLED for telegram_id=%s",
+                follower_tg_id,
+            )
             continue
         t = _text(language_code)
-        text = t['wish_fulfilled_body'].format(actor=actor, title=wish.title)
+        text = t["wish_fulfilled_body"].format(actor=actor, title=wish.title)
         try:
             await _send(bot, follower_tg_id, text, t["open_wishlist"], url)
             logger.info("sent WISH_FULFILLED notification to telegram_id=%s", follower_tg_id)
         except Exception:
-            logger.exception("failed to send WISH_FULFILLED notification to telegram_id=%s", follower_tg_id)
+            logger.exception(
+                "failed to send WISH_FULFILLED notification to telegram_id=%s", follower_tg_id
+            )
 
 
 async def handle_fulfilled_participant(
@@ -350,7 +377,10 @@ async def handle_fulfilled_participant(
     if await _is_duplicate(redis, event_id, participant.telegram_id):
         return
     if not await _check_outbound_rate(redis):
-        logger.warning("outbound Telegram rate limit hit — dropping FULFILLED_PARTICIPANT for telegram_id=%s", participant.telegram_id)
+        logger.warning(
+            "outbound Telegram rate limit hit — dropping FULFILLED_PARTICIPANT for telegram_id=%s",
+            participant.telegram_id,
+        )
         return
 
     t = _text(participant.language_code)
@@ -367,9 +397,14 @@ async def handle_fulfilled_participant(
     )
     try:
         await _send(bot, participant.telegram_id, text, t["open_wish"], url)
-        logger.info("sent FULFILLED_PARTICIPANT notification to telegram_id=%s", participant.telegram_id)
+        logger.info(
+            "sent FULFILLED_PARTICIPANT notification to telegram_id=%s", participant.telegram_id
+        )
     except Exception:
-        logger.exception("failed to send FULFILLED_PARTICIPANT notification to telegram_id=%s", participant.telegram_id)
+        logger.exception(
+            "failed to send FULFILLED_PARTICIPANT notification to telegram_id=%s",
+            participant.telegram_id,
+        )
 
 
 async def _get_followers(db: AsyncSession, owner_id: UUID) -> list[tuple[int, str | None]]:
@@ -402,7 +437,10 @@ async def handle_transfer_reported(
         return
 
     if not await _check_outbound_rate(redis):
-        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_REPORTED for telegram_id=%s", organizer.telegram_id)
+        logger.warning(
+            "outbound Telegram rate limit hit — dropping TRANSFER_REPORTED for telegram_id=%s",
+            organizer.telegram_id,
+        )
         return
 
     t = _text(organizer.language_code)
@@ -412,21 +450,27 @@ async def handle_transfer_reported(
         currency=event["currency"],
         wish_title=event["wish_title"],
     )
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(
-            text=t["gg_confirm_btn"],
-            callback_data=f"gg_confirm:{event['contribution_id']}",
-        ),
-        InlineKeyboardButton(
-            text=t["gg_reject_btn"],
-            callback_data=f"gg_reject:{event['contribution_id']}",
-        ),
-    ]])
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=t["gg_confirm_btn"],
+                    callback_data=f"gg_confirm:{event['contribution_id']}",
+                ),
+                InlineKeyboardButton(
+                    text=t["gg_reject_btn"],
+                    callback_data=f"gg_reject:{event['contribution_id']}",
+                ),
+            ]
+        ]
+    )
     try:
         await bot.send_message(chat_id=organizer.telegram_id, text=text, reply_markup=keyboard)
         logger.info("sent TRANSFER_REPORTED notification to telegram_id=%s", organizer.telegram_id)
     except Exception:
-        logger.exception("failed to send TRANSFER_REPORTED notification to telegram_id=%s", organizer.telegram_id)
+        logger.exception(
+            "failed to send TRANSFER_REPORTED notification to telegram_id=%s", organizer.telegram_id
+        )
 
 
 async def handle_transfer_confirmed(
@@ -449,7 +493,10 @@ async def handle_transfer_confirmed(
         return
 
     if not await _check_outbound_rate(redis):
-        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_CONFIRMED for telegram_id=%s", contributor.telegram_id)
+        logger.warning(
+            "outbound Telegram rate limit hit — dropping TRANSFER_CONFIRMED for telegram_id=%s",
+            contributor.telegram_id,
+        )
         return
 
     t = _text(contributor.language_code)
@@ -465,9 +512,14 @@ async def handle_transfer_confirmed(
     )
     try:
         await _send(bot, contributor.telegram_id, text, t["gg_open_gift"], url)
-        logger.info("sent TRANSFER_CONFIRMED notification to telegram_id=%s", contributor.telegram_id)
+        logger.info(
+            "sent TRANSFER_CONFIRMED notification to telegram_id=%s", contributor.telegram_id
+        )
     except Exception:
-        logger.exception("failed to send TRANSFER_CONFIRMED notification to telegram_id=%s", contributor.telegram_id)
+        logger.exception(
+            "failed to send TRANSFER_CONFIRMED notification to telegram_id=%s",
+            contributor.telegram_id,
+        )
 
 
 async def handle_transfer_rejected(
@@ -490,16 +542,24 @@ async def handle_transfer_rejected(
         return
 
     if not await _check_outbound_rate(redis):
-        logger.warning("outbound Telegram rate limit hit — dropping TRANSFER_REJECTED for telegram_id=%s", contributor.telegram_id)
+        logger.warning(
+            "outbound Telegram rate limit hit — dropping TRANSFER_REJECTED for telegram_id=%s",
+            contributor.telegram_id,
+        )
         return
 
     t = _text(contributor.language_code)
     text = t["gg_transfer_rejected_body"].format(wish_title=event["wish_title"])
     try:
         await bot.send_message(chat_id=contributor.telegram_id, text=text)
-        logger.info("sent TRANSFER_REJECTED notification to telegram_id=%s", contributor.telegram_id)
+        logger.info(
+            "sent TRANSFER_REJECTED notification to telegram_id=%s", contributor.telegram_id
+        )
     except Exception:
-        logger.exception("failed to send TRANSFER_REJECTED notification to telegram_id=%s", contributor.telegram_id)
+        logger.exception(
+            "failed to send TRANSFER_REJECTED notification to telegram_id=%s",
+            contributor.telegram_id,
+        )
 
 
 async def handle_group_gift_completed(
@@ -539,7 +599,10 @@ async def handle_group_gift_completed(
         already_sent = await redis.set(dedup_key, "1", nx=True, ex=DEDUP_TTL_SECONDS) is None
         if not already_sent:
             if not await _check_outbound_rate(redis):
-                logger.warning("outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (organizer) for telegram_id=%s", organizer.telegram_id)
+                logger.warning(
+                    "outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (organizer) for telegram_id=%s",
+                    organizer.telegram_id,
+                )
             else:
                 t = _text(organizer.language_code)
                 if collection_type == "immediate":
@@ -560,9 +623,15 @@ async def handle_group_gift_completed(
                         body += f"\n\n{payment_comment}"
                 try:
                     await bot.send_message(chat_id=organizer.telegram_id, text=body)
-                    logger.info("sent GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s", organizer.telegram_id)
+                    logger.info(
+                        "sent GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s",
+                        organizer.telegram_id,
+                    )
                 except Exception:
-                    logger.exception("failed to send GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s", organizer.telegram_id)
+                    logger.exception(
+                        "failed to send GROUP_GIFT_COMPLETED (organizer) to telegram_id=%s",
+                        organizer.telegram_id,
+                    )
 
     # contributor messages
     for contributor in contributors:
@@ -573,7 +642,10 @@ async def handle_group_gift_completed(
         if already_sent:
             continue
         if not await _check_outbound_rate(redis):
-            logger.warning("outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (contributor) for telegram_id=%s", contributor.telegram_id)
+            logger.warning(
+                "outbound rate limit hit — dropping GROUP_GIFT_COMPLETED (contributor) for telegram_id=%s",
+                contributor.telegram_id,
+            )
             continue
         t = _text(contributor.language_code)
         if collection_type == "immediate":
@@ -588,9 +660,14 @@ async def handle_group_gift_completed(
                 body += f"\n\n{payment_comment}"
         try:
             await bot.send_message(chat_id=contributor.telegram_id, text=body)
-            logger.info("sent GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s", contributor.telegram_id)
+            logger.info(
+                "sent GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s", contributor.telegram_id
+            )
         except Exception:
-            logger.exception("failed to send GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s", contributor.telegram_id)
+            logger.exception(
+                "failed to send GROUP_GIFT_COMPLETED (contributor) to telegram_id=%s",
+                contributor.telegram_id,
+            )
 
 
 async def handle_group_gift_created(

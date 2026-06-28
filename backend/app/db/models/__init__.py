@@ -11,4 +11,19 @@ from app.db.models.wish_images import WishImage
 from app.db.models.wishes import Wish
 from app.db.models.wishlists import Wishlist
 
-__all__ = ["AuditLog", "DiscoveryToken", "Follow", "FulfilledWish", "GroupGift", "GroupGiftApproval", "GroupGiftContribution", "RefreshToken", "Reservation", "User", "UserModerationLog", "Wish", "WishImage", "Wishlist"]
+__all__ = [
+    "AuditLog",
+    "DiscoveryToken",
+    "Follow",
+    "FulfilledWish",
+    "GroupGift",
+    "GroupGiftApproval",
+    "GroupGiftContribution",
+    "RefreshToken",
+    "Reservation",
+    "User",
+    "UserModerationLog",
+    "Wish",
+    "WishImage",
+    "Wishlist",
+]

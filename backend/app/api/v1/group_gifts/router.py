@@ -78,7 +78,11 @@ async def get_wish_group_gift(
 @router.post(
     "/group-gifts/{group_gift_id}/approve",
     response_model=GroupGiftResponse | None,
-    responses={status.HTTP_204_NO_CONTENT: {"description": "Group gift deleted after unanimous cancel approval"}},
+    responses={
+        status.HTTP_204_NO_CONTENT: {
+            "description": "Group gift deleted after unanimous cancel approval"
+        }
+    },
 )
 async def post_group_gift_approve(
     group_gift_id: UUID,
@@ -88,7 +92,9 @@ async def post_group_gift_approve(
     redis: Annotated[Redis, Depends(get_redis)],
     response: Response,
 ) -> GroupGiftResponse | None:
-    result = await toggle_group_gift_approval(db, current_user, group_gift_id, body.approval_type, redis=redis)
+    result = await toggle_group_gift_approval(
+        db, current_user, group_gift_id, body.approval_type, redis=redis
+    )
     if result is None:
         response.status_code = status.HTTP_204_NO_CONTENT
         return None
@@ -186,7 +192,9 @@ async def delete_group_gift_contribution(
     db: Annotated[AsyncSession, Depends(get_db_session)],
     redis: Annotated[Redis, Depends(get_redis)],
 ) -> Response:
-    await organizer_remove_contribution(db, current_user, group_gift_id, contribution_id, redis=redis)
+    await organizer_remove_contribution(
+        db, current_user, group_gift_id, contribution_id, redis=redis
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -24,8 +24,12 @@ def upgrade() -> None:
         sa.Column("priority", sa.Integer(), nullable=False),
         sa.Column("price", sa.Numeric(precision=12, scale=2), nullable=True),
         sa.Column("currency", sa.String(length=3), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["wishlist_id"], ["wishlists.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.CheckConstraint("priority >= 1 AND priority <= 5", name="ck_wishes_priority"),
@@ -34,7 +38,9 @@ def upgrade() -> None:
             "(price IS NULL AND currency IS NULL) OR (price IS NOT NULL AND currency IS NOT NULL)",
             name="ck_wishes_price_currency_pair",
         ),
-        sa.CheckConstraint("currency IS NULL OR currency = upper(currency)", name="ck_wishes_currency_uppercase"),
+        sa.CheckConstraint(
+            "currency IS NULL OR currency = upper(currency)", name="ck_wishes_currency_uppercase"
+        ),
     )
     op.create_index(op.f("ix_wishes_wishlist_id"), "wishes", ["wishlist_id"], unique=False)
 

@@ -4,6 +4,7 @@ Revision ID: 202606200003
 Revises: 202606200002
 Create Date: 2026-06-20
 """
+
 from alembic import op
 
 revision = "202606200003"
@@ -18,4 +19,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     import sqlalchemy as sa
+
     op.add_column("users", sa.Column("photo_url", sa.String(2048), nullable=True))

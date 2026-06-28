@@ -29,6 +29,7 @@ from app.modules.reservations.rate_limit import (
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _redis_at_count(count: int) -> MagicMock:
     """Redis mock where incr returns `count`"""
     redis = AsyncMock()
@@ -53,6 +54,7 @@ def _redis_over_limit(limit: int) -> MagicMock:
 # ---------------------------------------------------------------------------
 # generic rate limiter
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_check_rate_limit_passes_under_limit():
@@ -86,6 +88,7 @@ async def test_check_dual_rate_limit_raises_on_hourly_exceeded():
 # auth per-telegram-id rate limit
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_auth_tg_id_rate_limit_passes():
     redis = _redis_at_count(3)
@@ -95,6 +98,7 @@ async def test_auth_tg_id_rate_limit_passes():
 @pytest.mark.asyncio
 async def test_auth_tg_id_rate_limit_raises_429():
     from app.modules.auth.rate_limit import AUTH_PER_TG_ID_PER_MINUTE
+
     redis = _redis_at_count(AUTH_PER_TG_ID_PER_MINUTE + 1)
     with pytest.raises(HTTPException) as exc_info:
         await check_auth_rate_limit_by_telegram_id(redis, 123456)
@@ -105,6 +109,7 @@ async def test_auth_tg_id_rate_limit_raises_429():
 # ---------------------------------------------------------------------------
 # wishlist rate limits
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_wishlist_create_passes_under_limit():
@@ -146,6 +151,7 @@ async def test_wishlist_delete_raises_over_limit():
 # wish rate limits
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_wish_create_passes_under_limit():
     redis = _redis_at_count(50)
@@ -180,6 +186,7 @@ async def test_wish_delete_raises_over_limit():
 # follow rate limits
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_follow_passes_under_limit():
     redis = _redis_at_count(50)
@@ -205,6 +212,7 @@ async def test_unfollow_raises_over_limit():
 # ---------------------------------------------------------------------------
 # reservation rate limits
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_reservation_create_passes_under_limit():

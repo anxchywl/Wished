@@ -11,7 +11,9 @@ from app.modules.marketplace.parsers import KaspiParser
 
 logger = logging.getLogger(__name__)
 
-_EMPTY = LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="kaspi")
+_EMPTY = LinkPreviewResponse(
+    title=None, description=None, image_url=None, price=None, currency=None, source="kaspi"
+)
 
 # /shop/p/{slug}-{numeric-id}/  — numeric ID is always the last dash-segment
 _KASPI_SLUG_RE = re.compile(r"/shop/p/([a-z0-9][a-z0-9-]*?)-(\d{5,})/?", re.IGNORECASE)
@@ -35,7 +37,9 @@ def _title_from_slug(url: str) -> str | None:
 
 
 class KaspiExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         fetch_url = _canonical_kaspi_url(url)
         html: str | None = None
         try:

@@ -14,20 +14,24 @@ from fastapi import HTTPException
 # validate_preview_url
 # ---------------------------------------------------------------------------
 
+
 def test_validate_preview_url_accepts_wildberries() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     url, hostname = validate_preview_url("https://www.wildberries.ru/catalog/12345678/detail.aspx")
     assert hostname == "www.wildberries.ru"
 
 
 def test_validate_preview_url_accepts_ozon() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     _, hostname = validate_preview_url("https://ozon.ru/product/something-123/")
     assert hostname == "ozon.ru"
 
 
 def test_validate_preview_url_accepts_kaspi() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     _, hostname = validate_preview_url("https://kaspi.kz/shop/p/product-123")
     assert hostname == "kaspi.kz"
 
@@ -35,6 +39,7 @@ def test_validate_preview_url_accepts_kaspi() -> None:
 def test_validate_preview_url_rejects_unsupported_host() -> None:
     # generic/unknown hosts are no longer fetched — only the marketplace allowlist
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("https://example.com/product")
     assert exc_info.value.status_code == 422
@@ -42,12 +47,14 @@ def test_validate_preview_url_rejects_unsupported_host() -> None:
 
 def test_validate_preview_url_accepts_http() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     _, hostname = validate_preview_url("http://ozon.ru/product/something-123/")
     assert hostname == "ozon.ru"
 
 
 def test_validate_preview_url_strips_whitespace() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     url, _ = validate_preview_url("  https://ozon.ru/product/something-123/  ")
     assert not url.startswith(" ")
     assert not url.endswith(" ")
@@ -55,6 +62,7 @@ def test_validate_preview_url_strips_whitespace() -> None:
 
 def test_validate_preview_url_rejects_javascript_scheme() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("javascript:alert(1)")
     assert exc_info.value.status_code == 422
@@ -62,6 +70,7 @@ def test_validate_preview_url_rejects_javascript_scheme() -> None:
 
 def test_validate_preview_url_rejects_file_scheme() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("file:///etc/passwd")
     assert exc_info.value.status_code == 422
@@ -69,6 +78,7 @@ def test_validate_preview_url_rejects_file_scheme() -> None:
 
 def test_validate_preview_url_rejects_ftp_scheme() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("ftp://example.com/file")
     assert exc_info.value.status_code == 422
@@ -76,6 +86,7 @@ def test_validate_preview_url_rejects_ftp_scheme() -> None:
 
 def test_validate_preview_url_rejects_data_uri() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("data:text/html,<h1>test</h1>")
     assert exc_info.value.status_code == 422
@@ -83,6 +94,7 @@ def test_validate_preview_url_rejects_data_uri() -> None:
 
 def test_validate_preview_url_rejects_localhost() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("http://localhost/path")
     assert exc_info.value.status_code == 422
@@ -90,6 +102,7 @@ def test_validate_preview_url_rejects_localhost() -> None:
 
 def test_validate_preview_url_rejects_127_0_0_1() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url("http://127.0.0.1/path")
     assert exc_info.value.status_code == 422
@@ -97,6 +110,7 @@ def test_validate_preview_url_rejects_127_0_0_1() -> None:
 
 def test_validate_preview_url_rejects_url_exceeding_max_length() -> None:
     from app.modules.link_preview.service import validate_preview_url
+
     long_url = "https://example.com/" + "a" * 2100
     with pytest.raises(HTTPException) as exc_info:
         validate_preview_url(long_url)
@@ -107,6 +121,7 @@ def test_validate_preview_url_rejects_url_exceeding_max_length() -> None:
 # _check_host_not_private — SSRF protection
 # ---------------------------------------------------------------------------
 
+
 def _addr(ip: str) -> list:
     return [(None, None, None, None, (ip, 0))]
 
@@ -114,6 +129,7 @@ def _addr(ip: str) -> list:
 @pytest.mark.asyncio
 async def test_ssrf_check_allows_public_ip() -> None:
     from app.modules.link_preview.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
         await _check_host_not_private("example.com")  # must not raise
 
@@ -121,6 +137,7 @@ async def test_ssrf_check_allows_public_ip() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_loopback() -> None:
     from app.modules.link_preview.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("example.com")
@@ -130,6 +147,7 @@ async def test_ssrf_check_blocks_loopback() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_10_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
@@ -138,6 +156,7 @@ async def test_ssrf_check_blocks_private_10_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_172_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
@@ -146,6 +165,7 @@ async def test_ssrf_check_blocks_private_172_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_blocks_private_192_168_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
@@ -154,7 +174,10 @@ async def test_ssrf_check_blocks_private_192_168_range() -> None:
 @pytest.mark.asyncio
 async def test_ssrf_check_raises_on_dns_failure() -> None:
     from app.modules.link_preview.service import _check_host_not_private
-    with patch("app.modules.url_safety.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")):
+
+    with patch(
+        "app.modules.url_safety.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("doesnotexist.example.com")
         assert exc_info.value.status_code == 422
@@ -163,6 +186,7 @@ async def test_ssrf_check_raises_on_dns_failure() -> None:
 # ---------------------------------------------------------------------------
 # rate limiting
 # ---------------------------------------------------------------------------
+
 
 def _fake_redis_incr(count: int) -> MagicMock:
     """mock redis whose pipeline.execute() returns [incr_count, expire_ok]"""
@@ -187,6 +211,7 @@ def _settings(per_hour: int = 20) -> SimpleNamespace:
 @pytest.mark.asyncio
 async def test_rate_limit_passes_under_limit() -> None:
     from app.modules.link_preview.service import _check_rate_limit
+
     redis = _fake_redis_incr(1)
     await _check_rate_limit(redis, uuid4(), _settings(per_hour=20))  # must not raise
 
@@ -194,6 +219,7 @@ async def test_rate_limit_passes_under_limit() -> None:
 @pytest.mark.asyncio
 async def test_rate_limit_passes_at_exact_limit() -> None:
     from app.modules.link_preview.service import _check_rate_limit
+
     redis = _fake_redis_incr(20)
     await _check_rate_limit(redis, uuid4(), _settings(per_hour=20))  # must not raise
 
@@ -201,6 +227,7 @@ async def test_rate_limit_passes_at_exact_limit() -> None:
 @pytest.mark.asyncio
 async def test_rate_limit_rejects_over_limit() -> None:
     from app.modules.link_preview.service import _check_rate_limit
+
     redis = _fake_redis_incr(21)
     with pytest.raises(HTTPException) as exc_info:
         await _check_rate_limit(redis, uuid4(), _settings(per_hour=20))
@@ -210,6 +237,7 @@ async def test_rate_limit_rejects_over_limit() -> None:
 # ---------------------------------------------------------------------------
 # cache
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_cache_hit_returns_cached_result() -> None:
@@ -235,6 +263,7 @@ async def test_cache_hit_returns_cached_result() -> None:
 @pytest.mark.asyncio
 async def test_cache_miss_returns_none() -> None:
     from app.modules.link_preview.service import _get_cached
+
     redis = MagicMock()
     redis.get = AsyncMock(return_value=None)
     result = await _get_cached(redis, "https://example.com/product")
@@ -266,9 +295,11 @@ async def test_cache_stores_result() -> None:
 # _choose_extractor
 # ---------------------------------------------------------------------------
 
+
 def test_choose_extractor_wildberries() -> None:
     from app.modules.link_preview.service import _choose_extractor
     from app.modules.link_preview.extractors.wildberries import WildberriesExtractor
+
     assert isinstance(_choose_extractor("wildberries.ru"), WildberriesExtractor)
     assert isinstance(_choose_extractor("www.wildberries.kz"), WildberriesExtractor)
 
@@ -276,6 +307,7 @@ def test_choose_extractor_wildberries() -> None:
 def test_choose_extractor_ozon() -> None:
     from app.modules.link_preview.service import _choose_extractor
     from app.modules.link_preview.extractors.ozon import OzonExtractor
+
     assert isinstance(_choose_extractor("ozon.ru"), OzonExtractor)
     assert isinstance(_choose_extractor("ozon.kz"), OzonExtractor)
 
@@ -283,6 +315,7 @@ def test_choose_extractor_ozon() -> None:
 def test_choose_extractor_kaspi() -> None:
     from app.modules.link_preview.service import _choose_extractor
     from app.modules.link_preview.extractors.kaspi import KaspiExtractor
+
     assert isinstance(_choose_extractor("kaspi.kz"), KaspiExtractor)
     assert isinstance(_choose_extractor("www.kaspi.kz"), KaspiExtractor)
 
@@ -291,6 +324,7 @@ def test_choose_extractor_generic_for_unknown_host() -> None:
     from app.modules.link_preview.service import _choose_extractor
     from app.modules.link_preview.extractors.amazon import AmazonExtractor
     from app.modules.link_preview.extractors.generic import GenericExtractor
+
     assert isinstance(_choose_extractor("amazon.com"), AmazonExtractor)
     assert isinstance(_choose_extractor("www.amazon.com"), AmazonExtractor)
     assert isinstance(_choose_extractor("somestore.kz"), GenericExtractor)
@@ -299,6 +333,7 @@ def test_choose_extractor_generic_for_unknown_host() -> None:
 # ---------------------------------------------------------------------------
 # generic extractor
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_generic_extractor_extracts_opengraph() -> None:
@@ -366,6 +401,7 @@ async def test_generic_extractor_returns_empty_on_fetch_failure() -> None:
 # wildberries extractor
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_wildberries_extractor_uses_cdn_and_card_api() -> None:
     from app.modules.link_preview.extractors.wildberries import WildberriesExtractor
@@ -377,11 +413,13 @@ async def test_wildberries_extractor_uses_cdn_and_card_api() -> None:
     }
     card_api_response = {
         "data": {
-            "products": [{
-                "brand": "Nike",
-                "name": "Air Max 90",
-                "salePriceU": 599000,
-            }]
+            "products": [
+                {
+                    "brand": "Nike",
+                    "name": "Air Max 90",
+                    "salePriceU": 599000,
+                }
+            ]
         }
     }
 
@@ -457,6 +495,7 @@ async def test_wildberries_extractor_falls_back_to_html_when_cdn_fails() -> None
 # kaspi extractor
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_kaspi_extractor_extracts_metadata() -> None:
     from app.modules.link_preview.extractors.kaspi import KaspiExtractor
@@ -490,6 +529,7 @@ async def test_kaspi_extractor_extracts_metadata() -> None:
 # ozon extractor
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_ozon_extractor_extracts_metadata() -> None:
     from app.modules.link_preview.extractors.ozon import OzonExtractor
@@ -522,6 +562,7 @@ async def test_ozon_extractor_extracts_metadata() -> None:
 # redirect handling
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_fetch_follows_redirects() -> None:
     """extractor should follow redirects (handled by httpx client config)"""
@@ -548,6 +589,7 @@ async def test_fetch_follows_redirects() -> None:
 # ---------------------------------------------------------------------------
 # fetch_link_preview integration
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_fetch_link_preview_uses_cache_on_hit() -> None:
@@ -586,60 +628,106 @@ async def test_fetch_link_preview_uses_cache_on_hit() -> None:
 # LinkPreviewResponse field validators
 # ---------------------------------------------------------------------------
 
+
 def test_link_preview_response_rejects_javascript_image_url() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="T", description=None, image_url="javascript:alert(1)", price=None, currency=None, source=None)
+
+    r = LinkPreviewResponse(
+        title="T",
+        description=None,
+        image_url="javascript:alert(1)",
+        price=None,
+        currency=None,
+        source=None,
+    )
     assert r.image_url is None
 
 
 def test_link_preview_response_rejects_data_image_url() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="T", description=None, image_url="data:image/png;base64,abc", price=None, currency=None, source=None)
+
+    r = LinkPreviewResponse(
+        title="T",
+        description=None,
+        image_url="data:image/png;base64,abc",
+        price=None,
+        currency=None,
+        source=None,
+    )
     assert r.image_url is None
 
 
 def test_link_preview_response_accepts_https_image_url() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
+
     url = "https://example.com/image.jpg"
-    r = LinkPreviewResponse(title="T", description=None, image_url=url, price=None, currency=None, source=None)
+    r = LinkPreviewResponse(
+        title="T", description=None, image_url=url, price=None, currency=None, source=None
+    )
     assert r.image_url == url
 
 
 def test_link_preview_response_rejects_non_numeric_price() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="T", description=None, image_url=None, price="<script>", currency=None, source=None)
+
+    r = LinkPreviewResponse(
+        title="T", description=None, image_url=None, price="<script>", currency=None, source=None
+    )
     assert r.price is None
 
 
 def test_link_preview_response_accepts_valid_price() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="T", description=None, image_url=None, price="1299.99", currency="KZT", source=None)
+
+    r = LinkPreviewResponse(
+        title="T", description=None, image_url=None, price="1299.99", currency="KZT", source=None
+    )
     assert r.price == "1299.99"
     assert r.currency == "KZT"
 
 
 def test_link_preview_response_rejects_invalid_currency() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="T", description=None, image_url=None, price=None, currency="BADUSD", source=None)
+
+    r = LinkPreviewResponse(
+        title="T", description=None, image_url=None, price=None, currency="BADUSD", source=None
+    )
     assert r.currency is None
 
 
 def test_link_preview_response_strips_control_chars_from_title() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
-    r = LinkPreviewResponse(title="Hello\x00World\x1f", description=None, image_url=None, price=None, currency=None, source=None)
+
+    r = LinkPreviewResponse(
+        title="Hello\x00World\x1f",
+        description=None,
+        image_url=None,
+        price=None,
+        currency=None,
+        source=None,
+    )
     assert r.title == "HelloWorld"
 
 
 def test_link_preview_response_rejects_oversized_title() -> None:
     from pydantic import ValidationError
     from app.modules.link_preview.schemas import LinkPreviewResponse
+
     with pytest.raises(ValidationError):
-        LinkPreviewResponse(title="A" * 600, description=None, image_url=None, price=None, currency=None, source=None)
+        LinkPreviewResponse(
+            title="A" * 600,
+            description=None,
+            image_url=None,
+            price=None,
+            currency=None,
+            source=None,
+        )
 
 
 def test_clamp_result_pre_truncates_for_schema() -> None:
     from app.modules.link_preview.schemas import LinkPreviewResponse
     from app.modules.link_preview.service import _clamp_result
+
     # build a raw result bypassing pydantic to simulate what an extractor might return
     raw = object.__new__(LinkPreviewResponse)
     object.__setattr__(raw, "title", "A" * 600)
@@ -660,6 +748,7 @@ def test_clamp_result_pre_truncates_for_schema() -> None:
 def test_store_image_request_rejects_javascript_url() -> None:
     from pydantic import ValidationError
     from app.modules.link_preview.schemas import StoreImageRequest
+
     with pytest.raises(ValidationError):
         StoreImageRequest(image_url="javascript:void(0)")
 
@@ -667,11 +756,13 @@ def test_store_image_request_rejects_javascript_url() -> None:
 def test_store_image_request_rejects_data_url() -> None:
     from pydantic import ValidationError
     from app.modules.link_preview.schemas import StoreImageRequest
+
     with pytest.raises(ValidationError):
         StoreImageRequest(image_url="data:text/html,<script>")
 
 
 def test_store_image_request_accepts_https_url() -> None:
     from app.modules.link_preview.schemas import StoreImageRequest
+
     req = StoreImageRequest(image_url="https://example.com/photo.jpg")
     assert req.image_url == "https://example.com/photo.jpg"

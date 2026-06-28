@@ -10,6 +10,7 @@ from app.db.base import Base
 
 class Wishlist(Base):
     """wishlist record"""
+
     __tablename__ = "wishlists"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -25,7 +26,9 @@ class Wishlist(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     cover_image_bucket: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cover_image_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
-    cover_image_thumbnail_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    cover_image_thumbnail_object_name: Mapped[str | None] = mapped_column(
+        String(1024), nullable=True
+    )
     cover_image_medium_object_name: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

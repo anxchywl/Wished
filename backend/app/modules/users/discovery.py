@@ -1,4 +1,5 @@
 """user discovery access — PostgreSQL is source of truth; Redis is a TTL cache"""
+
 import json
 import secrets
 from datetime import UTC, datetime, timedelta

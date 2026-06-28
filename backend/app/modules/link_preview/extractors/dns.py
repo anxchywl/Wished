@@ -25,7 +25,9 @@ def _title_from_url(url: str) -> str | None:
 
 
 class DnsExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html = ""
         try:
             resp = await client.get(url)

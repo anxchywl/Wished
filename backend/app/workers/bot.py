@@ -27,8 +27,7 @@ from app.modules.notifications.worker import run_notification_worker
 from app.modules.users.discovery import create_discovery_token
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 FIND_FRIENDS_REQUEST_ID = 1
@@ -234,7 +233,9 @@ async def find_handler(message: types.Message) -> None:
     )
 
 
-def _friend_discovery_keyboard(text: dict[str, str], web_app_url: str | None) -> ReplyKeyboardMarkup:
+def _friend_discovery_keyboard(
+    text: dict[str, str], web_app_url: str | None
+) -> ReplyKeyboardMarkup:
     """build discovery keyboard"""
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -273,9 +274,7 @@ async def users_shared_handler(message: types.Message) -> None:
 
     selected_users = message.users_shared.users
     shared_users = [
-        shared_user
-        for shared_user in selected_users
-        if shared_user.user_id != message.from_user.id
+        shared_user for shared_user in selected_users if shared_user.user_id != message.from_user.id
     ]
     if not shared_users:
         await _delete_shared_users_message(message)
@@ -289,10 +288,7 @@ async def users_shared_handler(message: types.Message) -> None:
                 User.telegram_id != message.from_user.id,
             )
         )
-        registered_users = {
-            user.telegram_id: user
-            for user in result.scalars().all()
-        }
+        registered_users = {user.telegram_id: user for user in result.scalars().all()}
 
         settings = get_settings()
         for shared_user in shared_users:
@@ -307,9 +303,7 @@ async def users_shared_handler(message: types.Message) -> None:
                 )
                 web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
                 profile_url = (
-                    f"{web_app_url}/users"
-                    f"?profile_id={user.id}"
-                    f"&profile_token={discovery_token}"
+                    f"{web_app_url}/users?profile_id={user.id}&profile_token={discovery_token}"
                 )
                 keyboard = InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -348,11 +342,7 @@ async def users_shared_handler(message: types.Message) -> None:
 
 def _shared_user_name(shared_user: types.SharedUser, fallback: str) -> str:
     """build shared user name"""
-    full_name = " ".join(
-        part
-        for part in [shared_user.first_name, shared_user.last_name]
-        if part
-    )
+    full_name = " ".join(part for part in [shared_user.first_name, shared_user.last_name] if part)
     if full_name:
         return full_name
     if shared_user.username:
@@ -417,9 +407,7 @@ async def gg_confirm_handler(callback: types.CallbackQuery) -> None:
         )
         gift = result.scalar_one_or_none()
 
-        result = await db.execute(
-            select(User).where(User.telegram_id == callback.from_user.id)
-        )
+        result = await db.execute(select(User).where(User.telegram_id == callback.from_user.id))
         user = result.scalar_one_or_none()
         if user is None:
             await callback.answer("Not authorized", show_alert=True)
@@ -435,9 +423,14 @@ async def gg_confirm_handler(callback: types.CallbackQuery) -> None:
 
         try:
             redis = get_redis_client()
-            await group_gift_service.confirm_transfer(db, user, contribution.id, confirmed=True, redis=redis)
+            await group_gift_service.confirm_transfer(
+                db, user, contribution.id, confirmed=True, redis=redis
+            )
         except Exception:
-            logger.exception("gg_confirm_handler: confirm_transfer failed for contribution_id=%s", contribution_id)
+            logger.exception(
+                "gg_confirm_handler: confirm_transfer failed for contribution_id=%s",
+                contribution_id,
+            )
             await callback.answer("Something went wrong", show_alert=True)
             return
 
@@ -477,9 +470,7 @@ async def gg_reject_handler(callback: types.CallbackQuery) -> None:
         )
         gift = result.scalar_one_or_none()
 
-        result = await db.execute(
-            select(User).where(User.telegram_id == callback.from_user.id)
-        )
+        result = await db.execute(select(User).where(User.telegram_id == callback.from_user.id))
         user = result.scalar_one_or_none()
         if user is None:
             await callback.answer("Not authorized", show_alert=True)
@@ -495,9 +486,13 @@ async def gg_reject_handler(callback: types.CallbackQuery) -> None:
 
         try:
             redis = get_redis_client()
-            await group_gift_service.confirm_transfer(db, user, contribution.id, confirmed=False, redis=redis)
+            await group_gift_service.confirm_transfer(
+                db, user, contribution.id, confirmed=False, redis=redis
+            )
         except Exception:
-            logger.exception("gg_reject_handler: confirm_transfer failed for contribution_id=%s", contribution_id)
+            logger.exception(
+                "gg_reject_handler: confirm_transfer failed for contribution_id=%s", contribution_id
+            )
             await callback.answer("Something went wrong", show_alert=True)
             return
 
@@ -537,6 +532,7 @@ async def main() -> None:
     # blpop blocks for up to BLPOP_TIMEOUT seconds — the client must not have
     # a socket timeout shorter than that, so we use a dedicated connection here
     from redis.asyncio import Redis as AsyncRedis
+
     blocking_redis = AsyncRedis.from_url(
         settings.redis_connection_url,
         encoding="utf-8",

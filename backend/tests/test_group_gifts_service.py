@@ -22,10 +22,12 @@ async def test_owner_hide_visibility_returns_no_group_gift() -> None:
     owner_id = uuid4()
     wish_id = uuid4()
     gift = _gift(wish_id=wish_id, organizer_user_id=uuid4())
-    db = FakeDb([
-        FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
-        FakeResult(gift),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
+            FakeResult(gift),
+        ]
+    )
 
     response = await get_group_gift(
         db,
@@ -42,16 +44,18 @@ async def test_blocked_organizer_returns_cancelled_without_payment_fields() -> N
     owner_id = uuid4()
     wish_id = uuid4()
     organizer_id = uuid4()
-    db = FakeDb([
-        FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
-        FakeResult(
-            _gift(
-                wish_id=wish_id,
-                organizer_user_id=organizer_id,
-                organizer=_user(user_id=organizer_id, is_blocked=True),
-            )
-        ),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
+            FakeResult(
+                _gift(
+                    wish_id=wish_id,
+                    organizer_user_id=organizer_id,
+                    organizer=_user(user_id=organizer_id, is_blocked=True),
+                )
+            ),
+        ]
+    )
 
     response = await get_group_gift(db, _user(user_id=viewer_id), wish_id)
 
@@ -67,11 +71,13 @@ async def test_non_owner_create_group_gift_becomes_organizer() -> None:
     owner_id = uuid4()
     organizer_id = uuid4()
     wish_id = uuid4()
-    db = FakeDb([
-        FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
-        FakeResult(None),
-        FakeResult(None),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
+            FakeResult(None),
+            FakeResult(None),
+        ]
+    )
 
     response = await create_group_gift(
         db,
@@ -96,11 +102,13 @@ async def test_create_group_gift_optional_phone() -> None:
     owner_id = uuid4()
     organizer_id = uuid4()
     wish_id = uuid4()
-    db = FakeDb([
-        FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
-        FakeResult(None),
-        FakeResult(None),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(_wish(wish_id=wish_id, owner_user_id=owner_id)),
+            FakeResult(None),
+            FakeResult(None),
+        ]
+    )
 
     response = await create_group_gift(
         db,
@@ -150,11 +158,13 @@ async def test_wish_owner_can_join_group_gift_organized_by_someone_else() -> Non
     wish_id = uuid4()
     gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.wish = _wish(wish_id=wish_id, owner_user_id=owner_id)
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),
-        FakeResult([]),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(gift),
+            FakeResult(None),
+            FakeResult([]),
+        ]
+    )
 
     response = await join_group_gift(
         db,
@@ -174,11 +184,13 @@ async def test_organizer_can_join_their_own_group_gift() -> None:
     wish_id = uuid4()
     gift = _gift(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),
-        FakeResult([]),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(gift),
+            FakeResult(None),
+            FakeResult([]),
+        ]
+    )
 
     response = await join_group_gift(
         db,
@@ -205,11 +217,13 @@ async def test_join_rejects_amount_above_remaining_target() -> None:
         contributor=_user(),
         amount=Decimal("75.00"),
     )
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),
-        FakeResult([existing]),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(gift),
+            FakeResult(None),
+            FakeResult([existing]),
+        ]
+    )
 
     with pytest.raises(HTTPException) as exc:
         await join_group_gift(
@@ -246,13 +260,15 @@ async def test_commit_goal_reached_keeps_gift_active_until_organizer_completes()
         amount=Decimal("25.00"),
         status="pledged",
     )
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),
-        FakeResult([existing]),
-        FakeResult([existing, new_contribution]),
-        FakeResult([existing, new_contribution]),
-    ])
+    db = FakeDb(
+        [
+            FakeResult(gift),
+            FakeResult(None),
+            FakeResult([existing]),
+            FakeResult([existing, new_contribution]),
+            FakeResult([existing, new_contribution]),
+        ]
+    )
 
     response = await join_group_gift(
         db,
@@ -477,10 +493,12 @@ async def test_organizer_approval_with_no_contributors_cancels_immediately() -> 
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
 
     # single query: gift loaded in-memory; _execute_cancel queries for Reservation (returns None)
-    db = FakeDb([
-        FakeResult(gift),
-        FakeResult(None),  # Reservation lookup in _execute_cancel
-    ])
+    db = FakeDb(
+        [
+            FakeResult(gift),
+            FakeResult(None),  # Reservation lookup in _execute_cancel
+        ]
+    )
 
     result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
 
@@ -497,9 +515,7 @@ async def test_organizer_approval_with_contributor_is_partial() -> None:
     gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.collection_type = "commit"
     contributor = _user(user_id=contributor_id)
-    gift.contributions = [
-        _contribution(gift.id, contributor_id, contributor, status="pledged")
-    ]
+    gift.contributions = [_contribution(gift.id, contributor_id, contributor, status="pledged")]
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
 
     # single query: gift loaded in-memory; 1 of 2 participants → not unanimous
@@ -520,7 +536,9 @@ async def test_revoking_existing_approval_removes_it() -> None:
     wish_id = uuid4()
     existing = _approval(uuid4(), organizer_id)
     # gift already has the approval in-memory — no separate DB query for it
-    gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id, approvals=[existing])
+    gift = _gift_with_approvals(
+        wish_id=wish_id, organizer_user_id=organizer_id, approvals=[existing]
+    )
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
 
     db = FakeDb([FakeResult(gift)])

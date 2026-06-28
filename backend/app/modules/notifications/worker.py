@@ -62,7 +62,11 @@ async def run_notification_worker(
                 try:
                     await handler(event, db, bot, redis, mini_app_url)
                 except Exception:
-                    logger.exception("notification handler failed for event_type=%s event_id=%s", event_type, event.get("event_id"))
+                    logger.exception(
+                        "notification handler failed for event_type=%s event_id=%s",
+                        event_type,
+                        event.get("event_id"),
+                    )
         except asyncio.CancelledError:
             logger.info("notification worker cancelled")
             break

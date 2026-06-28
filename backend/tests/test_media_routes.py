@@ -1,4 +1,5 @@
 """media route tests"""
+
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -17,6 +18,7 @@ from app.main import create_app
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
 
 def _user():
     return SimpleNamespace(id=uuid4())
@@ -76,6 +78,7 @@ def _make_app(monkeypatch, fake_service=None):
 # ---------------------------------------------------------------------------
 # upload tests
 # ---------------------------------------------------------------------------
+
 
 def test_upload_wish_image_accepts_valid_jpeg(monkeypatch) -> None:
     wish_id = uuid4()
@@ -139,6 +142,7 @@ def test_delete_wish_image_returns_no_content(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 # validation-layer tests (calling service directly with real validation)
 # ---------------------------------------------------------------------------
+
 
 def _minimal_jpeg() -> bytes:
     """minimal valid JPEG: SOI + APP0 marker"""
@@ -232,6 +236,7 @@ def test_validate_image_upload_accepts_jpeg_extension() -> None:
 # ---------------------------------------------------------------------------
 # rate limiting tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_raises_429_when_per_minute_exceeded() -> None:

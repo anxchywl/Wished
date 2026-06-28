@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Follow, User
 from app.modules.events import publish_event
-from app.modules.users.schemas import FollowedUserListResponse, FollowedUserResponse, UserProfileResponse
+from app.modules.users.schemas import (
+    FollowedUserListResponse,
+    FollowedUserResponse,
+    UserProfileResponse,
+)
 from app.modules.cache import cache_delete, cache_get_or_fetch, following_cache_key, FOLLOWING_TTL
 
 
@@ -82,7 +86,9 @@ async def follow_user(
     """follow user"""
     target = await get_user_by_username(db, username)
     if target.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot follow yourself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot follow yourself"
+        )
     if target.profile_visibility != "public" and not has_discovery_access:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -96,19 +102,27 @@ async def follow_user(
 
     if not already_following and redis is not None:
         await cache_delete(redis, following_cache_key(current_user.id))
-        await publish_event(redis, "FOLLOWED", {
-            "follower_user_id": current_user.id,
-            "followed_user_id": target.id,
-        })
+        await publish_event(
+            redis,
+            "FOLLOWED",
+            {
+                "follower_user_id": current_user.id,
+                "followed_user_id": target.id,
+            },
+        )
 
     return build_user_profile_response(target, current_user, is_following=True)
 
 
-async def unfollow_user(db: AsyncSession, current_user: User, username: str, redis: Redis | None = None) -> UserProfileResponse:
+async def unfollow_user(
+    db: AsyncSession, current_user: User, username: str, redis: Redis | None = None
+) -> UserProfileResponse:
     """unfollow user"""
     target = await get_user_by_username(db, username)
     if target.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unfollow yourself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unfollow yourself"
+        )
 
     await db.execute(
         delete(Follow).where(
@@ -132,7 +146,9 @@ async def follow_user_by_id(
     """follow user by internal UUID"""
     target = await get_user_by_id(db, target_id)
     if target.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot follow yourself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot follow yourself"
+        )
     if target.profile_visibility != "public" and not has_discovery_access:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -146,19 +162,27 @@ async def follow_user_by_id(
 
     if not already_following and redis is not None:
         await cache_delete(redis, following_cache_key(current_user.id))
-        await publish_event(redis, "FOLLOWED", {
-            "follower_user_id": current_user.id,
-            "followed_user_id": target.id,
-        })
+        await publish_event(
+            redis,
+            "FOLLOWED",
+            {
+                "follower_user_id": current_user.id,
+                "followed_user_id": target.id,
+            },
+        )
 
     return build_user_profile_response(target, current_user, is_following=True)
 
 
-async def unfollow_user_by_id(db: AsyncSession, current_user: User, target_id: UUID, redis: Redis | None = None) -> UserProfileResponse:
+async def unfollow_user_by_id(
+    db: AsyncSession, current_user: User, target_id: UUID, redis: Redis | None = None
+) -> UserProfileResponse:
     """unfollow user by internal UUID"""
     target = await get_user_by_id(db, target_id)
     if target.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unfollow yourself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot unfollow yourself"
+        )
 
     await db.execute(
         delete(Follow).where(

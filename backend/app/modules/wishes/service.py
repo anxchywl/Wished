@@ -42,7 +42,9 @@ async def list_wishlist_wishes(
     redis: Redis | None = None,
 ) -> WishListResponse:
     """list wishlist wishes — owner views are Redis-cached; shared views bypass cache"""
-    wishlist = await get_accessible_wishlist(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    wishlist = await get_accessible_wishlist(
+        db, current_user, wishlist_id, share_token=share_token, redis=redis
+    )
     is_owner = wishlist.owner_user_id == current_user.id
 
     async def _fetch() -> WishListResponse:
@@ -162,18 +164,24 @@ async def create_wish(
     await db.flush()
 
     if payload.pending_marketplace_image_id and redis is not None and settings is not None:
-        await _attach_marketplace_image(db, current_user.id, wish.id, payload.pending_marketplace_image_id, settings, redis)
+        await _attach_marketplace_image(
+            db, current_user.id, wish.id, payload.pending_marketplace_image_id, settings, redis
+        )
 
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish.id)
 
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
-        await publish_event(redis, "WISH_CREATED", {
-            "wish_id": wish.id,
-            "wishlist_id": wish.wishlist_id,
-            "owner_user_id": current_user.id,
-        })
+        await publish_event(
+            redis,
+            "WISH_CREATED",
+            {
+                "wish_id": wish.id,
+                "wishlist_id": wish.wishlist_id,
+                "owner_user_id": current_user.id,
+            },
+        )
 
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
@@ -188,10 +196,13 @@ async def _attach_marketplace_image(
 ) -> None:
     """attach a marketplace-imported temp image to a newly created wish"""
     from app.modules.marketplace.service import get_pending_image_meta
+
     meta = await get_pending_image_meta(redis, user_id, pending_image_id)
     if meta is None:
         # pending image expired or invalid — silently skip
-        logger.warning("pending marketplace image not found: user=%s image=%s", user_id, pending_image_id)
+        logger.warning(
+            "pending marketplace image not found: user=%s image=%s", user_id, pending_image_id
+        )
         return
     try:
         image = WishImage(
@@ -292,7 +303,9 @@ async def update_wish(
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
-async def delete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> None:
+async def delete_wish(
+    db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None
+) -> None:
     """delete wish and all associated image variants from storage"""
     wish = await _get_owned_wish(db, current_user, wish_id)
     wishlist_id = wish.wishlist_id
@@ -355,18 +368,24 @@ async def complete_wish(
 
     if redis is not None:
         await cache_delete(redis, wishes_cache_key(wishlist_id))
-        await publish_event(redis, "WISH_FULFILLED", {
-            "wish_id": wish.id,
-            "wishlist_id": wishlist_id,
-            "owner_user_id": current_user.id,
-        })
+        await publish_event(
+            redis,
+            "WISH_FULFILLED",
+            {
+                "wish_id": wish.id,
+                "wishlist_id": wishlist_id,
+                "owner_user_id": current_user.id,
+            },
+        )
         for event in fulfilled_events:
             await publish_event(redis, "FULFILLED_PARTICIPANT", event)
 
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
-async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None) -> WishResponse:
+async def uncomplete_wish(
+    db: AsyncSession, current_user: User, wish_id: UUID, redis: Redis | None = None
+) -> WishResponse:
     """restore a completed wish to active"""
     wish = await _get_owned_wish(db, current_user, wish_id)
     if wish.status == "active":
@@ -378,9 +397,7 @@ async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, r
         )
     wishlist_id = wish.wishlist_id
     wish.status = "active"
-    await db.execute(
-        FulfilledWish.__table__.delete().where(FulfilledWish.wish_id == wish_id)
-    )
+    await db.execute(FulfilledWish.__table__.delete().where(FulfilledWish.wish_id == wish_id))
     await db.commit()
     wish = await _get_owned_wish(db, current_user, wish_id)
     if redis is not None:
@@ -388,7 +405,9 @@ async def uncomplete_wish(db: AsyncSession, current_user: User, wish_id: UUID, r
     return _to_response(wish, _build_group_gift_summary(wish.group_gift, current_user, True))
 
 
-async def _create_fulfilled_records(db: AsyncSession, wish: Wish, owner_user_id: UUID) -> list[dict]:
+async def _create_fulfilled_records(
+    db: AsyncSession, wish: Wish, owner_user_id: UUID
+) -> list[dict]:
     events: list[dict] = []
     gift_result = await db.execute(
         select(GroupGift)
@@ -407,7 +426,8 @@ async def _create_fulfilled_records(db: AsyncSession, wish: Wish, owner_user_id:
         participant_amounts: dict[UUID, Decimal] = {}
         for contribution in non_cancelled:
             participant_amounts[contribution.contributor_user_id] = (
-                participant_amounts.get(contribution.contributor_user_id, Decimal("0")) + contribution.amount
+                participant_amounts.get(contribution.contributor_user_id, Decimal("0"))
+                + contribution.amount
             )
         participant_ids = set(participant_amounts)
         participant_ids.add(active_gift.organizer_user_id)
@@ -427,14 +447,16 @@ async def _create_fulfilled_records(db: AsyncSession, wish: Wish, owner_user_id:
                     total_collected_amount=total_collected,
                 )
             )
-            events.append({
-                "participant_user_id": participant_id,
-                "wish_id": wish.id,
-                "wishlist_id": wish.wishlist_id,
-                "owner_user_id": owner_user_id,
-                "wish_title": wish.title,
-                "source": "group_gift",
-            })
+            events.append(
+                {
+                    "participant_user_id": participant_id,
+                    "wish_id": wish.id,
+                    "wishlist_id": wish.wishlist_id,
+                    "owner_user_id": owner_user_id,
+                    "wish_title": wish.title,
+                    "source": "group_gift",
+                }
+            )
         active_gift.status = "archived"
         for contribution in non_cancelled:
             contribution.status = "cancelled"
@@ -469,14 +491,16 @@ async def _create_fulfilled_records(db: AsyncSession, wish: Wish, owner_user_id:
             source="booking",
         )
     )
-    events.append({
-        "participant_user_id": reservation.reserver_user_id,
-        "wish_id": wish.id,
-        "wishlist_id": wish.wishlist_id,
-        "owner_user_id": owner_user_id,
-        "wish_title": wish.title,
-        "source": "booking",
-    })
+    events.append(
+        {
+            "participant_user_id": reservation.reserver_user_id,
+            "wish_id": wish.id,
+            "wishlist_id": wish.wishlist_id,
+            "owner_user_id": owner_user_id,
+            "wish_title": wish.title,
+            "source": "booking",
+        }
+    )
     reservation.status = "cancelled"
     return events
 

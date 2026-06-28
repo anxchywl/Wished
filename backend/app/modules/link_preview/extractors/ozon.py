@@ -31,7 +31,9 @@ def _title_from_slug(url: str) -> str | None:
 
 
 class OzonExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html: str | None = None
         final_url = url
         try:
@@ -55,6 +57,7 @@ class OzonExtractor:
             if data.price is None:
                 from urllib.parse import urlparse
                 from app.modules.marketplace.parsers import _meta_content
+
                 og_url = _meta_content(html, "og:url")
                 # only follow an og:url that is itself a valid Ozon product URL —
                 # never trust HTML to hand us an arbitrary outbound target

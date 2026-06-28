@@ -47,7 +47,9 @@ def _is_challenge_page(html: str) -> bool:
 
 
 class AlibabaExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         slug_title = _title_from_url(url)
         html: str | None = None
 
@@ -58,21 +60,18 @@ class AlibabaExtractor:
                 if not _is_challenge_page(text):
                     html = text
                 else:
-                    logger.debug("Alibaba returned challenge page for %s (%d bytes)", url, len(text))
+                    logger.debug(
+                        "Alibaba returned challenge page for %s (%d bytes)", url, len(text)
+                    )
         except Exception as exc:
             logger.debug("Alibaba page fetch failed for %s: %s", url, exc)
 
         if html:
-            title = (
-                _meta_content(html, "og:title")
-                or _meta_content(html, "title")
-                or slug_title
+            title = _meta_content(html, "og:title") or _meta_content(html, "title") or slug_title
+            image_url = _meta_content(html, "og:image") or _meta_content(html, "og:image:url")
+            description = _meta_content(html, "og:description") or _meta_content(
+                html, "description"
             )
-            image_url = (
-                _meta_content(html, "og:image")
-                or _meta_content(html, "og:image:url")
-            )
-            description = _meta_content(html, "og:description") or _meta_content(html, "description")
             return LinkPreviewResponse(
                 title=title,
                 description=description,

@@ -8,6 +8,7 @@ from app.core.config import Settings
 
 class TokenError(Exception):
     """token validation error"""
+
     pass
 
 

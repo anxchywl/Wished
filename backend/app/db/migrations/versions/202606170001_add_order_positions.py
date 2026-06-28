@@ -53,7 +53,9 @@ def upgrade() -> None:
 
     op.alter_column("wishlists", "position", nullable=False)
     op.alter_column("wishes", "position", nullable=False)
-    op.create_index("ix_wishlists_owner_user_id_position", "wishlists", ["owner_user_id", "position"])
+    op.create_index(
+        "ix_wishlists_owner_user_id_position", "wishlists", ["owner_user_id", "position"]
+    )
     op.create_index("ix_wishes_wishlist_id_position", "wishes", ["wishlist_id", "position"])
 
 

@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class GroupGift(Base):
     """group gift record — coordinates contributors for a single wish"""
+
     __tablename__ = "group_gifts"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -58,6 +59,7 @@ class GroupGift(Base):
 
 class GroupGiftContribution(Base):
     """individual contribution to a group gift"""
+
     __tablename__ = "group_gift_contributions"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -92,9 +94,12 @@ class GroupGiftContribution(Base):
 
 class GroupGiftApproval(Base):
     """per-participant vote for a distributed group gift action (cancel or unbook)"""
+
     __tablename__ = "group_gift_approvals"
     __table_args__ = (
-        UniqueConstraint("group_gift_id", "user_id", "approval_type", name="uq_group_gift_approvals"),
+        UniqueConstraint(
+            "group_gift_id", "user_id", "approval_type", name="uq_group_gift_approvals"
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

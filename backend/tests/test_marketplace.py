@@ -15,44 +15,52 @@ from fastapi import HTTPException
 # validate_import_url
 # ---------------------------------------------------------------------------
 
+
 def test_validate_import_url_accepts_kaspi() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     url, hostname = validate_import_url("https://kaspi.kz/shop/p/product-123")
     assert hostname == "kaspi.kz"
 
 
 def test_validate_import_url_accepts_www_kaspi() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     _, hostname = validate_import_url("https://www.kaspi.kz/shop/p/product-123")
     assert hostname == "www.kaspi.kz"
 
 
 def test_validate_import_url_accepts_wildberries_ru() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     _, hostname = validate_import_url("https://wildberries.ru/catalog/12345/detail.aspx")
     assert hostname == "wildberries.ru"
 
 
 def test_validate_import_url_accepts_wildberries_kz() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     _, hostname = validate_import_url("https://wildberries.kz/catalog/12345/detail.aspx")
     assert hostname == "wildberries.kz"
 
 
 def test_validate_import_url_accepts_ozon_ru() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     _, hostname = validate_import_url("https://ozon.ru/product/something-123/")
     assert hostname == "ozon.ru"
 
 
 def test_validate_import_url_accepts_ozon_kz() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     _, hostname = validate_import_url("https://ozon.kz/product/something-123/")
     assert hostname == "ozon.kz"
 
 
 def test_validate_import_url_strips_surrounding_whitespace() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     url, _ = validate_import_url("  https://kaspi.kz/shop/product  ")
     assert not url.startswith(" ")
     assert not url.endswith(" ")
@@ -60,6 +68,7 @@ def test_validate_import_url_strips_surrounding_whitespace() -> None:
 
 def test_validate_import_url_rejects_javascript_scheme() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("javascript:alert(1)")
     assert exc_info.value.status_code == 422
@@ -67,6 +76,7 @@ def test_validate_import_url_rejects_javascript_scheme() -> None:
 
 def test_validate_import_url_rejects_data_uri() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("data:text/html,<h1>test</h1>")
     assert exc_info.value.status_code == 422
@@ -74,6 +84,7 @@ def test_validate_import_url_rejects_data_uri() -> None:
 
 def test_validate_import_url_rejects_file_scheme() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("file:///etc/passwd")
     assert exc_info.value.status_code == 422
@@ -81,6 +92,7 @@ def test_validate_import_url_rejects_file_scheme() -> None:
 
 def test_validate_import_url_rejects_ftp_scheme() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("ftp://kaspi.kz/something")
     assert exc_info.value.status_code == 422
@@ -88,6 +100,7 @@ def test_validate_import_url_rejects_ftp_scheme() -> None:
 
 def test_validate_import_url_rejects_localhost() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("http://localhost/path")
     assert exc_info.value.status_code == 422
@@ -95,6 +108,7 @@ def test_validate_import_url_rejects_localhost() -> None:
 
 def test_validate_import_url_rejects_127_0_0_1() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("http://127.0.0.1/path")
     assert exc_info.value.status_code == 422
@@ -102,6 +116,7 @@ def test_validate_import_url_rejects_127_0_0_1() -> None:
 
 def test_validate_import_url_rejects_unsupported_marketplace() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("https://amazon.com/dp/B001")
     assert exc_info.value.status_code == 422
@@ -109,6 +124,7 @@ def test_validate_import_url_rejects_unsupported_marketplace() -> None:
 
 def test_validate_import_url_rejects_internal_ip() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException) as exc_info:
         validate_import_url("http://10.0.0.1/path")
     assert exc_info.value.status_code == 422
@@ -116,6 +132,7 @@ def test_validate_import_url_rejects_internal_ip() -> None:
 
 def test_validate_import_url_rejects_plain_text() -> None:
     from app.modules.marketplace.service import validate_import_url
+
     with pytest.raises(HTTPException):
         validate_import_url("not a url at all")
 
@@ -124,6 +141,7 @@ def test_validate_import_url_rejects_plain_text() -> None:
 # _check_host_not_private (SSRF protection)
 # ---------------------------------------------------------------------------
 
+
 def _addr(ip: str) -> list:
     return [(None, None, None, None, (ip, 0))]
 
@@ -131,6 +149,7 @@ def _addr(ip: str) -> list:
 @pytest.mark.asyncio
 async def test_check_host_not_private_allows_public_ip() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
         await _check_host_not_private("kaspi.kz")  # must not raise
 
@@ -138,6 +157,7 @@ async def test_check_host_not_private_allows_public_ip() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_loopback_127() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("kaspi.kz")
@@ -147,6 +167,7 @@ async def test_check_host_not_private_blocks_loopback_127() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_10_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("kaspi.kz")
@@ -156,6 +177,7 @@ async def test_check_host_not_private_blocks_10_range() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_172_16_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
@@ -164,6 +186,7 @@ async def test_check_host_not_private_blocks_172_16_range() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_192_168_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.100")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
@@ -172,6 +195,7 @@ async def test_check_host_not_private_blocks_192_168_range() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_link_local() -> None:
     from app.modules.marketplace.service import _check_host_not_private
+
     with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("169.254.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
@@ -180,7 +204,11 @@ async def test_check_host_not_private_blocks_link_local() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_blocks_ipv6_loopback() -> None:
     from app.modules.marketplace.service import _check_host_not_private
-    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=[(None, None, None, None, ("::1", 0, 0, 0))]):
+
+    with patch(
+        "app.modules.url_safety.socket.getaddrinfo",
+        return_value=[(None, None, None, None, ("::1", 0, 0, 0))],
+    ):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
 
@@ -188,7 +216,10 @@ async def test_check_host_not_private_blocks_ipv6_loopback() -> None:
 @pytest.mark.asyncio
 async def test_check_host_not_private_raises_on_dns_failure() -> None:
     from app.modules.marketplace.service import _check_host_not_private
-    with patch("app.modules.url_safety.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")):
+
+    with patch(
+        "app.modules.url_safety.socket.getaddrinfo", side_effect=socket.gaierror("NXDOMAIN")
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("doesnotexist.kaspi.kz")
         assert exc_info.value.status_code == 422
@@ -197,6 +228,7 @@ async def test_check_host_not_private_raises_on_dns_failure() -> None:
 # ---------------------------------------------------------------------------
 # rate limiting
 # ---------------------------------------------------------------------------
+
 
 def _fake_redis_pipeline(minute_count: int, hour_count: int) -> MagicMock:
     """build a minimal async-context-manager mock for redis.pipeline"""
@@ -224,6 +256,7 @@ def _settings(per_minute: int = 5, per_hour: int = 30) -> SimpleNamespace:
 @pytest.mark.asyncio
 async def test_rate_limit_passes_under_both_limits() -> None:
     from app.modules.marketplace.service import _check_import_rate_limit
+
     redis = _fake_redis_pipeline(minute_count=1, hour_count=1)
     await _check_import_rate_limit(redis, uuid4(), _settings())  # must not raise
 
@@ -231,6 +264,7 @@ async def test_rate_limit_passes_under_both_limits() -> None:
 @pytest.mark.asyncio
 async def test_rate_limit_rejects_over_per_minute() -> None:
     from app.modules.marketplace.service import _check_import_rate_limit
+
     redis = _fake_redis_pipeline(minute_count=6, hour_count=6)
     with pytest.raises(HTTPException) as exc_info:
         await _check_import_rate_limit(redis, uuid4(), _settings(per_minute=5))
@@ -240,6 +274,7 @@ async def test_rate_limit_rejects_over_per_minute() -> None:
 @pytest.mark.asyncio
 async def test_rate_limit_rejects_over_per_hour() -> None:
     from app.modules.marketplace.service import _check_import_rate_limit
+
     redis = _fake_redis_pipeline(minute_count=1, hour_count=31)
     with pytest.raises(HTTPException) as exc_info:
         await _check_import_rate_limit(redis, uuid4(), _settings(per_hour=30))
@@ -249,6 +284,7 @@ async def test_rate_limit_rejects_over_per_hour() -> None:
 @pytest.mark.asyncio
 async def test_rate_limit_passes_exactly_at_limit() -> None:
     from app.modules.marketplace.service import _check_import_rate_limit
+
     redis = _fake_redis_pipeline(minute_count=5, hour_count=30)
     await _check_import_rate_limit(redis, uuid4(), _settings(per_minute=5, per_hour=30))
 
@@ -257,20 +293,24 @@ async def test_rate_limit_passes_exactly_at_limit() -> None:
 # parsers — JSON-LD extraction
 # ---------------------------------------------------------------------------
 
+
 def _ld_html(data: dict) -> str:
     return f'<html><head><script type="application/ld+json">{json.dumps(data)}</script></head><body></body></html>'
 
 
 def test_kaspi_parser_extracts_json_ld() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
-    html = _ld_html({
-        "@type": "Product",
-        "name": "Наушники Sony WH-1000XM5",
-        "description": "Отличные наушники",
-        "image": "https://kaspi.kz/images/product.jpg",
-        "offers": {"@type": "Offer", "price": "89999", "priceCurrency": "KZT"},
-    })
+    html = _ld_html(
+        {
+            "@type": "Product",
+            "name": "Наушники Sony WH-1000XM5",
+            "description": "Отличные наушники",
+            "image": "https://kaspi.kz/images/product.jpg",
+            "offers": {"@type": "Offer", "price": "89999", "priceCurrency": "KZT"},
+        }
+    )
     product = parser.parse(html, "https://kaspi.kz/shop/p/product-123", "kaspi.kz")
 
     assert product.title == "Наушники Sony WH-1000XM5"
@@ -283,13 +323,18 @@ def test_kaspi_parser_extracts_json_ld() -> None:
 
 def test_wildberries_parser_extracts_json_ld() -> None:
     from app.modules.marketplace.parsers import WildberriesParser
+
     parser = WildberriesParser()
-    html = _ld_html({
-        "@type": "Product",
-        "name": "Кроссовки Nike Air Max",
-        "offers": {"@type": "Offer", "price": "5990", "priceCurrency": "RUB"},
-    })
-    product = parser.parse(html, "https://wildberries.ru/catalog/12345/detail.aspx", "wildberries.ru")
+    html = _ld_html(
+        {
+            "@type": "Product",
+            "name": "Кроссовки Nike Air Max",
+            "offers": {"@type": "Offer", "price": "5990", "priceCurrency": "RUB"},
+        }
+    )
+    product = parser.parse(
+        html, "https://wildberries.ru/catalog/12345/detail.aspx", "wildberries.ru"
+    )
 
     assert product.title == "Кроссовки Nike Air Max"
     assert product.price == Decimal("5990")
@@ -299,12 +344,15 @@ def test_wildberries_parser_extracts_json_ld() -> None:
 
 def test_ozon_parser_extracts_json_ld() -> None:
     from app.modules.marketplace.parsers import OzonParser
+
     parser = OzonParser()
-    html = _ld_html({
-        "@type": "Product",
-        "name": "Смартфон iPhone 15",
-        "offers": {"@type": "Offer", "price": "79900", "priceCurrency": "RUB"},
-    })
+    html = _ld_html(
+        {
+            "@type": "Product",
+            "name": "Смартфон iPhone 15",
+            "offers": {"@type": "Offer", "price": "79900", "priceCurrency": "RUB"},
+        }
+    )
     product = parser.parse(html, "https://ozon.ru/product/something-123/", "ozon.ru")
 
     assert product.title == "Смартфон iPhone 15"
@@ -314,11 +362,18 @@ def test_ozon_parser_extracts_json_ld() -> None:
 
 def test_parser_handles_json_ld_as_array() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
-    html = _ld_html([
-        {"@type": "WebPage", "name": "Page"},
-        {"@type": "Product", "name": "Чайник Tefal", "offers": {"price": "12500", "priceCurrency": "KZT"}},
-    ])
+    html = _ld_html(
+        [
+            {"@type": "WebPage", "name": "Page"},
+            {
+                "@type": "Product",
+                "name": "Чайник Tefal",
+                "offers": {"price": "12500", "priceCurrency": "KZT"},
+            },
+        ]
+    )
     product = parser.parse(html, "https://kaspi.kz/p/1", "kaspi.kz")
 
     assert product.title == "Чайник Tefal"
@@ -327,13 +382,16 @@ def test_parser_handles_json_ld_as_array() -> None:
 
 def test_parser_handles_image_as_list_in_json_ld() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
-    html = _ld_html({
-        "@type": "Product",
-        "name": "Test",
-        "image": ["https://kaspi.kz/img1.jpg", "https://kaspi.kz/img2.jpg"],
-        "offers": {"price": "100", "priceCurrency": "KZT"},
-    })
+    html = _ld_html(
+        {
+            "@type": "Product",
+            "name": "Test",
+            "image": ["https://kaspi.kz/img1.jpg", "https://kaspi.kz/img2.jpg"],
+            "offers": {"price": "100", "priceCurrency": "KZT"},
+        }
+    )
     product = parser.parse(html, "https://kaspi.kz/p/1", "kaspi.kz")
     assert product.image_url == "https://kaspi.kz/img1.jpg"
 
@@ -342,8 +400,10 @@ def test_parser_handles_image_as_list_in_json_ld() -> None:
 # parsers — OpenGraph fallback
 # ---------------------------------------------------------------------------
 
+
 def test_kaspi_parser_falls_back_to_opengraph_when_no_json_ld() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
     html = """
     <html><head>
@@ -363,6 +423,7 @@ def test_kaspi_parser_falls_back_to_opengraph_when_no_json_ld() -> None:
 
 def test_parser_falls_back_to_opengraph_after_broken_json_ld() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
     html = """
     <html><head>
@@ -379,8 +440,10 @@ def test_parser_falls_back_to_opengraph_after_broken_json_ld() -> None:
 # parsers — HTML fallback
 # ---------------------------------------------------------------------------
 
+
 def test_kaspi_parser_falls_back_to_html_selectors() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
     html = """
     <html><body>
@@ -397,6 +460,7 @@ def test_kaspi_parser_falls_back_to_html_selectors() -> None:
 
 def test_wildberries_parser_falls_back_to_html_selectors() -> None:
     from app.modules.marketplace.parsers import WildberriesParser
+
     parser = WildberriesParser()
     html = """
     <html><body>
@@ -413,6 +477,7 @@ def test_wildberries_parser_falls_back_to_html_selectors() -> None:
 
 def test_ozon_parser_falls_back_to_h1() -> None:
     from app.modules.marketplace.parsers import OzonParser
+
     parser = OzonParser()
     html = "<html><body><h1>Умные часы Xiaomi Band 8</h1></body></html>"
     product = parser.parse(html, "https://ozon.ru/product/123/", "ozon.ru")
@@ -426,8 +491,10 @@ def test_ozon_parser_falls_back_to_h1() -> None:
 # parsers — missing / empty data
 # ---------------------------------------------------------------------------
 
+
 def test_parser_returns_all_none_when_page_has_no_product_data() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
     html = "<html><body><p>Nothing to extract here</p></body></html>"
     product = parser.parse(html, "https://kaspi.kz/shop/p/product-999", "kaspi.kz")
@@ -441,6 +508,7 @@ def test_parser_returns_all_none_when_page_has_no_product_data() -> None:
 
 def test_parser_missing_price_does_not_set_default_currency() -> None:
     from app.modules.marketplace.parsers import KaspiParser
+
     parser = KaspiParser()
     html = _ld_html({"@type": "Product", "name": "Товар без цены"})
     product = parser.parse(html, "https://kaspi.kz/p/1", "kaspi.kz")
@@ -454,33 +522,40 @@ def test_parser_missing_price_does_not_set_default_currency() -> None:
 # get_parser
 # ---------------------------------------------------------------------------
 
+
 def test_get_parser_returns_kaspi_for_kaspi_kz() -> None:
     from app.modules.marketplace.parsers import KaspiParser, get_parser
+
     assert isinstance(get_parser("kaspi.kz"), KaspiParser)
 
 
 def test_get_parser_returns_kaspi_for_www_kaspi_kz() -> None:
     from app.modules.marketplace.parsers import KaspiParser, get_parser
+
     assert isinstance(get_parser("www.kaspi.kz"), KaspiParser)
 
 
 def test_get_parser_returns_wildberries_for_wildberries_kz() -> None:
     from app.modules.marketplace.parsers import WildberriesParser, get_parser
+
     assert isinstance(get_parser("wildberries.kz"), WildberriesParser)
 
 
 def test_get_parser_returns_ozon_for_ozon_kz() -> None:
     from app.modules.marketplace.parsers import OzonParser, get_parser
+
     assert isinstance(get_parser("ozon.kz"), OzonParser)
 
 
 def test_get_parser_returns_none_for_unsupported_host() -> None:
     from app.modules.marketplace.parsers import get_parser
+
     assert get_parser("amazon.com") is None
 
 
 def test_get_parser_returns_none_for_empty_string() -> None:
     from app.modules.marketplace.parsers import get_parser
+
     assert get_parser("") is None
 
 
@@ -488,46 +563,56 @@ def test_get_parser_returns_none_for_empty_string() -> None:
 # _parse_price
 # ---------------------------------------------------------------------------
 
+
 def test_parse_price_plain_integer() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("89999") == Decimal("89999")
 
 
 def test_parse_price_with_space_thousands_separator() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("149 999") == Decimal("149999")
 
 
 def test_parse_price_with_currency_symbol() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("5 990 ₽") == Decimal("5990")
 
 
 def test_parse_price_european_format_dot_thousands_comma_decimal() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("1.234,56") == Decimal("1234.56")
 
 
 def test_parse_price_with_decimal_comma() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("29,99") == Decimal("29.99")
 
 
 def test_parse_price_with_decimal_dot() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("29.99") == Decimal("29.99")
 
 
 def test_parse_price_returns_none_for_empty_string() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("") is None
 
 
 def test_parse_price_returns_none_for_non_numeric_text() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("цена по запросу") is None
 
 
 def test_parse_price_strips_tenge_sign() -> None:
     from app.modules.marketplace.parsers import _parse_price
+
     assert _parse_price("149 999 ₸") == Decimal("149999")

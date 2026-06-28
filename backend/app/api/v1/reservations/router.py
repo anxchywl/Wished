@@ -45,7 +45,9 @@ async def post_reservation(
     share_token: Annotated[str | None, Query()] = None,
 ) -> ReservationResponse:
     """create reservation for a wish"""
-    await check_reservation_create_limit(redis, current_user.id, settings.reservation_create_per_hour)
+    await check_reservation_create_limit(
+        redis, current_user.id, settings.reservation_create_per_hour
+    )
     return await create_reservation(db, current_user, wish_id, share_token=share_token, redis=redis)
 
 
@@ -58,7 +60,9 @@ async def delete_reservation(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """cancel own reservation"""
-    await check_reservation_cancel_limit(redis, current_user.id, settings.reservation_cancel_per_hour)
+    await check_reservation_cancel_limit(
+        redis, current_user.id, settings.reservation_cancel_per_hour
+    )
     await cancel_reservation(db, current_user, reservation_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -83,7 +87,9 @@ async def get_reservation_status(
     share_token: Annotated[str | None, Query()] = None,
 ) -> WishReservationStatusResponse:
     """get viewer-safe reservation status"""
-    return await get_wish_reservation_status(db, current_user, wish_id, share_token=share_token, redis=redis)
+    return await get_wish_reservation_status(
+        db, current_user, wish_id, share_token=share_token, redis=redis
+    )
 
 
 @router.get("/me/booked-wishes", response_model=BookedWishListResponse)

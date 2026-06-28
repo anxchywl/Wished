@@ -24,6 +24,7 @@ from app.main import create_app
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _settings() -> Settings:
     return Settings(
         telegram_bot_token="test-token",
@@ -50,7 +51,7 @@ def _make_app(db: AsyncMock, user: SimpleNamespace, redis: AsyncMock | None = No
     app = create_app()
     app.dependency_overrides[get_db_session] = lambda: db
     app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_redis] = lambda: (redis or _redis_ok())
+    app.dependency_overrides[get_redis] = lambda: redis or _redis_ok()
     app.dependency_overrides[get_settings] = lambda: _settings()
     return app
 
@@ -71,6 +72,7 @@ def _reservation(wish_id, reserver_id, rsv_id=None) -> MagicMock:
     rsv.reserver_user_id = reserver_id
     rsv.status = "active"
     from datetime import datetime, UTC
+
     rsv.created_at = datetime.now(UTC)
     rsv.updated_at = datetime.now(UTC)
     return rsv
@@ -79,6 +81,7 @@ def _reservation(wish_id, reserver_id, rsv_id=None) -> MagicMock:
 # ---------------------------------------------------------------------------
 # POST /wishes/{wish_id}/reserve
 # ---------------------------------------------------------------------------
+
 
 class TestCreateReservation:
     def test_creates_reservation_returns_201(self):
@@ -96,10 +99,19 @@ class TestCreateReservation:
         db.execute = AsyncMock(side_effect=[wish_result, no_existing, no_existing])
         db.add = MagicMock()
         db.commit = AsyncMock()
-        db.refresh = AsyncMock(side_effect=lambda r: setattr(r, "id", rsv_id) or setattr(r, "wish_id", wish_id) or setattr(r, "reserver_user_id", user.id) or setattr(r, "status", "active") or None)
+        db.refresh = AsyncMock(
+            side_effect=lambda r: (
+                setattr(r, "id", rsv_id)
+                or setattr(r, "wish_id", wish_id)
+                or setattr(r, "reserver_user_id", user.id)
+                or setattr(r, "status", "active")
+                or None
+            )
+        )
 
         # patch _to_response so we don't need full ORM object
         from datetime import datetime, UTC
+
         ts = datetime.now(UTC)
         with patch(
             "app.modules.reservations.service._to_response",
@@ -233,6 +245,7 @@ class TestCreateReservation:
 # DELETE /reservations/{reservation_id}  (reserver cancels)
 # ---------------------------------------------------------------------------
 
+
 class TestCancelReservation:
     def test_cancel_own_reservation_returns_204(self):
         user = SimpleNamespace(id=uuid4())
@@ -285,6 +298,7 @@ class TestCancelReservation:
 # ---------------------------------------------------------------------------
 # DELETE /wishes/{wish_id}/reservation  (owner removes reservation on their wish)
 # ---------------------------------------------------------------------------
+
 
 class TestOwnerCancelReservation:
     def _wish_with_owner(self, owner_id):
@@ -355,6 +369,7 @@ class TestOwnerCancelReservation:
 # GET /wishes/{wish_id}/reservation-status
 # ---------------------------------------------------------------------------
 
+
 class TestReservationStatus:
     def test_unreserved_wish_returns_not_reserved(self):
         user = SimpleNamespace(id=uuid4())
@@ -370,7 +385,11 @@ class TestReservationStatus:
         no_gift.scalar_one_or_none = MagicMock(return_value=None)
         db.execute = AsyncMock(side_effect=[wish_result, no_gift, no_rsv])
         db.scalar = AsyncMock(return_value=0)
-        db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
+        db.get = AsyncMock(
+            return_value=SimpleNamespace(
+                group_gift_visibility="anonymous", booking_visibility="anonymous"
+            )
+        )
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")
@@ -400,7 +419,11 @@ class TestReservationStatus:
         no_gift.scalar_one_or_none = MagicMock(return_value=None)
         db.execute = AsyncMock(side_effect=[wish_result, no_gift, rsv_result])
         db.scalar = AsyncMock(return_value=0)
-        db.get = AsyncMock(return_value=SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous"))
+        db.get = AsyncMock(
+            return_value=SimpleNamespace(
+                group_gift_visibility="anonymous", booking_visibility="anonymous"
+            )
+        )
 
         client = TestClient(_make_app(db, user))
         resp = client.get(f"/api/v1/wishes/{wish_id}/reservation-status")

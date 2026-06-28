@@ -21,11 +21,13 @@ _HEALTH_CACHE_TTL = 10
 
 class DependencyHealth(BaseModel):
     """dependency health"""
+
     status: Literal["ok", "error"]
 
 
 class HealthResponse(BaseModel):
     """health response"""
+
     status: Literal["ok", "degraded"]
     database: DependencyHealth
     redis: DependencyHealth

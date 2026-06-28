@@ -1,4 +1,5 @@
 """user discovery tests"""
+
 import pytest
 
 from app.modules.users.discovery import (

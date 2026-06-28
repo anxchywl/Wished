@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 class AdminStatsResponse(BaseModel):
     """dashboard aggregate counts"""
+
     total_users: int
     active_users: int
     total_wishlists: int
@@ -20,6 +21,7 @@ class AdminStatsResponse(BaseModel):
 
 class AdminUserItem(BaseModel):
     """admin view of a user record"""
+
     id: UUID
     telegram_id: int
     username: str | None
@@ -37,6 +39,7 @@ class AdminUserItem(BaseModel):
 
 class AdminWishlistItem(BaseModel):
     """admin view of a wishlist"""
+
     id: UUID
     owner_telegram_id: int
     owner_username: str | None
@@ -48,6 +51,7 @@ class AdminWishlistItem(BaseModel):
 
 class AdminWishItem(BaseModel):
     """admin view of a wish"""
+
     id: UUID
     wishlist_id: UUID
     owner_telegram_id: int
@@ -60,6 +64,7 @@ class AdminWishItem(BaseModel):
 
 class AdminMediaItem(BaseModel):
     """admin view of a media record"""
+
     id: UUID
     wish_id: UUID
     owner_telegram_id: int
@@ -70,6 +75,7 @@ class AdminMediaItem(BaseModel):
 
 class AuditLogItem(BaseModel):
     """admin audit log entry"""
+
     id: int
     actor_user_id: UUID | None
     actor_telegram_id: int | None
@@ -82,11 +88,13 @@ class AuditLogItem(BaseModel):
 
 class BlockUserRequest(BaseModel):
     """payload for block action"""
+
     reason: str
 
 
 class ModerationLogItem(BaseModel):
     """one entry in a user's moderation history"""
+
     id: UUID
     user_id: UUID
     action: str
@@ -97,5 +105,6 @@ class ModerationLogItem(BaseModel):
 
 class AdminMeResponse(BaseModel):
     """confirms admin identity"""
+
     is_admin: bool
     telegram_id: int

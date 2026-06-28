@@ -20,7 +20,9 @@ from app.modules.marketplace.parsers import _meta_content, _title_text
 
 logger = logging.getLogger(__name__)
 
-_LD_RE = re.compile(r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', re.DOTALL | re.IGNORECASE)
+_LD_RE = re.compile(
+    r'<script[^>]+type="application/ld\+json"[^>]*>(.*?)</script>', re.DOTALL | re.IGNORECASE
+)
 
 
 def _parse_json_ld(html: str) -> dict:
@@ -35,21 +37,32 @@ def _parse_json_ld(html: str) -> dict:
 
 
 class EbayExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         html: str | None = None
         try:
             resp = await client.get(url)
             if resp.status_code == 200 and len(resp.text) > 5000:
                 html = resp.text
             else:
-                logger.debug("eBay fetch returned %s (%d bytes) for %s", resp.status_code, len(resp.text), url)
+                logger.debug(
+                    "eBay fetch returned %s (%d bytes) for %s",
+                    resp.status_code,
+                    len(resp.text),
+                    url,
+                )
         except Exception as exc:
             logger.debug("eBay page fetch failed for %s: %s", url, exc)
 
         if not html:
             return LinkPreviewResponse(
-                title=None, description=None, image_url=None,
-                price=None, currency=None, source="ebay",
+                title=None,
+                description=None,
+                image_url=None,
+                price=None,
+                currency=None,
+                source="ebay",
             )
 
         # 1. JSON-LD

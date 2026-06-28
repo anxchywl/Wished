@@ -49,14 +49,16 @@ async def test_create_fulfilled_record_for_booking_and_cancel_reservation() -> N
     assert record.wish_id == wish.id
     assert record.participant_user_id == reserver_id
     assert record.source == "booking"
-    assert events == [{
-        "participant_user_id": reserver_id,
-        "wish_id": wish.id,
-        "wishlist_id": wish.wishlist_id,
-        "owner_user_id": owner_id,
-        "wish_title": wish.title,
-        "source": "booking",
-    }]
+    assert events == [
+        {
+            "participant_user_id": reserver_id,
+            "wish_id": wish.id,
+            "wishlist_id": wish.wishlist_id,
+            "owner_user_id": owner_id,
+            "wish_title": wish.title,
+            "source": "booking",
+        }
+    ]
 
 
 @pytest.mark.asyncio

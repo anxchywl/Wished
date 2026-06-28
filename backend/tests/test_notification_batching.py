@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 # helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_redis(set_result=True):
     """redis mock where `set nx=True` returns set_result"""
     redis = AsyncMock()
@@ -26,6 +27,7 @@ def _make_redis_outbound(count: int):
 # ---------------------------------------------------------------------------
 # _is_batched
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_is_batched_returns_false_on_first_call():
@@ -51,6 +53,7 @@ async def test_is_batched_returns_true_on_repeat_call():
 # _check_outbound_rate
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_check_outbound_rate_returns_true_under_limit():
     from app.modules.notifications.handlers import _check_outbound_rate, OUTBOUND_RATE_LIMIT
@@ -72,6 +75,7 @@ async def test_check_outbound_rate_returns_false_over_limit():
 # ---------------------------------------------------------------------------
 # _is_duplicate
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_is_duplicate_returns_false_on_first_send():

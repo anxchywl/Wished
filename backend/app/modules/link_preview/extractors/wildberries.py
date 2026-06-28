@@ -26,11 +26,56 @@ def _wb_basket(article_id: int) -> str:
     """compute the CDN basket number for a WB article ID (best guess; probe if it returns 404)"""
     vol = article_id // 100000
     thresholds = [
-        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601,
-        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269, 3485,
-        3701, 3917, 4133, 4349, 4565, 4781, 4997, 5213, 5429, 5645,
-        5861, 6077, 6293, 6509, 6725, 6941, 7157, 7373, 7589, 7805,
-        8021, 8237, 8453, 8669, 8885, 9101, 9317, 9533, 9749, 9965,
+        143,
+        287,
+        431,
+        719,
+        1007,
+        1061,
+        1115,
+        1169,
+        1313,
+        1601,
+        1655,
+        1919,
+        2045,
+        2189,
+        2405,
+        2621,
+        2837,
+        3053,
+        3269,
+        3485,
+        3701,
+        3917,
+        4133,
+        4349,
+        4565,
+        4781,
+        4997,
+        5213,
+        5429,
+        5645,
+        5861,
+        6077,
+        6293,
+        6509,
+        6725,
+        6941,
+        7157,
+        7373,
+        7589,
+        7805,
+        8021,
+        8237,
+        8453,
+        8669,
+        8885,
+        9101,
+        9317,
+        9533,
+        9749,
+        9965,
     ]
     return next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "51")
 
@@ -85,7 +130,9 @@ def _parse_wb_cdn_card(data: dict) -> dict:
     return {"title": title, "description": description}
 
 
-async def _fetch_wb_cdn_price(article_id: int, basket: str, client: httpx.AsyncClient) -> tuple[str, str] | None:
+async def _fetch_wb_cdn_price(
+    article_id: int, basket: str, client: httpx.AsyncClient
+) -> tuple[str, str] | None:
     """fetch current price from WB CDN price-history — works from any IP, price in kopecks.
 
     Returns (price_str, currency) preferring KZT when available.
@@ -113,8 +160,7 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
     """fetch sale price from WB card API — geo-blocked on non-RU IPs, but preferred when available"""
     try:
         api_url = (
-            f"https://card.wb.ru/cards/v2/detail"
-            f"?appType=1&curr=rub&dest=-1257786&nm={article_id}"
+            f"https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&nm={article_id}"
         )
         headers = {
             "Referer": "https://www.wildberries.ru/",
@@ -145,7 +191,9 @@ async def _fetch_wb_card_api(article_id: int, client: httpx.AsyncClient) -> dict
 
 
 class WildberriesExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         match = re.search(r"/catalog/(\d+)/", url)
         # short links (wb.ru/s/...) don't contain the catalog ID — follow the redirect
         # to discover the canonical wildberries.ru/catalog/... URL first
@@ -160,7 +208,14 @@ class WildberriesExtractor:
             except Exception as exc:
                 logger.debug("WB short-link redirect failed for %s: %s", url, exc)
         if not match:
-            return LinkPreviewResponse(title=None, description=None, image_url=None, price=None, currency=None, source="wildberries")
+            return LinkPreviewResponse(
+                title=None,
+                description=None,
+                image_url=None,
+                price=None,
+                currency=None,
+                source="wildberries",
+            )
 
         article_id = int(match.group(1))
         currency = "KZT" if "wildberries.kz" in hostname else "RUB"
@@ -221,4 +276,11 @@ class WildberriesExtractor:
         except Exception as exc:
             logger.debug("WB page fetch failed for %s: %s", url, exc)
 
-        return LinkPreviewResponse(title=None, description=description, image_url=image_url, price=price, currency=currency if price else None, source="wildberries")
+        return LinkPreviewResponse(
+            title=None,
+            description=description,
+            image_url=image_url,
+            price=price,
+            currency=currency if price else None,
+            source="wildberries",
+        )

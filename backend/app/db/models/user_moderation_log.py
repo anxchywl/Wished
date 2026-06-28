@@ -10,6 +10,7 @@ from app.db.base import Base
 
 class UserModerationLog(Base):
     """immutable record of every block/unblock action against a user"""
+
     __tablename__ = "user_moderation_logs"
 
     id: Mapped[UUID] = mapped_column(PostgresUUID(as_uuid=True), primary_key=True, default=uuid4)

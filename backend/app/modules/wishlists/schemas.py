@@ -9,6 +9,7 @@ WishlistVisibility = Literal["private", "public"]
 
 class WishlistCreateRequest(BaseModel):
     """wishlist create request"""
+
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=120)
@@ -33,6 +34,7 @@ class WishlistCreateRequest(BaseModel):
 
 class WishlistUpdateRequest(BaseModel):
     """wishlist update request"""
+
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, min_length=1, max_length=120)
@@ -66,6 +68,7 @@ class WishlistUpdateRequest(BaseModel):
 
 class WishlistReorderRequest(BaseModel):
     """wishlist reorder request"""
+
     model_config = ConfigDict(extra="forbid")
 
     wishlist_ids: list[UUID] = Field(min_length=1)
@@ -81,6 +84,7 @@ class WishlistReorderRequest(BaseModel):
 
 class WishlistResponse(BaseModel):
     """wishlist response"""
+
     id: UUID
     owner_user_id: UUID
     title: str
@@ -96,4 +100,5 @@ class WishlistResponse(BaseModel):
 
 class WishlistListResponse(BaseModel):
     """wishlist list response"""
+
     items: list[WishlistResponse]

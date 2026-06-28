@@ -11,6 +11,7 @@ from app.db.base import Base
 
 class Wish(Base):
     """wish record"""
+
     __tablename__ = "wishes"
     __table_args__ = (
         CheckConstraint("status IN ('active', 'completed', 'archived')", name="ck_wishes_status"),
@@ -47,5 +48,9 @@ class Wish(Base):
 
     wishlist = relationship("Wishlist", back_populates="wishes")
     images = relationship("WishImage", back_populates="wish", cascade="all, delete-orphan")
-    reservation = relationship("Reservation", back_populates="wish", uselist=False, cascade="all, delete-orphan")
-    group_gift = relationship("GroupGift", back_populates="wish", uselist=False, lazy="selectin", passive_deletes=True)
+    reservation = relationship(
+        "Reservation", back_populates="wish", uselist=False, cascade="all, delete-orphan"
+    )
+    group_gift = relationship(
+        "GroupGift", back_populates="wish", uselist=False, lazy="selectin", passive_deletes=True
+    )

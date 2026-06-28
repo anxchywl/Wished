@@ -1,4 +1,5 @@
 """users api routes"""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -50,11 +51,7 @@ async def get_user_profile_by_id(
     profile_token: str | None = None,
 ) -> UserProfileResponse:
     """get user profile by internal UUID"""
-    user = (
-        current_user
-        if current_user.id == user_id
-        else await get_user_by_id(db, user_id)
-    )
+    user = current_user if current_user.id == user_id else await get_user_by_id(db, user_id)
     has_discovery_access = await validate_discovery_token(
         redis,
         profile_token,
@@ -86,9 +83,15 @@ async def post_user_follow_by_id(
     await check_follow_limit(redis, current_user.id, settings.follow_per_hour)
     target = await get_user_by_id(db, user_id)
     has_discovery_access = await validate_discovery_token(
-        redis, profile_token, current_user.telegram_id, target.telegram_id, db=db,
+        redis,
+        profile_token,
+        current_user.telegram_id,
+        target.telegram_id,
+        db=db,
     )
-    return await follow_user_by_id(db, current_user, user_id, has_discovery_access=has_discovery_access, redis=redis)
+    return await follow_user_by_id(
+        db, current_user, user_id, has_discovery_access=has_discovery_access, redis=redis
+    )
 
 
 @router.delete("/users/id/{user_id}/follow", status_code=status.HTTP_204_NO_CONTENT)
@@ -178,9 +181,15 @@ async def post_user_follow(
     await check_follow_limit(redis, current_user.id, settings.follow_per_hour)
     target = await get_user_by_username(db, username.removeprefix("@"))
     has_discovery_access = await validate_discovery_token(
-        redis, profile_token, current_user.telegram_id, target.telegram_id, db=db,
+        redis,
+        profile_token,
+        current_user.telegram_id,
+        target.telegram_id,
+        db=db,
     )
-    return await follow_user(db, current_user, username, has_discovery_access=has_discovery_access, redis=redis)
+    return await follow_user(
+        db, current_user, username, has_discovery_access=has_discovery_access, redis=redis
+    )
 
 
 @router.delete("/users/{username}/follow", status_code=status.HTTP_204_NO_CONTENT)

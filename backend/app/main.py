@@ -39,7 +39,9 @@ def create_app() -> FastAPI:
         if not settings.admin_telegram_ids:
             logger.warning("ADMIN_TELEGRAM_IDS is empty — admin panel will be inaccessible")
         if not settings.allowed_origins:
-            raise RuntimeError("ALLOWED_ORIGINS must be set in production — refusing to start with open CORS")
+            raise RuntimeError(
+                "ALLOWED_ORIGINS must be set in production — refusing to start with open CORS"
+            )
 
     app = FastAPI(
         title=settings.app_name,
@@ -83,7 +85,9 @@ def create_app() -> FastAPI:
         await dispose_db()
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         # strip input values from error details to avoid leaking sensitive request data to logs
         safe_errors = [{"type": e["type"], "loc": e["loc"], "msg": e["msg"]} for e in exc.errors()]
         logger.warning("request validation error on %s %s", request.method, request.url.path)

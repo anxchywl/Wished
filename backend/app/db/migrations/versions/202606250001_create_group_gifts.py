@@ -24,13 +24,21 @@ def upgrade() -> None:
         sa.Column("payment_method", sa.String(length=100), nullable=False),
         sa.Column("payment_phone", sa.String(length=30), nullable=False),
         sa.Column("payment_comment", sa.String(length=500), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["wish_id"], ["wishes.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["organizer_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.CheckConstraint("status IN ('active', 'completed', 'cancelled')", name="ck_group_gifts_status"),
-        sa.CheckConstraint("collection_type IN ('immediate', 'commit')", name="ck_group_gifts_collection_type"),
+        sa.CheckConstraint(
+            "status IN ('active', 'completed', 'cancelled')", name="ck_group_gifts_status"
+        ),
+        sa.CheckConstraint(
+            "collection_type IN ('immediate', 'commit')", name="ck_group_gifts_collection_type"
+        ),
     )
     op.create_index(op.f("ix_group_gifts_wish_id"), "group_gifts", ["wish_id"], unique=False)
 
@@ -41,8 +49,12 @@ def upgrade() -> None:
         sa.Column("contributor_user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("amount", sa.Numeric(12, 2), nullable=False),
         sa.Column("status", sa.String(length=30), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.ForeignKeyConstraint(["group_gift_id"], ["group_gifts.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["contributor_user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
@@ -71,7 +83,9 @@ def downgrade() -> None:
     """revert migration"""
     op.execute("DROP INDEX IF EXISTS uq_gg_contrib_active")
     op.execute("DROP INDEX IF EXISTS uq_group_gifts_wish_active")
-    op.drop_index(op.f("ix_group_gift_contributions_group_gift_id"), table_name="group_gift_contributions")
+    op.drop_index(
+        op.f("ix_group_gift_contributions_group_gift_id"), table_name="group_gift_contributions"
+    )
     op.drop_table("group_gift_contributions")
     op.drop_index(op.f("ix_group_gifts_wish_id"), table_name="group_gifts")
     op.drop_table("group_gifts")

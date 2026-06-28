@@ -47,7 +47,9 @@ async def list_wishes(
     share_token: Annotated[str | None, Query()] = None,
 ) -> WishListResponse:
     """list wishlist wishes"""
-    return await list_wishlist_wishes(db, current_user, wishlist_id, share_token=share_token, redis=redis)
+    return await list_wishlist_wishes(
+        db, current_user, wishlist_id, share_token=share_token, redis=redis
+    )
 
 
 @router.post(
@@ -65,7 +67,8 @@ async def post_wish(
 ) -> WishResponse:
     """create wish"""
     await check_wish_create_limit(
-        redis, current_user.id,
+        redis,
+        current_user.id,
         settings.wish_create_per_hour,
         settings.wish_create_per_day,
     )
@@ -98,7 +101,9 @@ async def patch_wish(
     return await update_wish(db, current_user, wish_id, payload, redis=redis)
 
 
-@router.post("/wishes/{wish_id}/copy", response_model=WishResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/wishes/{wish_id}/copy", response_model=WishResponse, status_code=status.HTTP_201_CREATED
+)
 async def post_wish_copy(
     wish_id: UUID,
     payload: WishCopyRequest,

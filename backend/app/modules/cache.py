@@ -7,6 +7,7 @@ the cache from the database (lazy load).
 TTLs are intentionally shorter than client-side stale times so the server cache
 acts as a DB shield, not a consistency layer.
 """
+
 import logging
 from typing import TypeVar, Callable, Awaitable
 
@@ -17,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
-WISHLISTS_TTL = 120     # seconds — user's own wishlist list
-WISHES_TTL = 120        # seconds — wishes in a single wishlist
-FOLLOWING_TTL = 120     # seconds — user's following list
+WISHLISTS_TTL = 120  # seconds — user's own wishlist list
+WISHES_TTL = 120  # seconds — wishes in a single wishlist
+FOLLOWING_TTL = 120  # seconds — user's following list
 
 
 def wishlists_cache_key(user_id: object) -> str:

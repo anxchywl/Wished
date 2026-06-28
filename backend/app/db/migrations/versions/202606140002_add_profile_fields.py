@@ -16,15 +16,21 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("birthday", sa.Date(), nullable=True))
     op.add_column(
         "users",
-        sa.Column("profile_visibility", sa.String(length=32), server_default="public", nullable=False),
+        sa.Column(
+            "profile_visibility", sa.String(length=32), server_default="public", nullable=False
+        ),
     )
     op.add_column(
         "users",
-        sa.Column("birthday_visibility", sa.String(length=32), server_default="private", nullable=False),
+        sa.Column(
+            "birthday_visibility", sa.String(length=32), server_default="private", nullable=False
+        ),
     )
     op.add_column(
         "users",
-        sa.Column("wishlist_visibility", sa.String(length=32), server_default="public", nullable=False),
+        sa.Column(
+            "wishlist_visibility", sa.String(length=32), server_default="public", nullable=False
+        ),
     )
     op.create_check_constraint(
         "ck_users_profile_visibility",

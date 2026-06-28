@@ -28,7 +28,9 @@ def _first_image(html: str) -> str | None:
 
 
 class GenericExtractor:
-    async def extract(self, url: str, hostname: str, client: httpx.AsyncClient) -> LinkPreviewResponse:
+    async def extract(
+        self, url: str, hostname: str, client: httpx.AsyncClient
+    ) -> LinkPreviewResponse:
         try:
             resp = await client.get(url)
             resp.raise_for_status()
@@ -39,19 +41,13 @@ class GenericExtractor:
                 title=None, description=None, image_url=None, price=None, currency=None, source=None
             )
 
-        title = (
-            _meta_content(html, "og:title")
-            or _title_text(html)
-        )
+        title = _meta_content(html, "og:title") or _title_text(html)
         image_url = (
             _meta_content(html, "og:image")
             or _meta_content(html, "og:image:url")
             or _first_image(html)
         )
-        description = (
-            _meta_content(html, "og:description")
-            or _meta_content(html, "description")
-        )
+        description = _meta_content(html, "og:description") or _meta_content(html, "description")
 
         return LinkPreviewResponse(
             title=title.strip() if title else None,

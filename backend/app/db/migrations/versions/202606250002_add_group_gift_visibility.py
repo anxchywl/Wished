@@ -15,7 +15,9 @@ def upgrade() -> None:
     """apply migration"""
     op.add_column(
         "users",
-        sa.Column("group_gift_visibility", sa.String(length=20), server_default="hide", nullable=False),
+        sa.Column(
+            "group_gift_visibility", sa.String(length=20), server_default="hide", nullable=False
+        ),
     )
 
 

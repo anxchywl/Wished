@@ -90,7 +90,11 @@ def _get_signing_client() -> Minio:
 def get_presigned_url(bucket: str, object_name: str, expires_seconds: int | None = None) -> str:
     """generate a presigned GET URL for the browser-accessible endpoint"""
     settings = get_settings()
-    ttl = expires_seconds if expires_seconds is not None else settings.minio_presigned_url_expires_seconds
+    ttl = (
+        expires_seconds
+        if expires_seconds is not None
+        else settings.minio_presigned_url_expires_seconds
+    )
     return _get_signing_client().presigned_get_object(
         bucket_name=bucket,
         object_name=object_name,

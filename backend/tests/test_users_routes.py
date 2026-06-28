@@ -35,7 +35,9 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
         return False
 
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
-    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr(
+        "app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token
+    )
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob")
@@ -65,7 +67,9 @@ def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
         return False
 
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
-    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr(
+        "app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token
+    )
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob")
@@ -102,7 +106,9 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
 
     monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
     monkeypatch.setattr("app.api.v1.users.router.list_user_wishlists", fake_list_user_wishlists)
-    monkeypatch.setattr("app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token)
+    monkeypatch.setattr(
+        "app.api.v1.users.router.validate_discovery_token", fake_validate_discovery_token
+    )
     monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob/wishlists")

@@ -35,18 +35,20 @@ _FETCH_TIMEOUT = 10.0
 _MAX_IMAGE_BYTES = 15 * 1024 * 1024
 _CACHE_TTL = 3600
 
-ALLOWED_HOSTS: frozenset[str] = frozenset({
-    "kaspi.kz",
-    "www.kaspi.kz",
-    "wildberries.ru",
-    "www.wildberries.ru",
-    "wildberries.kz",
-    "www.wildberries.kz",
-    "ozon.ru",
-    "www.ozon.ru",
-    "ozon.kz",
-    "www.ozon.kz",
-})
+ALLOWED_HOSTS: frozenset[str] = frozenset(
+    {
+        "kaspi.kz",
+        "www.kaspi.kz",
+        "wildberries.ru",
+        "www.wildberries.ru",
+        "wildberries.kz",
+        "www.wildberries.kz",
+        "ozon.ru",
+        "www.ozon.ru",
+        "ozon.kz",
+        "www.ozon.kz",
+    }
+)
 
 _MARKETPLACE_BY_HOST: dict[str, str] = {
     "kaspi.kz": "kaspi",
@@ -61,10 +63,15 @@ _MARKETPLACE_BY_HOST: dict[str, str] = {
     "www.ozon.kz": "ozon",
 }
 
-_WB_HOSTS: frozenset[str] = frozenset({
-    "wildberries.ru", "www.wildberries.ru",
-    "wildberries.kz", "www.wildberries.kz",
-})
+_WB_HOSTS: frozenset[str] = frozenset(
+    {
+        "wildberries.ru",
+        "www.wildberries.ru",
+        "wildberries.kz",
+        "www.wildberries.kz",
+    }
+)
+
 
 def validate_import_url(url: str) -> tuple[str, str]:
     """validate scheme/credentials/port and enforce the marketplace host allowlist"""
@@ -104,8 +111,25 @@ def _wb_image_url(article_id: int) -> str:
     vol = article_id // 100000
     part = article_id // 1000
     thresholds = [
-        143, 287, 431, 719, 1007, 1061, 1115, 1169, 1313, 1601,
-        1655, 1919, 2045, 2189, 2405, 2621, 2837, 3053, 3269,
+        143,
+        287,
+        431,
+        719,
+        1007,
+        1061,
+        1115,
+        1169,
+        1313,
+        1601,
+        1655,
+        1919,
+        2045,
+        2189,
+        2405,
+        2621,
+        2837,
+        3053,
+        3269,
     ]
     basket = next((f"{i + 1:02d}" for i, t in enumerate(thresholds) if vol < t), "20")
     return f"https://basket-{basket}.wbbasket.ru/vol{vol}/part{part}/{article_id}/images/big/1.webp"
@@ -137,8 +161,7 @@ async def _fetch_wb_card_api(url: str, redis: Redis | None = None) -> dict | Non
 
     try:
         api_url = (
-            f"https://card.wb.ru/cards/v2/detail"
-            f"?appType=1&curr=rub&dest=-1257786&nm={article_id}"
+            f"https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&nm={article_id}"
         )
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -329,7 +352,9 @@ async def import_product(
             except Exception:
                 pass
             try:
-                pending_image_thumbnail_url = get_presigned_url(settings.minio_media_bucket, thumb_key)
+                pending_image_thumbnail_url = get_presigned_url(
+                    settings.minio_media_bucket, thumb_key
+                )
             except Exception:
                 pending_image_thumbnail_url = None
 

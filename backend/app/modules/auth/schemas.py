@@ -6,12 +6,13 @@ from pydantic import BaseModel, Field
 
 class TelegramAuthRequest(BaseModel):
     """telegram auth request"""
-    init_data: str = Field(min_length=1)
 
+    init_data: str = Field(min_length=1)
 
 
 class UserResponse(BaseModel):
     """auth user response"""
+
     id: UUID
     telegram_id: int
     username: str | None
@@ -24,6 +25,7 @@ class UserResponse(BaseModel):
 
 class TokenResponse(BaseModel):
     """token response — refresh token is delivered as an httpOnly cookie"""
+
     access_token: str
     token_type: str = "bearer"
     access_token_expires_at: datetime
@@ -33,6 +35,7 @@ class TokenResponse(BaseModel):
 
 class RefreshResponse(BaseModel):
     """refresh response — new refresh token is delivered as an httpOnly cookie"""
+
     access_token: str
     token_type: str = "bearer"
     access_token_expires_at: datetime

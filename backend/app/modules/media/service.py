@@ -33,9 +33,7 @@ async def list_wish_images(
         .where(WishImage.wish_id == wish_id, WishImage.status == "ready")
         .order_by(WishImage.created_at.asc())
     )
-    return WishImageListResponse(
-        items=[_to_response(image) for image in result.scalars().all()]
-    )
+    return WishImageListResponse(items=[_to_response(image) for image in result.scalars().all()])
 
 
 async def upload_wish_image(
@@ -59,8 +57,7 @@ async def upload_wish_image(
 
     # image count limit
     count_result = await db.execute(
-        select(WishImage)
-        .where(WishImage.wish_id == wish_id, WishImage.status == "ready")
+        select(WishImage).where(WishImage.wish_id == wish_id, WishImage.status == "ready")
     )
     existing = count_result.scalars().all()
     if len(existing) >= settings.max_images_per_wish:
@@ -72,7 +69,9 @@ async def upload_wish_image(
     # read upload — enforce size limit
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="uploaded file is empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="uploaded file is empty"
+        )
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,

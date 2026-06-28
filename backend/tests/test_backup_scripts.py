@@ -113,8 +113,7 @@ class TestMigrationSafetyChecker:
         # a migration listed in exceptions must not trigger a failure
         bad_migration = tmp_path / "202606200003_drop_user_photo_url.py"
         bad_migration.write_text(
-            'def upgrade():\n    op.drop_column("users", "photo_url")\n'
-            'def downgrade():\n    pass\n'
+            'def upgrade():\n    op.drop_column("users", "photo_url")\ndef downgrade():\n    pass\n'
         )
         result = self._run_checker(tmp_path)
         # checker finds no destructive ops because the file is in exceptions
@@ -139,8 +138,7 @@ class TestMigrationSafetyChecker:
     def test_destructive_migration_detected(self, tmp_path):
         bad_migration = tmp_path / "0002_drop_users.py"
         bad_migration.write_text(
-            'def upgrade():\n    op.drop_table("users")\n'
-            'def downgrade():\n    pass\n'
+            'def upgrade():\n    op.drop_table("users")\ndef downgrade():\n    pass\n'
         )
         result = self._run_checker(tmp_path)
         assert result.returncode == 1
@@ -150,7 +148,7 @@ class TestMigrationSafetyChecker:
         bad_migration = tmp_path / "0003_truncate.py"
         bad_migration.write_text(
             'def upgrade():\n    op.execute("TRUNCATE reservations CASCADE")\n'
-            'def downgrade():\n    pass\n'
+            "def downgrade():\n    pass\n"
         )
         result = self._run_checker(tmp_path)
         assert result.returncode == 1
@@ -193,15 +191,14 @@ class TestProductionComposeBackupService:
         # crude check: backup block must reference both dependencies
         backup_section_start = text.find("wished-backup")
         assert backup_section_start != -1
-        backup_section = text[backup_section_start:backup_section_start + 2000]
+        backup_section = text[backup_section_start : backup_section_start + 2000]
         assert "postgres" in backup_section
         assert "minio" in backup_section
 
     def test_no_down_v_in_prod_compose(self):
         # "down -v" may appear in comments but must not be an actual command
         non_comment_lines = [
-            line for line in self._compose_text().splitlines()
-            if not line.lstrip().startswith("#")
+            line for line in self._compose_text().splitlines() if not line.lstrip().startswith("#")
         ]
         text = "\n".join(non_comment_lines)
         assert "down -v" not in text
