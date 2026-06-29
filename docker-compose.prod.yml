@@ -271,3 +271,4 @@ networks:
     driver: bridge
   wished-data:
     driver: bridge
+    internal: true

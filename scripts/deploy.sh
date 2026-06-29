@@ -40,6 +40,10 @@ docker compose "${COMPOSE_ARGS[@]}" pull --quiet 2>/dev/null || true
 log "Building application images..."
 docker compose "${COMPOSE_ARGS[@]}" build
 
+log "Stopping app-layer services before migrations..."
+# release data-network endpoints so compose can reconcile network config safely
+docker compose "${COMPOSE_ARGS[@]}" stop backend bot caddy backup 2>/dev/null || true
+
 log "Running database migrations..."
 docker compose "${COMPOSE_ARGS[@]}" run --rm backend alembic upgrade head
 
