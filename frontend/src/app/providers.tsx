@@ -228,14 +228,6 @@ function PersistentLayout({ children }: { children: ReactNode }) {
       ? isWishlistsRoute && !initialWishlistsReady
       : !isReady || isAuthPending(authStatus));
 
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-background z-[9999]">
-        <span className="auth-loading-spinner" />
-      </div>
-    );
-  }
-
   if (authStatus === "blocked") {
     return <BlockedScreen />;
   }
@@ -245,7 +237,10 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     pathname === "/users" ||
     (pathname.startsWith("/users/") && pathname.split("/").length === 3);
 
-  if (!isMainRoute) {
+  // Non-main routes (e.g. wishlist detail) need no shell — but still wait for
+  // the loading gate to clear so we don't flash the inner page while auth is
+  // still pending.
+  if (!isMainRoute && !isLoading) {
     return <>{children}</>;
   }
 
@@ -268,8 +263,17 @@ function PersistentLayout({ children }: { children: ReactNode }) {
 
   const extraControls = pathname === "/users" ? <BookingVisibilityHeaderButton /> : undefined;
 
+  // Render the full shell unconditionally so the browser pre-paints the content
+  // on its own compositing layer while the loading overlay covers it.  When the
+  // overlay unmounts, the already-painted content is revealed instantly — no
+  // layout/paint pass, no millisecond blank frame.
   return (
     <div className="min-h-dvh flex flex-col">
+      {isLoading && (
+        <div className="fixed inset-0 flex items-center justify-center bg-background z-[9999]">
+          <span className="auth-loading-spinner" />
+        </div>
+      )}
       <CoverHeader title={title} hideProfile={hideProfile} extraControls={extraControls} />
       {children}
       <BottomNav />
