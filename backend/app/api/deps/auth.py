@@ -33,7 +33,7 @@ async def get_current_user(
             detail="Invalid access token",
         ) from exc
 
-    user = await get_user_by_id(db, user_id)
+    user = await get_user_by_id(db, user_id, allow_blocked=True)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,7 +43,7 @@ async def get_current_user(
     if user.is_blocked:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="account_blocked",
+            detail={"code": "account_blocked", "reason": user.blocked_reason},
         )
 
     return user

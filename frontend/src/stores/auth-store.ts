@@ -20,8 +20,9 @@ type AuthState = {
   authStatus: AuthStatus;
   tgUserId: number | null;
   isAppReady: boolean;
+  blockReason: string | null;
   setAccessToken: (value: string | null) => void;
-  setAuthStatus: (value: AuthStatus) => void;
+  setAuthStatus: (value: AuthStatus, blockReason?: string | null) => void;
   setTgUserId: (value: number | null) => void;
   setAppReady: (value: boolean) => void;
   prepareAccountSwitch: (tgUserId: number) => void;
@@ -40,8 +41,12 @@ function getInitialAuthStatus(): AuthStatus {
   try {
     const raw = window.localStorage.getItem("wished-auth");
     if (!raw) return "bootstrap";
-    const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null; tgUserId?: number | null } };
-    const { accessToken, tgUserId } = parsed?.state ?? {};
+    const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null; tgUserId?: number | null; blockReason?: string | null } };
+    const { accessToken, tgUserId, blockReason } = parsed?.state ?? {};
+    
+    if (blockReason) {
+      return "blocked";
+    }
     if (!accessToken) return "bootstrap";
     if (!tgUserId) {
       clearPersistedUserSession(tgUserId);
@@ -68,6 +73,7 @@ export const useAuthStore = create<AuthState>()(
       authStatus: getInitialAuthStatus(),
       tgUserId: null,
       isAppReady: false,
+      blockReason: null,
       setAccessToken: (value) =>
         set(() => {
           const authStatus = value ? "authenticated" : "unauthenticated";
@@ -79,9 +85,13 @@ export const useAuthStore = create<AuthState>()(
             authStatus,
           };
         }),
-      setAuthStatus: (value) => {
+      setAuthStatus: (value, blockReason) => {
         logStartup("auth status changed", value);
-        set({ authStatus: value });
+        if (blockReason !== undefined) {
+            set({ authStatus: value, blockReason });
+        } else {
+            set({ authStatus: value });
+        }
       },
       setTgUserId: (value) => set({ tgUserId: value }),
       setAppReady: (value) => set({ isAppReady: value }),
@@ -98,12 +108,13 @@ export const useAuthStore = create<AuthState>()(
           authStatus: "bootstrap",
           tgUserId: null,
           isAppReady: false,
+          blockReason: null,
         }),
     }),
     {
       name: "wished-auth",
       storage: createJSONStorage(() => getStorage()),
-      partialize: (state) => ({ accessToken: state.accessToken, tgUserId: state.tgUserId }),
+      partialize: (state) => ({ accessToken: state.accessToken, tgUserId: state.tgUserId, blockReason: state.blockReason }),
     },
   ),
 );

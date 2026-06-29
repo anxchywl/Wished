@@ -42,6 +42,8 @@ type AppProvidersProps = {
 
 function BlockedScreen() {
   const { t } = useTranslation();
+  const blockReason = useAuthStore((state) => state.blockReason);
+  
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-[9999] px-8 text-center gap-4">
       <div style={{ fontSize: 48 }}>🚫</div>
@@ -49,7 +51,10 @@ function BlockedScreen() {
         {t("accountRestrictedTitle")}
       </h1>
       <p style={{ fontSize: 15, color: "var(--tg-theme-hint-color)", lineHeight: 1.5 }}>
-        {t("accountRestrictedBody")}
+        {blockReason ? blockReason : t("accountRestrictedBody")}
+      </p>
+      <p style={{ fontSize: 13, color: "var(--tg-theme-hint-color)", opacity: 0.8, marginTop: 16 }}>
+        {t("accountRestrictedSupport") ?? "If you believe this is a mistake, please contact support."}
       </p>
     </div>
   );

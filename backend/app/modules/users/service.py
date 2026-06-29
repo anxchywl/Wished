@@ -18,21 +18,21 @@ from app.modules.users.schemas import (
 from app.modules.cache import cache_delete, cache_get_or_fetch, following_cache_key, FOLLOWING_TTL
 
 
-async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User:
-    """find user by id; blocked users are treated as not found"""
+async def get_user_by_id(db: AsyncSession, user_id: UUID, allow_blocked: bool = False) -> User:
+    """find user by id; blocked users are treated as not found unless allow_blocked is True"""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    if user is None or user.is_blocked:
+    if user is None or (user.is_blocked and not allow_blocked):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 
 
-async def get_user_by_username(db: AsyncSession, username: str) -> User:
-    """find user by username; blocked users are treated as not found"""
+async def get_user_by_username(db: AsyncSession, username: str, allow_blocked: bool = False) -> User:
+    """find user by username; blocked users are treated as not found unless allow_blocked is True"""
     normalized_username = _normalize_username(username)
     result = await db.execute(select(User).where(User.username.ilike(normalized_username)))
     user = result.scalar_one_or_none()
-    if user is None or user.is_blocked:
+    if user is None or (user.is_blocked and not allow_blocked):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
 

@@ -12,6 +12,7 @@ import {
   useUnblockUser,
 } from "./hooks";
 import type { AdminUserItem, AdminWishlistItem, AdminWishItem, AuditLogItem } from "./api";
+import { finalizeTextInput, normalizeTextInput } from "@/lib/forms/input-normalize";
 
 type Tab = "dashboard" | "users" | "content" | "logs";
 
@@ -173,13 +174,17 @@ function ModerationDialog({
 
   async function handleConfirm() {
     if (!dialog) return;
-    if (isBlock && !reason.trim()) {
-      setReasonError(true);
-      return;
+    if (isBlock) {
+      const cleanReason = finalizeTextInput(reason, 500);
+      setReason(cleanReason);
+      if (!cleanReason.trim()) {
+        setReasonError(true);
+        return;
+      }
     }
     try {
       if (isBlock) {
-        await blockMutation.mutateAsync({ userId: dialog.userId, reason: reason.trim() });
+        await blockMutation.mutateAsync({ userId: dialog.userId, reason: finalizeTextInput(reason, 500) });
       } else {
         await unblockMutation.mutateAsync({ userId: dialog.userId });
       }
@@ -191,78 +196,73 @@ function ModerationDialog({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      style={{
-        position: "fixed", inset: 0, zIndex: 9000,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        background: "rgba(0,0,0,0.55)", padding: 20,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className={`modal-backdrop ${dialog ? "visible" : ""}`}
+      onClick={onClose}
+      style={{ zIndex: 9000 }}
     >
-      <div style={{
-        background: "var(--tg-theme-bg-color, #fff)",
-        borderRadius: 16, padding: 24, width: "100%", maxWidth: 340,
-        display: "flex", flexDirection: "column", gap: 16,
-      }}>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "var(--tg-theme-text-color)" }}>
+      <div
+        className={`modal-sheet ${dialog ? "visible" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-handle" />
+        <h3 className="modal-title font-bold text-base mb-3 text-center">
           {isBlock ? t("adminBlockConfirmTitle") : t("adminUnblockConfirmTitle")}
-        </h2>
-        <p style={{ margin: 0, fontSize: 14, color: "var(--tg-theme-hint-color)", lineHeight: 1.5 }}>
-          {isBlock ? t("adminBlockConfirmBody") : t("adminUnblockConfirmBody")}
-        </p>
-        {isBlock && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--tg-theme-text-color)" }}>
-              {t("adminBlockReasonLabel")}
-            </label>
-            <textarea
-              ref={inputRef}
-              value={reason}
-              onChange={(e) => { setReason(e.target.value); setReasonError(false); }}
-              placeholder={t("adminBlockReasonPlaceholder")}
-              rows={3}
-              maxLength={500}
-              style={{
-                resize: "none", borderRadius: 8, padding: "8px 10px",
-                fontSize: 14, border: `1px solid ${reasonError ? "var(--tg-theme-destructive-text-color, red)" : "var(--tg-theme-hint-color, #ccc)"}`,
-                background: "var(--tg-theme-secondary-bg-color, #f5f5f5)",
-                color: "var(--tg-theme-text-color)",
-              }}
-            />
-            {reasonError && (
-              <span style={{ fontSize: 12, color: "var(--tg-theme-destructive-text-color, red)" }}>
-                {t("adminBlockReasonRequired")}
-              </span>
+        </h3>
+        
+        <div className="public-nav-viewport" style={{ maxHeight: "none", overflow: "visible", padding: 0 }}>
+          <div className="public-nav-frame public-nav-enter-forward flex flex-col gap-3">
+            <p className="text-sm text-muted text-center leading-relaxed">
+              {isBlock ? t("adminBlockConfirmBody") : t("adminUnblockConfirmBody")}
+            </p>
+            
+            {isBlock && (
+              <div className="flex flex-col gap-1 mt-2">
+                <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">
+                  {t("adminBlockReasonLabel")}
+                </label>
+                <textarea
+                  ref={inputRef}
+                  value={reason}
+                  onChange={(e) => { 
+                    setReason(normalizeTextInput(e.target.value, 500)); 
+                    setReasonError(false); 
+                  }}
+                  onBlur={() => {
+                    setReason((current) => finalizeTextInput(current, 500));
+                  }}
+                  placeholder={t("adminBlockReasonPlaceholder")}
+                  className={`min-h-20 max-h-28 rounded-xl border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none ${reasonError ? 'border-destructive' : 'border-border'}`}
+                  maxLength={500}
+                />
+                {reasonError && (
+                  <span className="text-xs text-destructive mt-1">
+                    {t("adminBlockReasonRequired")}
+                  </span>
+                )}
+              </div>
             )}
+            
+            <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={onClose}
+                className="flex-1 rounded-xl bg-muted/10 hover:bg-muted/20 text-muted h-10 text-sm font-medium transition-colors"
+              >
+                {t("adminCancel")}
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleConfirm}
+                className={`flex-1 rounded-xl h-10 text-sm font-medium text-white transition-colors ${
+                  isPending ? "opacity-60 cursor-not-allowed" : ""
+                } ${isBlock ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90"}`}
+              >
+                {t("adminConfirm")}
+              </button>
+            </div>
           </div>
-        )}
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={onClose}
-            style={{
-              flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
-              background: "var(--tg-theme-secondary-bg-color, #f0f0f0)",
-              color: "var(--tg-theme-text-color)", border: "none", cursor: "pointer",
-            }}
-          >
-            {t("adminCancel")}
-          </button>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleConfirm}
-            style={{
-              flex: 1, padding: "10px 0", borderRadius: 10, fontWeight: 600, fontSize: 14,
-              background: isBlock ? "var(--tg-theme-destructive-text-color, #e53935)" : "var(--tg-theme-button-color, #6B7EE8)",
-              color: "#fff", border: "none", cursor: isPending ? "not-allowed" : "pointer",
-              opacity: isPending ? 0.6 : 1,
-            }}
-          >
-            {t("adminConfirm")}
-          </button>
         </div>
       </div>
     </div>

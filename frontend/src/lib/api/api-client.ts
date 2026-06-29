@@ -80,9 +80,10 @@ export async function apiClient<TResponse>(
         response.status === 403 &&
         typeof payload === "object" &&
         payload !== null &&
-        (payload as { detail?: string }).detail === "account_blocked"
+        (payload as { detail?: { code?: string; reason?: string } }).detail?.code === "account_blocked"
       ) {
-        useAuthStore.getState().setAuthStatus("blocked");
+        const reason = (payload as { detail?: { code?: string; reason?: string } }).detail?.reason || null;
+        useAuthStore.getState().setAuthStatus("blocked", reason);
       }
       throw new ApiError(response.statusText || "API request failed", response.status, payload);
     }
