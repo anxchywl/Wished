@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import {
   useAdminStats,
@@ -147,10 +148,12 @@ function ModerationDialog({
   dialog,
   onClose,
   searchQuery,
+  user,
 }: {
   dialog: ModerationDialogState;
   onClose: () => void;
   searchQuery?: string;
+  user?: AdminUserItem;
 }) {
   const { t } = useTranslation();
   const [reason, setReason] = useState("");
@@ -171,6 +174,7 @@ function ModerationDialog({
 
   const isBlock = dialog.type === "block";
   const isPending = blockMutation.isPending || unblockMutation.isPending;
+  const name = user ? ([user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || `tg:${user.telegram_id}`) : "";
 
   async function handleConfirm() {
     if (!dialog) return;
@@ -194,7 +198,7 @@ function ModerationDialog({
     }
   }
 
-  return (
+  const content = (
     <div
       className={`modal-backdrop ${dialog ? "visible" : ""}`}
       onClick={onClose}
@@ -206,14 +210,11 @@ function ModerationDialog({
       >
         <div className="modal-handle" />
         <h3 className="modal-title font-bold text-base mb-3 text-center">
-          {isBlock ? t("adminBlockConfirmTitle") : t("adminUnblockConfirmTitle")}
+          {isBlock ? t("adminBlockConfirmTitle") : t("adminUnblockConfirmTitle")} {name}
         </h3>
         
         <div className="public-nav-viewport" style={{ maxHeight: "none", overflow: "visible", padding: 0 }}>
           <div className="public-nav-frame public-nav-enter-forward flex flex-col gap-3">
-            <p className="text-sm text-muted text-center leading-relaxed">
-              {isBlock ? t("adminBlockConfirmBody") : t("adminUnblockConfirmBody")}
-            </p>
             
             {isBlock && (
               <div className="flex flex-col gap-1 mt-2">
@@ -257,7 +258,7 @@ function ModerationDialog({
                 onClick={handleConfirm}
                 className={`flex-1 rounded-xl h-10 text-sm font-medium text-white transition-colors ${
                   isPending ? "opacity-60 cursor-not-allowed" : ""
-                } ${isBlock ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90"}`}
+                } ${isBlock ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"}`}
               >
                 {t("adminConfirm")}
               </button>
@@ -267,6 +268,7 @@ function ModerationDialog({
       </div>
     </div>
   );
+  return typeof document !== "undefined" ? createPortal(content, document.body) : null;
 }
 
 function UserRow({ user, searchQuery }: { user: AdminUserItem; searchQuery?: string }) {
@@ -298,7 +300,7 @@ function UserRow({ user, searchQuery }: { user: AdminUserItem; searchQuery?: str
 
   return (
     <>
-      <ModerationDialog dialog={dialog} onClose={() => setDialog(null)} searchQuery={searchQuery} />
+      <ModerationDialog dialog={dialog} onClose={() => setDialog(null)} searchQuery={searchQuery} user={user} />
       <article
         className="admin-list-card"
         style={{
@@ -309,12 +311,12 @@ function UserRow({ user, searchQuery }: { user: AdminUserItem; searchQuery?: str
       >
         <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: "50%", overflow: "hidden", background: "var(--tg-theme-button-color, #6B7EE8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>
           {user.photo_url
-            ? <img src={user.photo_url} alt={initials} width={36} height={36} style={{ objectFit: "cover" }} referrerPolicy="no-referrer" />
+            ? <img src={user.photo_url} alt={initials} width={36} height={36} loading="lazy" decoding="async" style={{ objectFit: "cover" }} referrerPolicy="no-referrer" />
             : initials}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span className="admin-list-title" style={{ margin: 0 }}>{name}</span>
+            <a href={`tg://user?id=${user.telegram_id}`} className="admin-list-title hover:underline" style={{ margin: 0, textDecoration: "none", color: "inherit" }}>{name}</a>
             {user.is_blocked && (
               <span style={{
                 fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
@@ -344,30 +346,32 @@ function UserRow({ user, searchQuery }: { user: AdminUserItem; searchQuery?: str
           )}
         </div>
         <div style={{ flexShrink: 0 }}>
-          {user.is_blocked ? (
-            <button
-              type="button"
-              onClick={() => setDialog({ type: "unblock", userId: user.id })}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                background: "var(--tg-theme-button-color, #6B7EE8)", color: "#fff",
-                border: "none", cursor: "pointer",
-              }}
-            >
-              {t("adminUnblockUser")}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDialog({ type: "block", userId: user.id })}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-                background: "var(--tg-theme-destructive-text-color, #e53935)", color: "#fff",
-                border: "none", cursor: "pointer",
-              }}
-            >
-              {t("adminBlockUser")}
-            </button>
+          {!user.is_admin && (
+            user.is_blocked ? (
+              <button
+                type="button"
+                onClick={() => setDialog({ type: "unblock", userId: user.id })}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: "var(--tg-theme-button-color, #6B7EE8)", color: "#fff",
+                  border: "none", cursor: "pointer",
+                }}
+              >
+                {t("adminUnblockUser")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDialog({ type: "block", userId: user.id })}
+                style={{
+                  padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: "var(--tg-theme-destructive-text-color, #e53935)", color: "#fff",
+                  border: "none", cursor: "pointer",
+                }}
+              >
+                {t("adminBlockUser")}
+              </button>
+            )
           )}
         </div>
       </article>

@@ -35,6 +35,7 @@ class AdminUserItem(BaseModel):
     is_blocked: bool
     blocked_at: str | None
     blocked_reason: str | None
+    is_admin: bool
 
 
 class AdminWishlistItem(BaseModel):

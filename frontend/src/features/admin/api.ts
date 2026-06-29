@@ -30,6 +30,7 @@ export type AdminUserItem = {
   is_blocked: boolean;
   blocked_at: string | null;
   blocked_reason: string | null;
+  is_admin: boolean;
 };
 
 export type ModerationLogItem = {

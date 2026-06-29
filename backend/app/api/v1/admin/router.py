@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps.auth import require_admin
 from app.api.deps.database import get_db_session
+from app.core.config import Settings, get_settings
 from fastapi import HTTPException, status as http_status
 from app.db.models.audit_log import AuditLog
 from app.db.models.follows import Follow
@@ -119,6 +120,7 @@ async def get_admin_stats(
 async def list_users(
     admin: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     q: str | None = Query(default=None, max_length=100),
@@ -178,6 +180,7 @@ async def list_users(
                 is_blocked=u.is_blocked,
                 blocked_at=u.blocked_at.isoformat() if u.blocked_at else None,
                 blocked_reason=u.blocked_reason,
+                is_admin=u.telegram_id in settings.admin_telegram_ids,
             )
         )
 
