@@ -6,6 +6,8 @@ from app.modules.reservations.service import (
     create_reservation,
     get_wish_reservation_status,
     list_my_booked_wishes,
+    reorder_booked_wishes,
+    reorder_fulfilled_wishes,
 )
 
 __all__ = [
@@ -14,4 +16,6 @@ __all__ = [
     "create_reservation",
     "get_wish_reservation_status",
     "list_my_booked_wishes",
+    "reorder_booked_wishes",
+    "reorder_fulfilled_wishes",
 ]

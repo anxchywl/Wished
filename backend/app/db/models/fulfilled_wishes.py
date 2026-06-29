@@ -46,6 +46,7 @@ class FulfilledWish(Base):
     contributor_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     user_contribution_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_collected_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
     fulfilled_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

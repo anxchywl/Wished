@@ -2,7 +2,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,7 @@ class Follow(Base):
         index=True,
         nullable=False,
     )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

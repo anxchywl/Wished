@@ -21,9 +21,13 @@ from app.modules.reservations import (
     create_reservation,
     get_wish_reservation_status,
     list_my_booked_wishes,
+    reorder_booked_wishes,
+    reorder_fulfilled_wishes,
 )
 from app.modules.reservations.schemas import (
     BookedWishListResponse,
+    BookedWishReorderRequest,
+    FulfilledWishReorderRequest,
     ReservationResponse,
     WishReservationStatusResponse,
 )
@@ -99,3 +103,23 @@ async def get_my_booked_wishes(
 ) -> BookedWishListResponse:
     """list wishes the current user has actively booked"""
     return await list_my_booked_wishes(db, current_user)
+
+
+@router.patch("/me/booked-wishes/reorder", response_model=BookedWishListResponse)
+async def patch_my_booked_wishes_order(
+    payload: BookedWishReorderRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> BookedWishListResponse:
+    """reorder wishes the current user has actively booked"""
+    return await reorder_booked_wishes(db, current_user, payload)
+
+
+@router.patch("/me/fulfilled-wishes/reorder", response_model=BookedWishListResponse)
+async def patch_my_fulfilled_wishes_order(
+    payload: FulfilledWishReorderRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> BookedWishListResponse:
+    """reorder wishes the current user helped fulfill"""
+    return await reorder_fulfilled_wishes(db, current_user, payload)

@@ -1,13 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useIsMutating } from "@tanstack/react-query";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  defaultDropAnimationSideEffects,
+  DragStartEvent,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { AuthRequiredPanel } from "@/components/feedback/auth-required-panel";
 import { PublicWishlistNavigator } from "@/features/users/public-wishlist-navigator";
 import { UserAvatar } from "@/features/users/user-avatar";
-import { useFollowingQuery } from "@/features/users/hooks";
-import { useBookedWishesQuery, useCancelReservationMutation } from "@/features/reservations/hooks";
+import {
+  useFollowingQuery,
+  useReorderFollowingMutation,
+} from "@/features/users/hooks";
+import {
+  useBookedWishesQuery,
+  useCancelReservationMutation,
+  useReorderBookedWishesMutation,
+  useReorderFulfilledWishesMutation,
+} from "@/features/reservations/hooks";
 import { useGroupGiftQuery } from "@/features/group-gifts/hooks";
 import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { useProfileQuery, useUpdatePrivacyMutation } from "@/features/profile/hooks";
@@ -16,6 +45,7 @@ import { logStartup } from "@/lib/debug/startup-log";
 import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { BookedWishItem, FulfilledWishItem } from "@/features/reservations/api";
+import type { FollowedUserResponse } from "@/features/users/api";
 import { WishImageThumb } from "@/features/wishlists/wishlist-visuals";
 
 /**
@@ -196,40 +226,7 @@ export function UserDiscoveryManager() {
           <AuthRequiredPanel />
         ) : followedUsers.length > 0 ? (
           <>
-          <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
-            <div className="px-4 py-3">
-              <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
-            </div>
-            <div className="mx-4 h-0.5 bg-border" />
-            <div className="discover-following">
-              {followedUsers.map((user, index) => (
-                <div key={user.user_id}>
-                  <button
-                    type="button"
-                    className="discover-following-row pressable-action"
-                    onClick={() => {
-                      router.replace(`/users?profile_id=${encodeURIComponent(user.user_id)}`);
-                    }}
-                  >
-                    <UserAvatar user={user} />
-                    <span>{user.first_name || user.username}</span>
-                  </button>
-                  {index < followedUsers.length - 1 && <div className="mx-4 h-px bg-border" />}
-                </div>
-              ))}
-            </div>
-            <div className="mx-4 h-0.5 bg-border" />
-            <button
-              type="button"
-              className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"
-              onClick={openTelegramFriendPicker}
-            >
-              <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              <span>{t("followNew")}</span>
-            </button>
-          </div>
+          <FriendsPanel items={followedUsers} />
           <BookedWishesPanel items={bookedWishes} />
           <FulfilledWishesPanel items={fulfilledWishes} />
           </>
@@ -263,15 +260,266 @@ export function UserDiscoveryManager() {
   );
 }
 
+function useDiscoverDragSensors() {
+  return useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 300,
+        tolerance: 6,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+}
+
+function usePreventScrollWhileDragging(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const preventScroll = (event: TouchEvent) => {
+      event.preventDefault();
+    };
+    document.addEventListener("touchmove", preventScroll, { passive: false });
+    return () => {
+      document.removeEventListener("touchmove", preventScroll);
+    };
+  }, [active]);
+}
+
+function FriendsPanel({ items }: { items: FollowedUserResponse[] }) {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const sensors = useDiscoverDragSensors();
+  const reorderMutation = useReorderFollowingMutation();
+  const isReordering = useIsMutating({ mutationKey: ["reorderFollowing"] }) > 0;
+  const [orderIds, setOrderIds] = useState<string[]>([]);
+  const [activeUser, setActiveUser] = useState<FollowedUserResponse | null>(null);
+  const users = useMemo(() => items, [items]);
+
+  const resolvedOrderIds = useMemo(() => {
+    if (orderIds.length === 0) return users.map((user) => user.user_id);
+    return orderIds;
+  }, [orderIds, users]);
+
+  const orderedUsers = useMemo(() => {
+    const byId = new Map(users.map((user) => [user.user_id, user]));
+    const ordered = resolvedOrderIds
+      .map((id) => byId.get(id))
+      .filter((user): user is FollowedUserResponse => Boolean(user));
+    const orderedIds = new Set(ordered.map((user) => user.user_id));
+    return [...ordered, ...users.filter((user) => !orderedIds.has(user.user_id))];
+  }, [users, resolvedOrderIds]);
+
+  usePreventScrollWhileDragging(activeUser !== null);
+
+  useEffect(() => {
+    if (activeUser || reorderMutation.isPending || isReordering) return;
+    const userIds = users.map((user) => user.user_id);
+    setOrderIds((prev) => {
+      if (prev.length === userIds.length && prev.every((id, index) => id === userIds[index])) {
+        return prev;
+      }
+      return userIds;
+    });
+  }, [users, activeUser, reorderMutation.isPending, isReordering]);
+
+  function handleDragStart(event: DragStartEvent) {
+    const activeItem = users.find((user) => user.user_id === event.active.id);
+    if (activeItem) setActiveUser(activeItem);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const currentOrder = orderIds.length > 0 ? orderIds : resolvedOrderIds;
+      const oldIndex = currentOrder.indexOf(active.id as string);
+      const newIndex = currentOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      setOrderIds(newOrder);
+      reorderMutation.mutate(
+        { user_ids: newOrder },
+        {
+          onError: () => {
+            setOrderIds(orderIds);
+          },
+        },
+      );
+    }
+    setActiveUser(null);
+  }
+
+  return (
+    <div className="panel discover-following-panel flex flex-col p-0 overflow-hidden bg-background w-full self-start" style={{ padding: 0 }}>
+      <div className="px-4 py-3">
+        <h3 className="text-sm font-bold text-foreground">{t("friends")}</h3>
+      </div>
+      <div className="mx-4 h-0.5 bg-border" />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveUser(null)}
+      >
+        <div className="discover-following">
+          <SortableContext items={resolvedOrderIds} strategy={verticalListSortingStrategy}>
+            {orderedUsers.map((user, index) => (
+              <SortableFriendRow
+                key={user.user_id}
+                user={user}
+                isLast={index === orderedUsers.length - 1}
+                onOpen={() => {
+                  router.replace(`/users?profile_id=${encodeURIComponent(user.user_id)}`);
+                }}
+              />
+            ))}
+          </SortableContext>
+        </div>
+        <DragOverlay
+          dropAnimation={{
+            sideEffects: defaultDropAnimationSideEffects({
+              styles: { active: { opacity: "0.4" } },
+            }),
+          }}
+        >
+          {activeUser ? <FriendRowOverlay user={activeUser} /> : null}
+        </DragOverlay>
+      </DndContext>
+      <div className="mx-4 h-0.5 bg-border" />
+      <button
+        type="button"
+        className="pressable-action flex items-center justify-center gap-2 p-4 w-full text-primary font-bold text-sm cursor-pointer"
+        onClick={openTelegramFriendPicker}
+      >
+        <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>{t("followNew")}</span>
+      </button>
+    </div>
+  );
+}
+
+function SortableFriendRow({
+  user,
+  isLast,
+  onOpen,
+}: {
+  user: FollowedUserResponse;
+  isLast: boolean;
+  onOpen: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: user.user_id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "opacity-30" : ""}
+      {...attributes}
+      {...listeners}
+    >
+      <FriendRowBase user={user} onOpen={onOpen} />
+      {!isLast && <div className="mx-4 h-px bg-border" />}
+    </div>
+  );
+}
+
+function FriendRowOverlay({ user }: { user: FollowedUserResponse }) {
+  return (
+    <div className="bg-background shadow-xl rounded-2xl scale-[1.02] cursor-grabbing ring-1 ring-border/50">
+      <FriendRowBase user={user} onOpen={() => {}} />
+    </div>
+  );
+}
+
+function FriendRowBase({ user, onOpen }: { user: FollowedUserResponse; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="discover-following-row pressable-action"
+      onClick={onOpen}
+    >
+      <UserAvatar user={user} />
+      <span>{user.first_name || user.username}</span>
+    </button>
+  );
+}
+
 function FulfilledWishesPanel({
   items,
 }: {
   items: FulfilledWishItem[];
 }) {
   const { t } = useTranslation();
+  const sensors = useDiscoverDragSensors();
+  const reorderMutation = useReorderFulfilledWishesMutation();
+  const isReordering = useIsMutating({ mutationKey: ["reorderFulfilledWishes"] }) > 0;
   const [selectedWish, setSelectedWish] = useState<BookedWishItem | null>(null);
+  const [orderIds, setOrderIds] = useState<string[]>([]);
+  const [activeWish, setActiveWish] = useState<FulfilledWishItem | null>(null);
+  const fulfilledItems = useMemo(() => items, [items]);
+
+  const resolvedOrderIds = useMemo(() => {
+    if (orderIds.length === 0) return fulfilledItems.map((item) => item.fulfilled_id);
+    return orderIds;
+  }, [orderIds, fulfilledItems]);
+
+  const orderedItems = useMemo(() => {
+    const byId = new Map(fulfilledItems.map((item) => [item.fulfilled_id, item]));
+    const ordered = resolvedOrderIds
+      .map((id) => byId.get(id))
+      .filter((item): item is FulfilledWishItem => Boolean(item));
+    const orderedIds = new Set(ordered.map((item) => item.fulfilled_id));
+    return [...ordered, ...fulfilledItems.filter((item) => !orderedIds.has(item.fulfilled_id))];
+  }, [fulfilledItems, resolvedOrderIds]);
+
+  usePreventScrollWhileDragging(activeWish !== null);
+
+  useEffect(() => {
+    if (activeWish || reorderMutation.isPending || isReordering) return;
+    const fulfilledIds = fulfilledItems.map((item) => item.fulfilled_id);
+    setOrderIds((prev) => {
+      if (prev.length === fulfilledIds.length && prev.every((id, index) => id === fulfilledIds[index])) {
+        return prev;
+      }
+      return fulfilledIds;
+    });
+  }, [fulfilledItems, activeWish, reorderMutation.isPending, isReordering]);
 
   if (!items.length) return null;
+
+  function handleDragStart(event: DragStartEvent) {
+    const activeItem = fulfilledItems.find((item) => item.fulfilled_id === event.active.id);
+    if (activeItem) setActiveWish(activeItem);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const currentOrder = orderIds.length > 0 ? orderIds : resolvedOrderIds;
+      const oldIndex = currentOrder.indexOf(active.id as string);
+      const newIndex = currentOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      setOrderIds(newOrder);
+      reorderMutation.mutate(
+        { fulfilled_ids: newOrder },
+        {
+          onError: () => {
+            setOrderIds(orderIds);
+          },
+        },
+      );
+    }
+    setActiveWish(null);
+  }
 
   return (
     <>
@@ -280,14 +528,35 @@ function FulfilledWishesPanel({
           <h3 className="text-sm font-bold text-foreground">{t("fulfilledWishes")}</h3>
         </div>
         <div className="mx-4 h-0.5 bg-border" />
-        <div className="flex flex-col">
-          {items.map((item, index) => (
-            <div key={item.fulfilled_id}>
-              <FulfilledWishRow item={item} onOpen={() => setSelectedWish(toBookedWishItem(item))} />
-              {index < items.length - 1 && <div className="h-px bg-border/60 ml-[68px]" />}
-            </div>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveWish(null)}
+        >
+          <div className="flex flex-col">
+            <SortableContext items={resolvedOrderIds} strategy={verticalListSortingStrategy}>
+              {orderedItems.map((item, index) => (
+                <SortableFulfilledWishRow
+                  key={item.fulfilled_id}
+                  item={item}
+                  isLast={index === orderedItems.length - 1}
+                  onOpen={() => setSelectedWish(toBookedWishItem(item))}
+                />
+              ))}
+            </SortableContext>
+          </div>
+          <DragOverlay
+            dropAnimation={{
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: { active: { opacity: "0.4" } },
+              }),
+            }}
+          >
+            {activeWish ? <FulfilledWishRowOverlay item={activeWish} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
       {selectedWish && (
         <BookedWishModal
@@ -296,6 +565,45 @@ function FulfilledWishesPanel({
         />
       )}
     </>
+  );
+}
+
+function SortableFulfilledWishRow({
+  item,
+  isLast,
+  onOpen,
+}: {
+  item: FulfilledWishItem;
+  isLast: boolean;
+  onOpen: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.fulfilled_id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "opacity-30" : ""}
+      {...attributes}
+      {...listeners}
+    >
+      <FulfilledWishRow item={item} onOpen={onOpen} />
+      {!isLast && <div className="h-px bg-border/60 ml-[68px]" />}
+    </div>
+  );
+}
+
+function FulfilledWishRowOverlay({ item }: { item: FulfilledWishItem }) {
+  return (
+    <div className="bg-background shadow-xl rounded-2xl scale-[1.02] cursor-grabbing ring-1 ring-border/50">
+      <FulfilledWishRow item={item} onOpen={() => {}} />
+    </div>
   );
 }
 
@@ -356,6 +664,7 @@ function toBookedWishItem(item: FulfilledWishItem): BookedWishItem {
     reserved_at: item.fulfilled_at,
     is_group_gift: item.source === "group_gift",
     is_fulfilled_history: true,
+    position: item.position,
     group_gift: item.source === "group_gift"
       ? {
           group_gift_id: item.group_gift_id ?? "",
@@ -397,9 +706,67 @@ function BookedWishesPanel({
   items: BookedWishItem[];
 }) {
   const { t } = useTranslation();
+  const sensors = useDiscoverDragSensors();
+  const reorderMutation = useReorderBookedWishesMutation();
+  const isReordering = useIsMutating({ mutationKey: ["reorderBookedWishes"] }) > 0;
   const [selectedWish, setSelectedWish] = useState<BookedWishItem | null>(null);
+  const [orderIds, setOrderIds] = useState<string[]>([]);
+  const [activeWish, setActiveWish] = useState<BookedWishItem | null>(null);
+  const bookedItems = useMemo(() => items, [items]);
+
+  const resolvedOrderIds = useMemo(() => {
+    if (orderIds.length === 0) return bookedItems.map((item) => item.wish_id);
+    return orderIds;
+  }, [orderIds, bookedItems]);
+
+  const orderedItems = useMemo(() => {
+    const byId = new Map(bookedItems.map((item) => [item.wish_id, item]));
+    const ordered = resolvedOrderIds
+      .map((id) => byId.get(id))
+      .filter((item): item is BookedWishItem => Boolean(item));
+    const orderedIds = new Set(ordered.map((item) => item.wish_id));
+    return [...ordered, ...bookedItems.filter((item) => !orderedIds.has(item.wish_id))];
+  }, [bookedItems, resolvedOrderIds]);
+
+  usePreventScrollWhileDragging(activeWish !== null);
+
+  useEffect(() => {
+    if (activeWish || reorderMutation.isPending || isReordering) return;
+    const wishIds = bookedItems.map((item) => item.wish_id);
+    setOrderIds((prev) => {
+      if (prev.length === wishIds.length && prev.every((id, index) => id === wishIds[index])) {
+        return prev;
+      }
+      return wishIds;
+    });
+  }, [bookedItems, activeWish, reorderMutation.isPending, isReordering]);
 
   if (!items.length) return null;
+
+  function handleDragStart(event: DragStartEvent) {
+    const activeItem = bookedItems.find((item) => item.wish_id === event.active.id);
+    if (activeItem) setActiveWish(activeItem);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const currentOrder = orderIds.length > 0 ? orderIds : resolvedOrderIds;
+      const oldIndex = currentOrder.indexOf(active.id as string);
+      const newIndex = currentOrder.indexOf(over.id as string);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      setOrderIds(newOrder);
+      reorderMutation.mutate(
+        { wish_ids: newOrder },
+        {
+          onError: () => {
+            setOrderIds(orderIds);
+          },
+        },
+      );
+    }
+    setActiveWish(null);
+  }
 
   return (
     <>
@@ -408,14 +775,35 @@ function BookedWishesPanel({
           <h3 className="text-sm font-bold text-foreground">{t("bookedWishes")}</h3>
         </div>
         <div className="mx-4 h-0.5 bg-border" />
-        <div className="flex flex-col">
-          {items.map((item, index) => (
-            <div key={item.reservation_id}>
-              <BookedWishRow item={item} onOpen={() => setSelectedWish(item)} />
-              {index < items.length - 1 && <div className="h-px bg-border/60 ml-[68px]" />}
-            </div>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveWish(null)}
+        >
+          <div className="flex flex-col">
+            <SortableContext items={resolvedOrderIds} strategy={verticalListSortingStrategy}>
+              {orderedItems.map((item, index) => (
+                <SortableBookedWishRow
+                  key={item.wish_id}
+                  item={item}
+                  isLast={index === orderedItems.length - 1}
+                  onOpen={() => setSelectedWish(item)}
+                />
+              ))}
+            </SortableContext>
+          </div>
+          <DragOverlay
+            dropAnimation={{
+              sideEffects: defaultDropAnimationSideEffects({
+                styles: { active: { opacity: "0.4" } },
+              }),
+            }}
+          >
+            {activeWish ? <BookedWishRowOverlay item={activeWish} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
       {selectedWish && (
         <BookedWishModal
@@ -424,6 +812,45 @@ function BookedWishesPanel({
         />
       )}
     </>
+  );
+}
+
+function SortableBookedWishRow({
+  item,
+  isLast,
+  onOpen,
+}: {
+  item: BookedWishItem;
+  isLast: boolean;
+  onOpen: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.wish_id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "opacity-30" : ""}
+      {...attributes}
+      {...listeners}
+    >
+      <BookedWishRow item={item} onOpen={onOpen} />
+      {!isLast && <div className="h-px bg-border/60 ml-[68px]" />}
+    </div>
+  );
+}
+
+function BookedWishRowOverlay({ item }: { item: BookedWishItem }) {
+  return (
+    <div className="bg-background shadow-xl rounded-2xl scale-[1.02] cursor-grabbing ring-1 ring-border/50">
+      <BookedWishRow item={item} onOpen={() => {}} />
+    </div>
   );
 }
 

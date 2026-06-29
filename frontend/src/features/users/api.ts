@@ -15,6 +15,7 @@ export type UserProfileResponse = {
 
 export type FollowedUserResponse = UserProfileResponse & {
   followed_at: string;
+  position: number;
 };
 
 export type FollowedUserListResponse = {
@@ -47,6 +48,17 @@ export function getUserProfileById(accessToken: string, userId: string, profileT
  */
 export function listFollowing(accessToken: string) {
   return apiClient<FollowedUserListResponse>("/users/following", { accessToken });
+}
+
+/**
+ * reorder followed users
+ */
+export function reorderFollowing(accessToken: string, input: { user_ids: string[] }) {
+  return apiClient<FollowedUserListResponse>("/users/following/reorder", {
+    method: "PATCH",
+    accessToken,
+    body: input,
+  });
 }
 
 /**

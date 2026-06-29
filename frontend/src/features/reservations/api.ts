@@ -65,6 +65,7 @@ export type BookedWishItem = {
   is_group_gift: boolean;
   group_gift: BookedWishGroupGiftDetail | null;
   is_fulfilled_history?: boolean;
+  position: number;
 };
 
 export type FulfilledWishItem = {
@@ -90,6 +91,7 @@ export type FulfilledWishItem = {
   user_contribution_amount: string | null;
   total_collected_amount: string | null;
   group_gift_id: string | null;
+  position: number;
 };
 
 export type BookedWishListResponse = {
@@ -144,4 +146,26 @@ export function removeWishReservation(accessToken: string, wishId: string) {
  */
 export function getBookedWishes(accessToken: string) {
   return apiClient<BookedWishListResponse>("/me/booked-wishes", { accessToken });
+}
+
+/**
+ * reorder booked wishes
+ */
+export function reorderBookedWishes(accessToken: string, input: { wish_ids: string[] }) {
+  return apiClient<BookedWishListResponse>("/me/booked-wishes/reorder", {
+    method: "PATCH",
+    accessToken,
+    body: input,
+  });
+}
+
+/**
+ * reorder fulfilled wishes
+ */
+export function reorderFulfilledWishes(accessToken: string, input: { fulfilled_ids: string[] }) {
+  return apiClient<BookedWishListResponse>("/me/fulfilled-wishes/reorder", {
+    method: "PATCH",
+    accessToken,
+    body: input,
+  });
 }

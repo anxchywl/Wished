@@ -9,6 +9,8 @@ import {
   getBookedWishes,
   getReservationStatus,
   removeWishReservation,
+  reorderBookedWishes,
+  reorderFulfilledWishes,
 } from "@/features/reservations/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
 import { useAuthStore } from "@/stores/auth-store";
@@ -86,6 +88,103 @@ export function useBookedWishesQuery() {
     refetchInterval: 15_000,
     refetchOnMount: "always",
   });
+}
+
+/**
+ * reorder booked wishes mutation
+ */
+export function useReorderBookedWishesMutation() {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationKey: ["reorderBookedWishes"],
+    mutationFn: (input: { wish_ids: string[] }) => reorderBookedWishes(accessToken ?? "", input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: bookedWishesQueryKey });
+      const previousBookedWishes = queryClient.getQueryData<BookedWishListResponse>(bookedWishesQueryKey);
+      queryClient.setQueryData<BookedWishListResponse>(bookedWishesQueryKey, (current) => ({
+        items: reorderBookedWishItems(current?.items ?? [], input.wish_ids),
+        fulfilled_items: current?.fulfilled_items ?? [],
+      }));
+      return { previousBookedWishes };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousBookedWishes) {
+        queryClient.setQueryData(bookedWishesQueryKey, context.previousBookedWishes);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(bookedWishesQueryKey, data);
+    },
+  });
+}
+
+/**
+ * reorder fulfilled wishes mutation
+ */
+export function useReorderFulfilledWishesMutation() {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+
+  return useMutation({
+    mutationKey: ["reorderFulfilledWishes"],
+    mutationFn: (input: { fulfilled_ids: string[] }) => reorderFulfilledWishes(accessToken ?? "", input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: bookedWishesQueryKey });
+      const previousBookedWishes = queryClient.getQueryData<BookedWishListResponse>(bookedWishesQueryKey);
+      queryClient.setQueryData<BookedWishListResponse>(bookedWishesQueryKey, (current) => ({
+        items: current?.items ?? [],
+        fulfilled_items: reorderFulfilledWishItems(
+          current?.fulfilled_items ?? [],
+          input.fulfilled_ids,
+        ),
+      }));
+      return { previousBookedWishes };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousBookedWishes) {
+        queryClient.setQueryData(bookedWishesQueryKey, context.previousBookedWishes);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(bookedWishesQueryKey, data);
+    },
+  });
+}
+
+/**
+ * reorder cached booked wishes
+ */
+export function reorderBookedWishItems(
+  items: BookedWishListResponse["items"],
+  wishIds: string[],
+) {
+  const byId = new Map(items.map((item) => [item.wish_id, item]));
+  const next = wishIds
+    .map((id, position) => {
+      const item = byId.get(id);
+      return item ? { ...item, position } : null;
+    })
+    .filter((item): item is BookedWishListResponse["items"][number] => Boolean(item));
+  return next.length === items.length ? next : items;
+}
+
+/**
+ * reorder cached fulfilled wishes
+ */
+export function reorderFulfilledWishItems(
+  items: BookedWishListResponse["fulfilled_items"],
+  fulfilledIds: string[],
+) {
+  const byId = new Map(items.map((item) => [item.fulfilled_id, item]));
+  const next = fulfilledIds
+    .map((id, position) => {
+      const item = byId.get(id);
+      return item ? { ...item, position } : null;
+    })
+    .filter((item): item is BookedWishListResponse["fulfilled_items"][number] => Boolean(item));
+  return next.length === items.length ? next : items;
 }
 
 /**

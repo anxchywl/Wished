@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,7 @@ from app.db.models import Follow, User
 from app.modules.events import publish_event
 from app.modules.users.schemas import (
     FollowedUserListResponse,
+    FollowedUserReorderRequest,
     FollowedUserResponse,
     UserProfileResponse,
 )
@@ -63,13 +64,14 @@ async def _fetch_followed_users(db: AsyncSession, current_user: User) -> Followe
         select(Follow, User)
         .join(User, User.id == Follow.followed_user_id)
         .where(Follow.follower_user_id == current_user.id)
-        .order_by(Follow.created_at.desc())
+        .order_by(Follow.position.asc())
     )
     return FollowedUserListResponse(
         items=[
             FollowedUserResponse(
                 **build_user_profile_response(user, current_user, is_following=True).model_dump(),
                 followed_at=follow.created_at,
+                position=follow.position,
             )
             for follow, user in result.all()
         ]
@@ -93,7 +95,14 @@ async def follow_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     already_following = False
-    db.add(Follow(follower_user_id=current_user.id, followed_user_id=target.id))
+    next_position = await _next_follow_position(db, current_user.id)
+    db.add(
+        Follow(
+            follower_user_id=current_user.id,
+            followed_user_id=target.id,
+            position=next_position,
+        )
+    )
     try:
         await db.commit()
     except IntegrityError:
@@ -153,7 +162,14 @@ async def follow_user_by_id(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     already_following = False
-    db.add(Follow(follower_user_id=current_user.id, followed_user_id=target.id))
+    next_position = await _next_follow_position(db, current_user.id)
+    db.add(
+        Follow(
+            follower_user_id=current_user.id,
+            followed_user_id=target.id,
+            position=next_position,
+        )
+    )
     try:
         await db.commit()
     except IntegrityError:
@@ -209,6 +225,33 @@ async def is_following_user(db: AsyncSession, current_user: User, user: User) ->
     return result.scalar_one_or_none() is not None
 
 
+async def reorder_followed_users(
+    db: AsyncSession,
+    current_user: User,
+    payload: FollowedUserReorderRequest,
+    redis: Redis | None = None,
+) -> FollowedUserListResponse:
+    """reorder followed users"""
+    result = await db.execute(
+        select(Follow)
+        .join(User, User.id == Follow.followed_user_id)
+        .where(Follow.follower_user_id == current_user.id)
+    )
+    follows = result.scalars().all()
+    follows_by_user_id = {follow.followed_user_id: follow for follow in follows}
+
+    if set(payload.user_ids) != set(follows_by_user_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User ids do not match")
+
+    for position, user_id in enumerate(payload.user_ids):
+        follows_by_user_id[user_id].position = position
+
+    await db.commit()
+    if redis is not None:
+        await cache_delete(redis, following_cache_key(current_user.id))
+    return await _fetch_followed_users(db, current_user)
+
+
 def build_user_profile_response(
     user: User,
     current_user: User | None = None,
@@ -226,3 +269,13 @@ def build_user_profile_response(
         is_self=is_owner,
         is_following=False if is_owner else is_following,
     )
+
+
+async def _next_follow_position(db: AsyncSession, follower_user_id: UUID) -> int:
+    """find next follow position"""
+    result = await db.execute(
+        select(func.coalesce(func.min(Follow.position), 0)).where(
+            Follow.follower_user_id == follower_user_id
+        )
+    )
+    return result.scalar_one() - 1

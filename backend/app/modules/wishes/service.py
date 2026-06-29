@@ -445,6 +445,7 @@ async def _create_fulfilled_records(
                     contributor_count=contributor_count,
                     user_contribution_amount=participant_amounts.get(participant_id),
                     total_collected_amount=total_collected,
+                    position=-1,
                 )
             )
             events.append(
@@ -489,6 +490,7 @@ async def _create_fulfilled_records(
             wish_id=wish.id,
             participant_user_id=reservation.reserver_user_id,
             source="booking",
+            position=-1,
         )
     )
     events.append(

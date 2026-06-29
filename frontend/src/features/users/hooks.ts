@@ -1,7 +1,19 @@
 // users queries
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { followUser, followUserById, getUserProfile, getUserProfileById, getUserWishlistsById, listFollowing, unfollowUser, unfollowUserById, type UserProfileResponse } from "@/features/users/api";
+import {
+  followUser,
+  followUserById,
+  getUserProfile,
+  getUserProfileById,
+  getUserWishlistsById,
+  listFollowing,
+  reorderFollowing,
+  unfollowUser,
+  unfollowUserById,
+  type FollowedUserListResponse,
+  type UserProfileResponse,
+} from "@/features/users/api";
 import { useAuthStore, useSyncTgUserId } from "@/stores/auth-store";
 
 export const userQueryKeys = {
@@ -45,6 +57,55 @@ export function useFollowingQuery() {
     enabled: Boolean(authStatus === "authenticated" && accessToken),
     staleTime: 3 * 60 * 1000,
   });
+}
+
+/**
+ * reorder followed users mutation
+ */
+export function useReorderFollowingMutation() {
+  const queryClient = useQueryClient();
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const tgUserId = useSyncTgUserId();
+
+  return useMutation({
+    mutationKey: ["reorderFollowing"],
+    mutationFn: (input: { user_ids: string[] }) => reorderFollowing(accessToken ?? "", input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: userQueryKeys.following(tgUserId) });
+      const previousFollowing = queryClient.getQueryData<FollowedUserListResponse>(
+        userQueryKeys.following(tgUserId),
+      );
+      queryClient.setQueryData<FollowedUserListResponse>(userQueryKeys.following(tgUserId), (current) => ({
+        items: reorderFollowedUserItems(current?.items ?? [], input.user_ids),
+      }));
+      return { previousFollowing };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previousFollowing) {
+        queryClient.setQueryData(userQueryKeys.following(tgUserId), context.previousFollowing);
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(userQueryKeys.following(tgUserId), data);
+    },
+  });
+}
+
+/**
+ * reorder cached followed users
+ */
+export function reorderFollowedUserItems(
+  items: FollowedUserListResponse["items"],
+  userIds: string[],
+) {
+  const byId = new Map(items.map((user) => [user.user_id, user]));
+  const next = userIds
+    .map((id, position) => {
+      const user = byId.get(id);
+      return user ? { ...user, position } : null;
+    })
+    .filter((user): user is FollowedUserListResponse["items"][number] => Boolean(user));
+  return next.length === items.length ? next : items;
 }
 
 /**

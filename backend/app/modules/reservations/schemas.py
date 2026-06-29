@@ -77,6 +77,7 @@ class BookedWishItem(BaseModel):
     reserved_at: datetime
     is_group_gift: bool = False
     group_gift: BookedWishGroupGiftDetail | None = None
+    position: int
 
 
 class FulfilledWishItem(BaseModel):
@@ -104,6 +105,7 @@ class FulfilledWishItem(BaseModel):
     user_contribution_amount: str | None = None
     total_collected_amount: str | None = None
     group_gift_id: UUID | None = None
+    position: int
 
 
 class BookedWishListResponse(BaseModel):
@@ -111,3 +113,15 @@ class BookedWishListResponse(BaseModel):
 
     items: list[BookedWishItem]
     fulfilled_items: list[FulfilledWishItem] = []
+
+
+class BookedWishReorderRequest(BaseModel):
+    """booked wish reorder request"""
+
+    wish_ids: list[UUID]
+
+
+class FulfilledWishReorderRequest(BaseModel):
+    """fulfilled wish reorder request"""
+
+    fulfilled_ids: list[UUID]

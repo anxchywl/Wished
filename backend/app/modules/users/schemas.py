@@ -2,6 +2,7 @@
 
 from datetime import date
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel
 
@@ -23,9 +24,16 @@ class FollowedUserResponse(UserProfileResponse):
     """followed user response"""
 
     followed_at: datetime
+    position: int
 
 
 class FollowedUserListResponse(BaseModel):
     """followed user list response"""
 
     items: list[FollowedUserResponse]
+
+
+class FollowedUserReorderRequest(BaseModel):
+    """followed user reorder request"""
+
+    user_ids: list[UUID]

@@ -3,12 +3,12 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import FulfilledWish, Reservation, User, Wish, Wishlist
+from app.db.models import BookedWishOrder, FulfilledWish, Reservation, User, Wish, Wishlist
 from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.modules.wishlists.share_token import validate_wishlist_share_token
 from app.modules.reservations.schemas import (
@@ -16,7 +16,9 @@ from app.modules.reservations.schemas import (
     BookedWishGroupGiftDetail,
     BookedWishItem,
     BookedWishListResponse,
+    BookedWishReorderRequest,
     FulfilledWishItem,
+    FulfilledWishReorderRequest,
     ReservationResponse,
     WishReservationStatusResponse,
 )
@@ -365,6 +367,7 @@ async def list_my_booked_wishes(
                 reserved_at=rsv.created_at,
                 is_group_gift=False,
                 group_gift=None,
+                position=0,
             )
         )
 
@@ -441,12 +444,77 @@ async def list_my_booked_wishes(
                 reserved_at=gift.created_at,
                 is_group_gift=True,
                 group_gift=gift_detail,
+                position=0,
             )
         )
 
-    items.sort(key=lambda x: x.reserved_at, reverse=True)
+    order_map = await _ensure_booked_wish_orders(
+        db,
+        current_user,
+        [(item.wish_id, item.reserved_at) for item in items],
+    )
+    for item in items:
+        item.position = order_map[item.wish_id]
+    items.sort(key=lambda item: item.position)
     fulfilled_items = await _list_my_fulfilled_wishes(db, current_user)
     return BookedWishListResponse(items=items, fulfilled_items=fulfilled_items)
+
+
+async def reorder_booked_wishes(
+    db: AsyncSession,
+    current_user: User,
+    payload: BookedWishReorderRequest,
+) -> BookedWishListResponse:
+    """reorder booked wishes"""
+    current = await list_my_booked_wishes(db, current_user)
+    current_wish_ids = [item.wish_id for item in current.items]
+    if set(payload.wish_ids) != set(current_wish_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish ids do not match")
+
+    order_map = await _ensure_booked_wish_orders(
+        db,
+        current_user,
+        [(item.wish_id, item.reserved_at) for item in current.items],
+    )
+    result = await db.execute(
+        select(BookedWishOrder).where(
+            BookedWishOrder.user_id == current_user.id,
+            BookedWishOrder.wish_id.in_(payload.wish_ids),
+        )
+    )
+    orders_by_wish_id = {order.wish_id: order for order in result.scalars().all()}
+    if set(orders_by_wish_id) != set(order_map):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Wish ids do not match")
+
+    for position, wish_id in enumerate(payload.wish_ids):
+        orders_by_wish_id[wish_id].position = position
+
+    await db.commit()
+    return await list_my_booked_wishes(db, current_user)
+
+
+async def reorder_fulfilled_wishes(
+    db: AsyncSession,
+    current_user: User,
+    payload: FulfilledWishReorderRequest,
+) -> BookedWishListResponse:
+    """reorder fulfilled wishes"""
+    result = await db.execute(
+        select(FulfilledWish).where(FulfilledWish.participant_user_id == current_user.id)
+    )
+    records = result.scalars().all()
+    records_by_id = {record.id: record for record in records}
+
+    if set(payload.fulfilled_ids) != set(records_by_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Fulfilled wish ids do not match"
+        )
+
+    for position, fulfilled_id in enumerate(payload.fulfilled_ids):
+        records_by_id[fulfilled_id].position = position
+
+    await db.commit()
+    return await list_my_booked_wishes(db, current_user)
 
 
 async def _list_my_fulfilled_wishes(
@@ -471,7 +539,7 @@ async def _list_my_fulfilled_wishes(
             FulfilledWish.participant_user_id == current_user.id,
             Wishlist.owner_user_id != current_user.id,
         )
-        .order_by(FulfilledWish.fulfilled_at.desc())
+        .order_by(FulfilledWish.position.asc(), FulfilledWish.fulfilled_at.desc())
     )
 
     def _make_images(wish: Wish) -> list[WishImageResponse]:
@@ -537,9 +605,53 @@ async def _list_my_fulfilled_wishes(
                     else None
                 ),
                 group_gift_id=record.group_gift_id,
+                position=record.position,
             )
         )
     return items
+
+
+async def _ensure_booked_wish_orders(
+    db: AsyncSession,
+    current_user: User,
+    wish_entries: list[tuple[UUID, object]],
+) -> dict[UUID, int]:
+    """ensure current booked wish rows have per-user order records"""
+    if not wish_entries:
+        return {}
+
+    wish_ids = [wish_id for wish_id, _ordered_at in wish_entries]
+    result = await db.execute(
+        select(BookedWishOrder).where(
+            BookedWishOrder.user_id == current_user.id,
+            BookedWishOrder.wish_id.in_(wish_ids),
+        )
+    )
+    orders_by_wish_id = {order.wish_id: order for order in result.scalars().all()}
+    missing = [entry for entry in wish_entries if entry[0] not in orders_by_wish_id]
+    if missing:
+        next_position = await _next_booked_wish_position(db, current_user.id)
+        for offset, (wish_id, _ordered_at) in enumerate(missing):
+            order = BookedWishOrder(
+                user_id=current_user.id,
+                wish_id=wish_id,
+                position=next_position - offset,
+            )
+            db.add(order)
+            orders_by_wish_id[wish_id] = order
+        await db.commit()
+
+    return {wish_id: orders_by_wish_id[wish_id].position for wish_id in wish_ids}
+
+
+async def _next_booked_wish_position(db: AsyncSession, user_id: UUID) -> int:
+    """find next booked wish position"""
+    result = await db.execute(
+        select(func.coalesce(func.min(BookedWishOrder.position), 0)).where(
+            BookedWishOrder.user_id == user_id
+        )
+    )
+    return result.scalar_one() - 1
 
 
 async def _get_accessible_wish(

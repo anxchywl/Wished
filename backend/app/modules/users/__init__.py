@@ -6,6 +6,7 @@ from app.modules.users.service import (
     get_user_by_username,
     is_following_user,
     list_followed_users,
+    reorder_followed_users,
     unfollow_user,
     unfollow_user_by_id,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "get_user_by_username",
     "is_following_user",
     "list_followed_users",
+    "reorder_followed_users",
     "unfollow_user",
     "unfollow_user_by_id",
 ]

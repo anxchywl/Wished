@@ -19,12 +19,17 @@ from app.modules.users import (
     get_user_by_username,
     is_following_user,
     list_followed_users,
+    reorder_followed_users,
     unfollow_user,
     unfollow_user_by_id,
 )
 from app.modules.users.discovery import validate_discovery_token
 from app.modules.users.rate_limit import check_follow_limit, check_unfollow_limit
-from app.modules.users.schemas import FollowedUserListResponse, UserProfileResponse
+from app.modules.users.schemas import (
+    FollowedUserListResponse,
+    FollowedUserReorderRequest,
+    UserProfileResponse,
+)
 from app.core.config import Settings, get_settings
 from app.modules.wishlists import list_user_wishlists, list_user_wishlists_by_id
 from app.modules.wishlists.schemas import WishlistListResponse
@@ -40,6 +45,17 @@ async def get_following(
 ) -> FollowedUserListResponse:
     """list followed users"""
     return await list_followed_users(db, current_user, redis=redis)
+
+
+@router.patch("/users/following/reorder", response_model=FollowedUserListResponse)
+async def patch_following_order(
+    payload: FollowedUserReorderRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+) -> FollowedUserListResponse:
+    """reorder followed users"""
+    return await reorder_followed_users(db, current_user, payload, redis=redis)
 
 
 @router.get("/users/id/{user_id}", response_model=UserProfileResponse)
