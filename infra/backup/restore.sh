@@ -104,5 +104,5 @@ fi
 
 log "Restore complete."
 log "Next steps:"
-log "  1. Restart application services: docker compose -f docker-compose.prod.yml up -d"
+log "  1. Restart application services: docker compose -f docker/docker-compose.prod.yml up -d"
 log "  2. Verify application health"

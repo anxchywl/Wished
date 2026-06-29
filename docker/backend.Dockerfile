@@ -7,11 +7,11 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir --upgrade pip
 
-COPY pyproject.toml ./
+COPY backend/pyproject.toml ./
 RUN pip install --no-cache-dir ".[dev]"
 
-COPY alembic.ini ./
-COPY app ./app
+COPY backend/alembic.ini ./
+COPY backend/app ./app
 
 EXPOSE 8000
 

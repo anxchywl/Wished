@@ -9,10 +9,10 @@ RUN ARCH="${TARGETARCH:-amd64}" && \
     -o /usr/local/bin/mc && \
     chmod +x /usr/local/bin/mc
 
-COPY entrypoint.sh /usr/local/bin/entrypoint
-COPY backup.sh /usr/local/bin/backup
-COPY restore.sh /usr/local/bin/restore
-COPY verify.sh /usr/local/bin/verify-backup
+COPY infra/backup/entrypoint.sh /usr/local/bin/entrypoint
+COPY infra/backup/backup.sh /usr/local/bin/backup
+COPY infra/backup/restore.sh /usr/local/bin/restore
+COPY infra/backup/verify.sh /usr/local/bin/verify-backup
 
 RUN chmod +x \
     /usr/local/bin/entrypoint \

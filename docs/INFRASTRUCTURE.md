@@ -18,7 +18,7 @@ Wished infrastructure is composed of the following services:
 
 ## 2. Containers
 
-Development (`docker-compose.yml`):
+Development (`docker/docker-compose.yml`):
 
 - **backend** — FastAPI application; validates Telegram init data, exposes API, connects to PostgreSQL, Redis, and MinIO.
 - **caddy** — Reverse proxy; routes public HTTP/HTTPS traffic to frontend and backend, handles TLS.
@@ -27,7 +27,7 @@ Development (`docker-compose.yml`):
 - **minio** — MinIO object storage; stores uploaded media, dedicated persistent volume.
 - **bot** — Telegram bot worker; runs background tasks and bot interactions.
 
-Production additions (`docker-compose.prod.yml`):
+Production additions (`docker/docker-compose.prod.yml`):
 
 - **minio-init** — One-time setup container; creates required MinIO buckets and policies.
 - **backup** — Scheduled backup jobs; exports PostgreSQL and MinIO data to external storage.
@@ -325,8 +325,6 @@ wished/
   docs/
     PRODUCT.md
     INFRASTRUCTURE.md
-  docker-compose.yml
-  docker-compose.prod.yml
   .env.example
   backend/
     pyproject.toml
@@ -339,6 +337,9 @@ wished/
     caddy/
   deploy/
   docker/
+    docker-compose.yml
+    docker-compose.prod.yml
+    *.Dockerfile
   tests/
   scripts/
   .github/
@@ -424,23 +425,23 @@ Stop all application containers immediately, restore from the last pre-migration
 
 ```bash
 # 1 — stop app services (do NOT use down -v)
-docker compose -f docker-compose.prod.yml stop backend frontend bot caddy
+docker compose -f docker/docker-compose.prod.yml stop backend frontend bot caddy
 
 # 2 — verify backup
-docker compose -f docker-compose.prod.yml run --rm backup verify-backup
+docker compose -f docker/docker-compose.prod.yml run --rm backup verify-backup
 
 # 3 — restore PostgreSQL + MinIO (prompts for confirmation)
-docker compose -f docker-compose.prod.yml run --rm backup restore latest
+docker compose -f docker/docker-compose.prod.yml run --rm backup restore latest
 # or: ... restore 2026-06-22_12-00
 
 # 4 — run pending migrations if restoring from an older backup
-docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+docker compose -f docker/docker-compose.prod.yml run --rm backend alembic upgrade head
 
 # 5 — restart all services
 bash deploy/deploy.sh
 
 # 6 — verify health
-docker compose -f docker-compose.prod.yml ps
+docker compose -f docker/docker-compose.prod.yml ps
 curl -f https://your-domain/api/v1/health
 ```
 
@@ -457,7 +458,7 @@ mc mirror external/wished-backups/2026-06-22_12-00/ /var/backups/wished/2026-06-
 Run weekly or after any infrastructure change:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm backup verify-backup
+docker compose -f docker/docker-compose.prod.yml run --rm backup verify-backup
 ```
 
 Checks: recent backup exists, PostgreSQL dump is structurally valid, backup age is within expected interval.

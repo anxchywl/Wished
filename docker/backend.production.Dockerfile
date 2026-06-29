@@ -9,9 +9,9 @@ RUN groupadd --system wished \
     && useradd --system --gid wished --home-dir /app wished \
     && pip install --no-cache-dir --upgrade pip
 
-COPY pyproject.toml ./
-COPY alembic.ini ./
-COPY --chown=wished:wished app ./app
+COPY backend/pyproject.toml ./
+COPY backend/alembic.ini ./
+COPY --chown=wished:wished backend/app ./app
 
 RUN pip install --no-cache-dir .
 

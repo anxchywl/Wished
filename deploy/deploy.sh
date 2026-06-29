@@ -3,7 +3,7 @@
 # NEVER runs docker compose down -v or any command that removes volumes.
 set -euo pipefail
 
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker/docker-compose.prod.yml}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-wished}"
 ENV_FILE="${ENV_FILE:-.env}"
 

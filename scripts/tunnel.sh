@@ -37,7 +37,7 @@ DOMAIN=$(echo "$URL" | sed 's|https://||')
 sed -i '' "s|NEXT_PUBLIC_TELEGRAM_DEV_ORIGINS=.*|NEXT_PUBLIC_TELEGRAM_DEV_ORIGINS=$DOMAIN|" "$ENV_FILE"
 
 echo "→ .env updated. Recreating bot container..."
-docker compose up -d --force-recreate bot
+docker compose --env-file "$ENV_FILE" -f "$ROOT_DIR/docker/docker-compose.yml" up -d --force-recreate bot
 
 echo "✓ Done. Open @wished_things_bot in Telegram and tap Open Wished."
 echo "  Keep this terminal open — tunnel closes when you exit."

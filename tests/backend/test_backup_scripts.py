@@ -53,7 +53,7 @@ class TestDeploySafetyGuard:
     """deploy.sh must refuse dangerous flags."""
 
     def _run_deploy(self, *args):
-        env = {**os.environ, "COMPOSE_FILE": "docker-compose.prod.yml"}
+        env = {**os.environ, "COMPOSE_FILE": "docker/docker-compose.prod.yml"}
         return subprocess.run(
             ["bash", str(ROOT / "deploy" / "deploy.sh"), *args],
             capture_output=True,
@@ -155,9 +155,9 @@ class TestMigrationSafetyChecker:
 
 
 class TestProductionComposeBackupService:
-    """docker-compose.prod.yml must include backup service with host-path volume."""
+    """docker/docker-compose.prod.yml must include backup service with host-path volume."""
 
-    PROD_COMPOSE = ROOT / "docker-compose.prod.yml"
+    PROD_COMPOSE = ROOT / "docker" / "docker-compose.prod.yml"
 
     def _compose_text(self):
         return self.PROD_COMPOSE.read_text()

@@ -4,7 +4,7 @@ Safe to re-run: skips wishlists that already have cover_image_object_name set
 and skips wishlists whose description contains no embedded [cover:data:...].
 
 Run inside the backend container:
-  docker compose exec backend python scripts/migrate_wishlist_covers.py
+  docker compose -f docker/docker-compose.yml exec backend python scripts/migrate_wishlist_covers.py
 """
 
 from __future__ import annotations

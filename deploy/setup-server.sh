@@ -116,7 +116,7 @@ if [ -z "${HEARTBEAT}" ]; then
     echo "  1. Go to https://healthchecks.io and create a free account"
     echo "  2. Add a check: period 6h, grace 2h"
     echo "  3. Copy the ping URL and add to .env: BACKUP_HEARTBEAT_URL=<url>"
-    echo "  4. Restart: docker compose -f docker-compose.prod.yml up -d backup"
+    echo "  4. Restart: docker compose -f docker/docker-compose.prod.yml up -d backup"
     echo ""
 fi
 

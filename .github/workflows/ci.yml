@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     name: Lint & Test
@@ -68,11 +72,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Validate production compose config
-        run: docker compose -f docker-compose.prod.yml config --quiet
+        run: docker compose -f docker/docker-compose.prod.yml config --quiet
 
       - name: Build production images
-        run: docker compose -f docker-compose.prod.yml build frontend backend bot backup
+        uses: docker/bake-action@v6
+        with:
+          files: docker/docker-compose.prod.yml
+          targets: |
+            frontend
+            backend
+            backup
+          set: |
+            *.cache-from=type=gha
+            *.cache-to=type=gha,mode=max
 
   deploy:
     name: Deploy

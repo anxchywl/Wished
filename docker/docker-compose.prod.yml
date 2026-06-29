@@ -1,8 +1,10 @@
+name: wished
+
 services:
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/frontend.Dockerfile
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
       args:
         NEXT_PUBLIC_API_URL: /api/v1
         NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
@@ -21,9 +23,10 @@ services:
       - wished-app
 
   backend:
+    image: wished-backend
     build:
-      context: ./backend
-      dockerfile: ../docker/backend.production.Dockerfile
+      context: ..
+      dockerfile: docker/backend.production.Dockerfile
     container_name: wished-backend
     environment:
       APP_ENV: production
@@ -86,7 +89,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile
+      - ../infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
     environment:
@@ -167,9 +170,7 @@ services:
       - wished-data
 
   bot:
-    build:
-      context: ./backend
-      dockerfile: ../docker/backend.production.Dockerfile
+    image: wished-backend
     container_name: wished-bot
     command: python -m app.workers.bot
     environment:
@@ -212,8 +213,8 @@ services:
   # Configure BACKUP_EXTERNAL_ENABLED=true + S3 credentials for off-server copies.
   backup:
     build:
-      context: ./infra/backup
-      dockerfile: ../../docker/backup.Dockerfile
+      context: ..
+      dockerfile: docker/backup.Dockerfile
     container_name: wished-backup
     environment:
       POSTGRES_HOST: postgres

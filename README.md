@@ -94,7 +94,7 @@ Infrastructure, setup, and deployment: [docs/INFRASTRUCTURE.md](./docs/INFRASTRU
 cp .env.example .env
 # fill in BOT_TOKEN and other required values
 
-docker compose up -d
+docker compose -f docker/docker-compose.yml up -d
 ```
 
 See [docs/INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for full setup, environment variables, and production deployment.
