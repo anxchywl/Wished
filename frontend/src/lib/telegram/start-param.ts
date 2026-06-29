@@ -1,4 +1,6 @@
 const WISHLIST_PREFIX = "wl_";
+const PROFILE_PREFIX = "p_";
+const PUBLIC_USERNAME_PATTERN = /^[a-z0-9_]{3,32}$/;
 
 type WishlistStartParam = {
   userId: string;
@@ -51,4 +53,16 @@ export function decodeWishlistStartParam(value: string): WishlistStartParam | nu
   } catch {
     return null;
   }
+}
+
+export function encodeProfileStartParam(publicUsername: string) {
+  const normalizedUsername = publicUsername.trim().replace(/^@/, "").toLowerCase();
+  if (!PUBLIC_USERNAME_PATTERN.test(normalizedUsername)) return null;
+  return `${PROFILE_PREFIX}${normalizedUsername}`;
+}
+
+export function decodeProfileStartParam(value: string): string | null {
+  if (!value.startsWith(PROFILE_PREFIX)) return null;
+  const normalizedUsername = value.slice(PROFILE_PREFIX.length).trim().replace(/^@/, "").toLowerCase();
+  return PUBLIC_USERNAME_PATTERN.test(normalizedUsername) ? normalizedUsername : null;
 }

@@ -5,6 +5,9 @@ import type { WishlistListResponse } from "@/features/wishlists/types";
 export type UserProfileResponse = {
   user_id: string;
   username: string | null;
+  public_username?: string | null;
+  public_profile_url?: string | null;
+  telegram_startapp_url?: string | null;
   first_name: string | null;
   last_name: string | null;
   photo_url: string | null;
@@ -39,6 +42,21 @@ export function getUserProfile(accessToken: string, username: string, profileTok
 export function getUserProfileById(accessToken: string, userId: string, profileToken?: string | null) {
   const query = profileToken ? `?profile_token=${encodeURIComponent(profileToken)}` : "";
   return apiClient<UserProfileResponse>(`/users/id/${encodeURIComponent(userId)}${query}`, {
+    accessToken,
+  });
+}
+
+/**
+ * resolve user profile by public Wished username
+ */
+export function getUserProfileByPublicUsername(
+  accessToken: string,
+  publicUsername: string,
+  profileToken?: string | null,
+) {
+  const normalizedUsername = publicUsername.trim().replace(/^@/, "");
+  const query = profileToken ? `?profile_token=${encodeURIComponent(profileToken)}` : "";
+  return apiClient<UserProfileResponse>(`/users/public/${encodeURIComponent(normalizedUsername)}${query}`, {
     accessToken,
   });
 }

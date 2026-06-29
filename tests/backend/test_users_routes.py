@@ -54,6 +54,56 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
     assert "id" not in response.json()
 
 
+def test_get_user_profile_by_public_username_returns_profile(monkeypatch) -> None:
+    """test public username profile route"""
+    app = create_app()
+    current_user = _user(username="alice")
+    target_user = _user(username="bob")
+    target_user.public_username = "max"
+    app.dependency_overrides[get_current_user] = lambda: current_user
+    app.dependency_overrides[get_db_session] = lambda: object()
+    app.dependency_overrides[get_redis] = _fake_redis
+
+    async def fake_get_user_by_public_username(db, public_username):
+        assert public_username == "max"
+        return target_user
+
+    async def fake_validate_discovery_token(
+        redis, token, requester_tid, target_tid, db=None
+    ):
+        return False
+
+    async def fake_is_following_user(db, current_user, user):
+        return False
+
+    async def fake_check_public_username_resolve_limit(redis, user_id, per_hour):
+        return None
+
+    monkeypatch.setattr(
+        "app.api.v1.users.router.get_user_by_public_username",
+        fake_get_user_by_public_username,
+    )
+    monkeypatch.setattr(
+        "app.api.v1.users.router.validate_discovery_token",
+        fake_validate_discovery_token,
+    )
+    monkeypatch.setattr(
+        "app.api.v1.users.router.is_following_user",
+        fake_is_following_user,
+    )
+    monkeypatch.setattr(
+        "app.api.v1.users.router.check_public_username_resolve_limit",
+        fake_check_public_username_resolve_limit,
+    )
+
+    response = TestClient(app).get("/api/v1/users/public/max")
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == str(target_user.id)
+    assert response.json()["public_username"] == "max"
+    assert response.json()["public_profile_url"] == "http://localhost:3000/@max"
+
+
 def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
     """test private profile hidden"""
     app = create_app()

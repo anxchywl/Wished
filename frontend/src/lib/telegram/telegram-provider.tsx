@@ -45,7 +45,7 @@ type TelegramWindow = Window & {
   };
 };
 
-const TELEGRAM_INIT_DATA_WAIT_MS = 3_000;
+const TELEGRAM_INIT_DATA_WAIT_MS = 10_000;
 const TELEGRAM_INIT_DATA_POLL_MS = 100;
 
 /**
@@ -98,23 +98,20 @@ export function TelegramProvider({ children }: TelegramProviderProps) {
       }
     }
 
-    captureTelegramInitDataFromLocation();
-
-    const isTelegram =
-      typeof window !== "undefined" &&
-      (Boolean(getEarlyCapturedInitDataRaw()) ||
-        window.location.search.includes("tgWebAppData") ||
-        window.location.hash.includes("tgWebAppData") ||
-        ("Telegram" in window));
-
-    if (!isTelegram && !shouldMock) {
-      logStartup("telegram context missing", initialAuthStatus, getTelegramDebugState());
-      setError("Not running inside Telegram");
-      setIsReady(true);
-      return;
-    }
-
     async function initializeTelegram() {
+      captureTelegramInitDataFromLocation();
+
+      if (!shouldMock) {
+        const hasTelegramEnvironment = await waitForTelegramEnvironment(initialAuthStatus);
+        if (cancelled) return;
+        if (!hasTelegramEnvironment) {
+          logStartup("telegram context missing", initialAuthStatus, getTelegramDebugState());
+          setError("Not running inside Telegram");
+          setIsReady(true);
+          return;
+        }
+      }
+
       let initError: unknown = null;
       if (hasTelegramLaunchParams()) {
         try {
@@ -267,6 +264,15 @@ function hasTelegramLaunchParams(): boolean {
   return Boolean(searchParams.get("tgWebAppPlatform") || hashParams.get("tgWebAppPlatform"));
 }
 
+function hasTelegramEnvironment(): boolean {
+  return Boolean(
+    getEarlyCapturedInitDataRaw() ||
+      getTelegramInitDataFromLocation() ||
+      hasTelegramLaunchParams() ||
+      "Telegram" in window,
+  );
+}
+
 /**
  * get telegram debug state
  */
@@ -311,6 +317,22 @@ async function waitForTelegramInitDataRaw(authStatus: ReturnType<typeof useAuthS
   }
 
   return rawInitData;
+}
+
+async function waitForTelegramEnvironment(authStatus: ReturnType<typeof useAuthStore.getState>["authStatus"]): Promise<boolean> {
+  const startedAt = Date.now();
+  let loggedPending = false;
+
+  while (!hasTelegramEnvironment() && Date.now() - startedAt < TELEGRAM_INIT_DATA_WAIT_MS) {
+    if (!loggedPending) {
+      loggedPending = true;
+      logStartup("waiting for telegram context", authStatus, getTelegramDebugState());
+    }
+    await sleep(TELEGRAM_INIT_DATA_POLL_MS);
+    captureTelegramInitDataFromLocation();
+  }
+
+  return hasTelegramEnvironment();
 }
 
 /**

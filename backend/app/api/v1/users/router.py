@@ -16,6 +16,7 @@ from app.modules.users import (
     follow_user,
     follow_user_by_id,
     get_user_by_id,
+    get_user_by_public_username,
     get_user_by_username,
     is_following_user,
     list_followed_users,
@@ -24,7 +25,11 @@ from app.modules.users import (
     unfollow_user_by_id,
 )
 from app.modules.users.discovery import validate_discovery_token
-from app.modules.users.rate_limit import check_follow_limit, check_unfollow_limit
+from app.modules.users.rate_limit import (
+    check_follow_limit,
+    check_public_username_resolve_limit,
+    check_unfollow_limit,
+)
 from app.modules.users.schemas import (
     FollowedUserListResponse,
     FollowedUserReorderRequest,
@@ -148,6 +153,40 @@ async def get_user_wishlists_by_id(
         user_id,
         allow_profile_access=has_discovery_access or is_following,
         owner=target_user,
+    )
+
+
+@router.get("/users/public/{public_username}", response_model=UserProfileResponse)
+async def get_user_profile_by_public_username(
+    public_username: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    redis: Annotated[Redis, Depends(get_redis)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    profile_token: str | None = None,
+) -> UserProfileResponse:
+    """resolve a shareable public profile username"""
+    await check_public_username_resolve_limit(
+        redis, current_user.id, settings.public_username_resolve_per_hour
+    )
+    user = await get_user_by_public_username(db, public_username)
+    has_discovery_access = await validate_discovery_token(
+        redis,
+        profile_token,
+        current_user.telegram_id,
+        user.telegram_id,
+        db=db,
+    )
+    is_following = await is_following_user(db, current_user, user)
+    if (
+        user.id != current_user.id
+        and user.profile_visibility != "public"
+        and not has_discovery_access
+        and not is_following
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return build_user_profile_response(
+        user, current_user, is_following=is_following, settings=settings
     )
 
 

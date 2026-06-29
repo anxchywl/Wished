@@ -12,6 +12,9 @@ class UserProfileResponse(BaseModel):
 
     user_id: str
     username: str | None
+    public_username: str | None = None
+    public_profile_url: str | None = None
+    telegram_startapp_url: str | None = None
     first_name: str | None
     last_name: str | None
     photo_url: str | None

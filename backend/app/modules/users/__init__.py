@@ -1,9 +1,15 @@
 from app.modules.users.service import (
+    allocate_public_username,
     build_user_profile_response,
+    build_public_profile_url,
+    build_telegram_startapp_url,
+    ensure_public_username,
     follow_user,
     follow_user_by_id,
+    get_user_by_public_username,
     get_user_by_id,
     get_user_by_username,
+    is_valid_public_username,
     is_following_user,
     list_followed_users,
     reorder_followed_users,
@@ -12,11 +18,17 @@ from app.modules.users.service import (
 )
 
 __all__ = [
+    "allocate_public_username",
     "build_user_profile_response",
+    "build_public_profile_url",
+    "build_telegram_startapp_url",
+    "ensure_public_username",
     "follow_user",
     "follow_user_by_id",
+    "get_user_by_public_username",
     "get_user_by_id",
     "get_user_by_username",
+    "is_valid_public_username",
     "is_following_user",
     "list_followed_users",
     "reorder_followed_users",

@@ -40,6 +40,7 @@ import {
 import { useGroupGiftQuery } from "@/features/group-gifts/hooks";
 import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { useProfileQuery, useUpdatePrivacyMutation } from "@/features/profile/hooks";
+import { ProfileLinkShareCard } from "@/features/profile";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { logStartup } from "@/lib/debug/startup-log";
 import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store";
@@ -193,6 +194,7 @@ export function UserDiscoveryManager() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedUsername = searchParams.get("profile");
+  const selectedPublicUsername = searchParams.get("profile_public");
   const selectedUserId = searchParams.get("profile_id");
   const profileToken = searchParams.get("profile_token");
   const selectedWishlistId = searchParams.get("wishlist");
@@ -201,6 +203,7 @@ export function UserDiscoveryManager() {
   const followingQuery = useFollowingQuery();
   const followedUsers = followingQuery.data?.items ?? [];
   const bookedWishesQuery = useBookedWishesQuery();
+  const profileQuery = useProfileQuery(accessToken);
   const bookedWishes = bookedWishesQuery.data?.items ?? [];
   const fulfilledWishes = bookedWishesQuery.data?.fulfilled_items ?? [];
   const { t } = useTranslation();
@@ -224,7 +227,14 @@ export function UserDiscoveryManager() {
           <AuthRequiredPanel forcePending />
         ) : guardDecision === "auth_required" ? (
           <AuthRequiredPanel />
-        ) : followedUsers.length > 0 ? (
+        ) : (
+          <>
+          <ProfileLinkShareCard
+            publicUsername={profileQuery.data?.public_username}
+            publicProfileUrl={profileQuery.data?.public_profile_url}
+            telegramStartappUrl={profileQuery.data?.telegram_startapp_url}
+          />
+          {followedUsers.length > 0 ? (
           <>
           <FriendsPanel items={followedUsers} />
           <BookedWishesPanel items={bookedWishes} />
@@ -242,12 +252,15 @@ export function UserDiscoveryManager() {
           </section>
           </>
         )}
+          </>
+        )}
 
       </main>
 
       <PublicWishlistNavigator
-        open={Boolean(selectedUsername || selectedUserId)}
+        open={Boolean(selectedUsername || selectedUserId || selectedPublicUsername)}
         username={selectedUsername}
+        publicUsername={selectedPublicUsername}
         userId={selectedUserId}
         profileToken={profileToken}
         initialWishlistId={selectedWishlistId}

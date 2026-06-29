@@ -17,10 +17,19 @@ def test_get_me_returns_current_profile() -> None:
     response = TestClient(app).get("/api/v1/me")
 
     assert response.status_code == 200
-    assert response.json() == {
+    payload = response.json()
+    assert payload["public_username"] == "alice"
+    assert payload["public_profile_url"].endswith("/@alice")
+    assert payload["telegram_startapp_url"] is None or payload[
+        "telegram_startapp_url"
+    ].endswith("?startapp=p_alice")
+    assert payload == {
         "id": str(user.id),
         "telegram_id": 123456789,
         "username": "alice",
+        "public_username": "alice",
+        "public_profile_url": payload["public_profile_url"],
+        "telegram_startapp_url": payload["telegram_startapp_url"],
         "first_name": "Alice",
         "last_name": "Example",
         "photo_url": "https://example.com/photo.jpg",
@@ -114,6 +123,7 @@ def _user() -> SimpleNamespace:
         id=uuid4(),
         telegram_id=123456789,
         username="alice",
+        public_username="alice",
         first_name="Alice",
         last_name="Example",
         photo_url="https://example.com/photo.jpg",

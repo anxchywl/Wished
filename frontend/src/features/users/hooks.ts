@@ -6,6 +6,7 @@ import {
   followUserById,
   getUserProfile,
   getUserProfileById,
+  getUserProfileByPublicUsername,
   getUserWishlistsById,
   listFollowing,
   reorderFollowing,
@@ -19,6 +20,7 @@ import { useAuthStore, useSyncTgUserId } from "@/stores/auth-store";
 export const userQueryKeys = {
   all: ["users"] as const,
   profile: (username: string) => ["users", "profile", username] as const,
+  profileByPublicUsername: (publicUsername: string) => ["users", "profile-public", publicUsername] as const,
   profileById: (userId: string) => ["users", "profile-id", userId] as const,
   wishlistsById: (userId: string) => ["users", "wishlists-id", userId] as const,
   following: (tgUserId: number | null) => ["users", "following", tgUserId] as const,
@@ -39,6 +41,29 @@ export function useUserProfileQuery(username: string, profileToken?: string | nu
     queryKey,
     queryFn: () => getUserProfile(accessToken ?? "", username, profileToken),
     enabled: Boolean(authStatus === "authenticated" && accessToken && username),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * load user profile by public Wished username
+ */
+export function useUserProfileByPublicUsernameQuery(
+  publicUsername: string | null,
+  profileToken?: string | null,
+) {
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const authStatus = useAuthStore((state) => state.authStatus);
+  const normalizedUsername = publicUsername?.trim().replace(/^@/, "").toLowerCase() ?? "";
+
+  const queryKey = profileToken
+    ? ([...userQueryKeys.profileByPublicUsername(normalizedUsername), profileToken] as const)
+    : userQueryKeys.profileByPublicUsername(normalizedUsername);
+
+  return useQuery({
+    queryKey,
+    queryFn: () => getUserProfileByPublicUsername(accessToken ?? "", normalizedUsername, profileToken),
+    enabled: Boolean(authStatus === "authenticated" && accessToken && normalizedUsername),
     staleTime: 5 * 60 * 1000,
   });
 }

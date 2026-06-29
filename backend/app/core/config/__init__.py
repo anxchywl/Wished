@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_bot_username: str = ""
     telegram_mini_app_url: str = ""
+    public_web_app_url: str = ""
     # telegram recommends validating auth_date within minutes, not hours
     telegram_init_data_max_age_seconds: int = 300
 
@@ -82,6 +83,7 @@ class Settings(BaseSettings):
     # follow/unfollow rate limits
     follow_per_hour: int = 100
     unfollow_per_hour: int = 100
+    public_username_resolve_per_hour: int = 300
 
     # reservation rate limits
     reservation_create_per_hour: int = 60

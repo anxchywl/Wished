@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
@@ -11,6 +11,7 @@ from app.core.security.tokens import generate_refresh_token, hash_token
 from app.db.models import RefreshToken, User
 from app.integrations.telegram import TelegramUserData
 from app.modules.auth.schemas import RefreshResponse, TokenResponse, UserResponse
+from app.modules.users import allocate_public_username, ensure_public_username
 
 
 class AuthError(Exception):
@@ -27,6 +28,7 @@ async def authenticate_telegram_user(
     """authenticate telegram user; returns (response, refresh_token_plaintext)"""
     user = await _get_or_create_user(db, telegram_user)
     _update_user_from_telegram(user, telegram_user)
+    await ensure_public_username(db, user, telegram_user.username)
     user.last_login_at = datetime.now(UTC)
 
     access_token, access_expires_at = create_access_token(user.id, settings)
@@ -84,9 +86,15 @@ async def logout(db: AsyncSession, refresh_token_value: str) -> None:
 
 async def _get_or_create_user(db: AsyncSession, telegram_user: TelegramUserData) -> User:
     """get or create user"""
+    user_id = uuid4()
+    public_username = await allocate_public_username(db, user_id, telegram_user.username)
     await db.execute(
         postgres_insert(User)
-        .values(telegram_id=telegram_user.telegram_id)
+        .values(
+            id=user_id,
+            telegram_id=telegram_user.telegram_id,
+            public_username=public_username,
+        )
         .on_conflict_do_nothing(index_elements=[User.__table__.c.telegram_id])
     )
 

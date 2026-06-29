@@ -1964,6 +1964,104 @@ html[data-theme="dark"] .theme-confirm-danger:active {
   flex-shrink: 0;
 }
 
+.profile-link-share-card {
+  width: 100%;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 16px;
+  background: rgb(var(--color-background));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+html[data-theme="dark"] .profile-link-share-card {
+  background: #0f0f16;
+}
+
+.profile-link-share-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-link-share-label {
+  color: rgb(var(--color-foreground));
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.profile-link-share-url {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgb(var(--color-muted));
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-link-share-status {
+  color: rgb(var(--color-primary));
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.profile-link-share-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-link-share-button {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 12px;
+  background: rgba(var(--color-primary) / 0.06);
+  color: rgb(var(--color-primary));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease, background-color 0.16s ease;
+}
+
+.profile-link-share-primary {
+  border-color: rgb(var(--color-primary));
+  background: rgb(var(--color-primary));
+  color: #ffffff;
+}
+
+.profile-link-share-button:active {
+  transform: scale(0.96);
+  opacity: 0.86;
+}
+
+@media (max-width: 380px) {
+  .profile-link-share-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-link-share-actions {
+    width: 100%;
+  }
+
+  .profile-link-share-button {
+    flex: 1;
+  }
+}
+
 .public-skeleton {
   overflow: hidden;
   position: relative;
@@ -2185,4 +2283,3 @@ body:has(.modal-backdrop.visible) .top-controls {
     transform: translate3d(0, 0, 0);
   }
 }
-

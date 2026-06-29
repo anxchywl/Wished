@@ -32,7 +32,7 @@ import { useBookedWishesQuery } from "@/features/reservations/hooks";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
 import { extractTgUserIdFromInitData } from "@/lib/telegram/capture-init-data";
-import { decodeWishlistStartParam } from "@/lib/telegram/start-param";
+import { decodeProfileStartParam, decodeWishlistStartParam } from "@/lib/telegram/start-param";
 import { isAuthPending } from "@/stores/auth-store";
 import { clearPersistedCache } from "@/lib/query/cache-persister";
 
@@ -381,6 +381,13 @@ function TelegramDeepLinkHandler() {
         return;
       }
 
+      const publicUsername = decodeProfileStartParam(startParam);
+      if (publicUsername) {
+        window.sessionStorage.removeItem("wished/tgStartParam");
+        setPendingUrl(`/users?profile_public=${encodeURIComponent(publicUsername)}`);
+        return;
+      }
+
       if (startParam.length <= PROFILE_TOKEN_LENGTH) return;
       const token = startParam.slice(0, PROFILE_TOKEN_LENGTH);
       const username = startParam.slice(PROFILE_TOKEN_LENGTH);
@@ -406,6 +413,8 @@ function TelegramDeepLinkHandler() {
     const pendingParams = new URLSearchParams(pendingUrl.split("?")[1] ?? "");
     const alreadyThere =
       current.get("profile")?.toLowerCase() === pendingParams.get("profile")?.toLowerCase() &&
+      current.get("profile_public")?.toLowerCase() === pendingParams.get("profile_public")?.toLowerCase() &&
+      current.get("profile_id") === pendingParams.get("profile_id") &&
       current.get("wishlist") === pendingParams.get("wishlist");
     if (alreadyThere) {
       setPendingUrl(null);

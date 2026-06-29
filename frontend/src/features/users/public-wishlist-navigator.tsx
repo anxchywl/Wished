@@ -9,8 +9,22 @@ import { useReservationStatusQuery, useCreateReservationMutation } from "@/featu
 import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
-import { getUserProfile, getUserProfileById, type UserProfileResponse } from "@/features/users/api";
-import { userQueryKeys, useFollowMutation, useFollowByIdMutation, useUserProfileQuery, useUserProfileByIdQuery, useUserWishlistsByIdQuery } from "@/features/users/hooks";
+import { ProfileLinkShareCard } from "@/features/profile";
+import {
+  getUserProfile,
+  getUserProfileById,
+  getUserProfileByPublicUsername,
+  type UserProfileResponse,
+} from "@/features/users/api";
+import {
+  userQueryKeys,
+  useFollowMutation,
+  useFollowByIdMutation,
+  useUserProfileQuery,
+  useUserProfileByIdQuery,
+  useUserProfileByPublicUsernameQuery,
+  useUserWishlistsByIdQuery,
+} from "@/features/users/hooks";
 import { getWishlist, listUserWishlists } from "@/features/wishlists/api";
 import { getUserWishlistsById } from "@/features/users/api";
 import { wishlistQueryKeys } from "@/features/wishlists/query-keys";
@@ -30,6 +44,7 @@ import { isAuthFailure, isAuthPending, useAuthStore } from "@/stores/auth-store"
 type PublicWishlistNavigatorProps = {
   open: boolean;
   username: string | null;
+  publicUsername?: string | null;
   userId?: string | null;
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
@@ -56,6 +71,7 @@ type NavigationDirection = "forward" | "back";
 export function PublicWishlistNavigator({
   open,
   username,
+  publicUsername,
   userId,
   profileToken,
   initialUser,
@@ -97,12 +113,13 @@ export function PublicWishlistNavigator({
       setGroupGiftActionMode("overview");
       setGroupGiftFocusMode(false);
     }
-  }, [initialWishlistId, initialWishId, open, username, userId]);
+  }, [initialWishlistId, initialWishId, open, username, publicUsername, userId]);
 
-  if (!open || (!username && !userId)) return null;
+  if (!open || (!username && !userId && !publicUsername)) return null;
 
   const activeUserId = userId ?? null;
   const activeUsername = username ? username.trim().replace(/^@/, "") : null;
+  const activePublicUsername = publicUsername ? publicUsername.trim().replace(/^@/, "").toLowerCase() : null;
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
@@ -184,6 +201,7 @@ export function PublicWishlistNavigator({
       return (
         <PublicUserView
           username={activeUsername}
+          publicUsername={activePublicUsername}
           userId={activeUserId}
           profileToken={profileToken}
           initialUser={initialUser}
@@ -318,6 +336,7 @@ export function PublicWishlistNavigator({
 
 type PublicUserViewProps = {
   username: string | null;
+  publicUsername?: string | null;
   userId?: string | null;
   profileToken?: string | null;
   initialUser?: UserProfileResponse | null;
@@ -328,39 +347,64 @@ type PublicUserViewProps = {
 /**
  * show public profile
  */
-function PublicUserView({ username, userId, profileToken, initialUser, onOpenWishlist, onClose }: PublicUserViewProps) {
+function PublicUserView({
+  username,
+  publicUsername,
+  userId,
+  profileToken,
+  initialUser,
+  onOpenWishlist,
+  onClose,
+}: PublicUserViewProps) {
   const accessToken = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
   const profileByIdQuery = useUserProfileByIdQuery(userId ?? null, profileToken);
+  const profileByPublicUsernameQuery = useUserProfileByPublicUsernameQuery(publicUsername ?? null, profileToken);
   const profileByUsernameQuery = useUserProfileQuery(username ?? "", profileToken);
-  const wishlistsByIdQuery = useUserWishlistsByIdQuery(userId ?? null, profileToken);
+  const resolvedProfile = profileByPublicUsernameQuery.data ?? profileByIdQuery.data ?? profileByUsernameQuery.data ?? initialUser;
+  const resolvedUserId = userId ?? (publicUsername ? resolvedProfile?.user_id : null) ?? null;
+  const wishlistsByIdQuery = useUserWishlistsByIdQuery(resolvedUserId, profileToken);
   const wishlistsByUsernameQuery = useUserWishlistsQuery(username ?? "", profileToken);
-  const profileQuery = userId ? profileByIdQuery : profileByUsernameQuery;
-  const wishlistsQuery = userId ? wishlistsByIdQuery : wishlistsByUsernameQuery;
-  const profile = profileQuery.data ?? initialUser;
-  const followByIdMutation = useFollowByIdMutation(userId ?? "", profileToken);
+  const profileQuery = publicUsername
+    ? profileByPublicUsernameQuery
+    : userId
+      ? profileByIdQuery
+      : profileByUsernameQuery;
+  const wishlistsQuery = resolvedUserId ? wishlistsByIdQuery : wishlistsByUsernameQuery;
+  const profile = profileQuery.data ?? resolvedProfile;
+  const followByIdMutation = useFollowByIdMutation(resolvedUserId ?? "", profileToken);
   const followByUsernameMutation = useFollowMutation(username ?? "", profileToken);
-  const followMutation = userId ? followByIdMutation : followByUsernameMutation;
+  const followMutation = resolvedUserId ? followByIdMutation : followByUsernameMutation;
   const wishlists = wishlistsQuery.data?.items ?? [];
   const { t } = useTranslation();
 
   useEffect(() => {
     if (!accessToken) return;
-    if (userId) {
+    if (publicUsername) {
       const profileKey = profileToken
-        ? ([...userQueryKeys.profileById(userId), profileToken] as const)
-        : userQueryKeys.profileById(userId);
-      const wishlistsKey = profileToken
-        ? ([...userQueryKeys.wishlistsById(userId), profileToken] as const)
-        : userQueryKeys.wishlistsById(userId);
+        ? ([...userQueryKeys.profileByPublicUsername(publicUsername), profileToken] as const)
+        : userQueryKeys.profileByPublicUsername(publicUsername);
       queryClient.prefetchQuery({
         queryKey: profileKey,
-        queryFn: () => getUserProfileById(accessToken, userId, profileToken),
+        queryFn: () => getUserProfileByPublicUsername(accessToken, publicUsername, profileToken),
+        staleTime: 5 * 60 * 1000,
+      });
+    }
+    if (resolvedUserId) {
+      const profileKey = profileToken
+        ? ([...userQueryKeys.profileById(resolvedUserId), profileToken] as const)
+        : userQueryKeys.profileById(resolvedUserId);
+      const wishlistsKey = profileToken
+        ? ([...userQueryKeys.wishlistsById(resolvedUserId), profileToken] as const)
+        : userQueryKeys.wishlistsById(resolvedUserId);
+      queryClient.prefetchQuery({
+        queryKey: profileKey,
+        queryFn: () => getUserProfileById(accessToken, resolvedUserId, profileToken),
         staleTime: 5 * 60 * 1000,
       });
       queryClient.prefetchQuery({
         queryKey: wishlistsKey,
-        queryFn: () => getUserWishlistsById(accessToken, userId, profileToken),
+        queryFn: () => getUserWishlistsById(accessToken, resolvedUserId, profileToken),
         staleTime: 2 * 60 * 1000,
       });
     } else if (username) {
@@ -381,7 +425,7 @@ function PublicUserView({ username, userId, profileToken, initialUser, onOpenWis
         staleTime: 2 * 60 * 1000,
       });
     }
-  }, [accessToken, profileToken, queryClient, username, userId]);
+  }, [accessToken, profileToken, publicUsername, queryClient, resolvedUserId, username]);
 
   function handleWishlistHover(wishlistId: string) {
     if (!accessToken) return;
@@ -476,6 +520,11 @@ function PublicUserView({ username, userId, profileToken, initialUser, onOpenWis
         </div>
       ) : null}
 
+      <ProfileLinkShareCard
+        publicUsername={profile?.public_username}
+        publicProfileUrl={profile?.public_profile_url}
+        telegramStartappUrl={profile?.telegram_startapp_url}
+      />
 
       <section className="flex flex-col mt-1 px-2">
         <div className="px-4 py-3 border-b-2 border-border">

@@ -6,7 +6,7 @@ from app.db.models.fulfilled_wishes import FulfilledWish
 from app.db.models.group_gifts import GroupGift, GroupGiftApproval, GroupGiftContribution
 from app.db.models.reservations import BookedWishOrder, Reservation
 from app.db.models.user_moderation_log import UserModerationLog
-from app.db.models.users import User
+from app.db.models.users import ProfileUsernameAlias, User
 from app.db.models.wish_images import WishImage
 from app.db.models.wishes import Wish
 from app.db.models.wishlists import Wishlist
@@ -20,6 +20,7 @@ __all__ = [
     "GroupGift",
     "GroupGiftApproval",
     "GroupGiftContribution",
+    "ProfileUsernameAlias",
     "RefreshToken",
     "Reservation",
     "User",

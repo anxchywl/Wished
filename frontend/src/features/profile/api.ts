@@ -5,6 +5,9 @@ export type ProfileResponse = {
   id: string;
   telegram_id: number;
   username: string | null;
+  public_username: string | null;
+  public_profile_url: string | null;
+  telegram_startapp_url: string | null;
   first_name: string | null;
   last_name: string | null;
   photo_url: string | null;

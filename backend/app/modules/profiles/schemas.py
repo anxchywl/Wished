@@ -27,6 +27,9 @@ class ProfileResponse(BaseModel):
     id: UUID
     telegram_id: int
     username: str | None
+    public_username: str | None
+    public_profile_url: str | None
+    telegram_startapp_url: str | None
     first_name: str | None
     last_name: str | None
     photo_url: str | None

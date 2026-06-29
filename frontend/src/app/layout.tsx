@@ -72,6 +72,17 @@ const captureTelegramInitDataScript = `
         }
       } catch (e2) {}
     }
+    if (effectiveStartParam && effectiveStartParam.indexOf("p_") === 0) {
+      try {
+        var publicUsername = effectiveStartParam.slice(2).toLowerCase();
+        if (/^[a-z0-9_]{3,32}$/.test(publicUsername)) {
+          var currentPublicSearch = new URLSearchParams(window.location.search);
+          if (currentPublicSearch.get("profile_public") !== publicUsername) {
+            window.history.replaceState(null, "", "/users?profile_public=" + encodeURIComponent(publicUsername));
+          }
+        }
+      } catch (e3) {}
+    }
   } catch (e) {}
 })();
 `;

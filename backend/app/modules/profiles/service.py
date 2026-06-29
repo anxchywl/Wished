@@ -6,6 +6,7 @@ from app.modules.profiles.schemas import (
     ProfileResponse,
     ProfileUpdateRequest,
 )
+from app.modules.users.service import build_public_profile_url, build_telegram_startapp_url
 
 
 def _supported_wishlist_visibility(value: str) -> str:
@@ -20,6 +21,9 @@ def build_profile_response(user: User) -> ProfileResponse:
         id=user.id,
         telegram_id=user.telegram_id,
         username=user.username,
+        public_username=getattr(user, "public_username", None),
+        public_profile_url=build_public_profile_url(user),
+        telegram_startapp_url=build_telegram_startapp_url(user),
         first_name=user.first_name,
         last_name=user.last_name,
         photo_url=user.photo_url,
