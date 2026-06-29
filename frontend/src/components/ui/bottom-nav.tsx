@@ -3,8 +3,50 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "@/lib/i18n/useTranslation";
+
+function useScrollDirection() {
+  const [direction, setDirection] = useState<"up" | "down">("up");
+  const directionRef = useRef<"up" | "down">("up");
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    const updateScrollDirection = () => {
+      const scrollY = window.scrollY;
+      
+      if (Math.abs(scrollY - lastScrollY) < 15) {
+        ticking = false;
+        return;
+      }
+      
+      let nextDirection: "up" | "down" = scrollY > lastScrollY ? "down" : "up";
+      if (scrollY <= 0) nextDirection = "up"; // always show at top
+      
+      if (nextDirection !== directionRef.current) {
+        directionRef.current = nextDirection;
+        setDirection(nextDirection);
+      }
+      
+      lastScrollY = scrollY > 0 ? scrollY : 0;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateScrollDirection);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return direction;
+}
 
 /**
  * bottom navigation bar
@@ -15,6 +57,7 @@ export function BottomNav() {
   const { t } = useTranslation();
   const navRef = useRef<HTMLElement>(null);
   const maxViewportHeightRef = useRef(0);
+  const scrollDirection = useScrollDirection();
 
   const tabs = useMemo(() => [
     {
@@ -90,7 +133,15 @@ export function BottomNav() {
   }, []);
 
   return (
-    <nav ref={navRef} className="bottom-nav" aria-label="main navigation">
+    <nav
+      ref={navRef}
+      className="bottom-nav"
+      aria-label="main navigation"
+      style={{
+        transform: `translateY(calc(var(--keyboard-offset, 0px) + ${scrollDirection === "down" ? "120px" : "0px"}))`,
+        transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+      }}
+    >
       {tabs.map((tab) => {
         const isActive =
           pathname === tab.href ||

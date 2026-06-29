@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UIControls } from "@/components/ui/controls";
 import { BirthdayPicker } from "@/components/ui/birthday-picker";
@@ -23,48 +23,6 @@ function getTelegramPhotoUrl(): string | null {
   }
 }
 
-function useScrollDirection() {
-  const [direction, setDirection] = useState<"up" | "down">("up");
-  const directionRef = useRef<"up" | "down">("up");
-
-  useEffect(() => {
-    let lastScrollY = window.scrollY;
-    let ticking = false;
-
-    const updateScrollDirection = () => {
-      const scrollY = window.scrollY;
-      
-      if (Math.abs(scrollY - lastScrollY) < 15) {
-        ticking = false;
-        return;
-      }
-      
-      let nextDirection: "up" | "down" = scrollY > lastScrollY ? "down" : "up";
-      if (scrollY <= 0) nextDirection = "up"; // always show at top
-      
-      if (nextDirection !== directionRef.current) {
-        directionRef.current = nextDirection;
-        setDirection(nextDirection);
-      }
-      
-      lastScrollY = scrollY > 0 ? scrollY : 0;
-      ticking = false;
-    };
-
-    const onScroll = () => {
-      if (!ticking) {
-        window.requestAnimationFrame(updateScrollDirection);
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  return direction;
-}
-
 type CoverHeaderProps = {
   title: string;
   hideProfile?: boolean;
@@ -85,7 +43,6 @@ export function CoverHeader({ title, hideProfile = false, extraControls }: Cover
   const isAdmin = adminMe?.is_admin === true;
   const [pickerOpen, setPickerOpen] = useState(false);
   const telegramPhotoUrl = getTelegramPhotoUrl();
-  const scrollDirection = useScrollDirection();
 
   // derive display name
   const displayName = profile?.first_name
@@ -136,74 +93,60 @@ export function CoverHeader({ title, hideProfile = false, extraControls }: Cover
           "--fallback-d": coverStyle.d,
         } as React.CSSProperties}
       >
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "calc(60px + env(safe-area-inset-top))",
-            zIndex: 40,
-            pointerEvents: "none",
-            transform: scrollDirection === "down" ? "translateY(-100%)" : "translateY(0)",
-            transition: "transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
-        >
-          <UIControls prepend={extraControls} />
+        <UIControls prepend={extraControls} />
 
-          {/* profile row */}
-          {profile && !hideProfile && (
-            <div className="cover-profile-row" style={{ pointerEvents: "auto" }}>
-              {/* avatar — clickable only for admins */}
+        {/* profile row */}
+        {profile && !hideProfile && (
+          <div className="cover-profile-row">
+            {/* avatar — clickable only for admins */}
+            <button
+              type="button"
+              className="cover-avatar"
+              onClick={isAdmin ? () => router.push("/admin") : undefined}
+              disabled={!isAdmin}
+              aria-label={isAdmin ? "Admin panel" : undefined}
+            >
+              {telegramPhotoUrl ? (
+                <>
+                  <img
+                    src={telegramPhotoUrl}
+                    alt={displayName ?? ""}
+                    className="cover-avatar-img"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                      (e.currentTarget.nextElementSibling as HTMLElement | null)?.style &&
+                        ((e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex");
+                    }}
+                  />
+                  <span className="cover-avatar-initials" style={{ display: "none" }}>{initials}</span>
+                </>
+              ) : (
+                <span className="cover-avatar-initials">{initials}</span>
+              )}
+            </button>
+
+            {/* name + birthday */}
+            <div className="cover-profile-meta">
+              <p className="cover-profile-name">
+                {displayName ?? profile.username ?? "—"}
+              </p>
               <button
+                className="cover-birthday-btn"
                 type="button"
-                className="cover-avatar"
-                onClick={isAdmin ? () => router.push("/admin") : undefined}
-                disabled={!isAdmin}
-                aria-label={isAdmin ? "Admin panel" : undefined}
+                onClick={() => setPickerOpen(true)}
+                aria-label="Set birthday"
               >
-                {telegramPhotoUrl ? (
-                  <>
-                    <img
-                      src={telegramPhotoUrl}
-                      alt={displayName ?? ""}
-                      className="cover-avatar-img"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).style.display = "none";
-                        (e.currentTarget.nextElementSibling as HTMLElement | null)?.style &&
-                          ((e.currentTarget.nextElementSibling as HTMLElement).style.display = "flex");
-                      }}
-                    />
-                    <span className="cover-avatar-initials" style={{ display: "none" }}>{initials}</span>
-                  </>
+                {profile.birthday ? (
+                  <span className="cover-birthday-value">
+                    {formatBirthday(profile.birthday)}
+                  </span>
                 ) : (
-                  <span className="cover-avatar-initials">{initials}</span>
+                  <span className="cover-birthday-add">+ {t("addBirthday")}</span>
                 )}
               </button>
-
-              {/* name + birthday */}
-              <div className="cover-profile-meta">
-                <p className="cover-profile-name">
-                  {displayName ?? profile.username ?? "—"}
-                </p>
-                <button
-                  className="cover-birthday-btn"
-                  type="button"
-                  onClick={() => setPickerOpen(true)}
-                  aria-label="Set birthday"
-                >
-                  {profile.birthday ? (
-                    <span className="cover-birthday-value">
-                      {formatBirthday(profile.birthday)}
-                    </span>
-                  ) : (
-                    <span className="cover-birthday-add">+ {t("addBirthday")}</span>
-                  )}
-                </button>
-              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* page title */}
         {title && <h1 className="cover-title">{title}</h1>}
