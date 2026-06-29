@@ -1422,15 +1422,15 @@ html[data-theme="dark"] .modal-sheet {
   justify-content: center;
   min-height: 28px;
   padding: 5px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.96), rgba(16, 185, 129, 0.92));
-  color: #ffffff;
+  background: rgba(220, 252, 231, 0.82);
+  color: rgba(22, 101, 52, 0.86);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1;
   text-align: center;
-  box-shadow: 0 10px 26px rgba(16, 185, 129, 0.28);
+  box-shadow: 0 10px 26px rgba(22, 101, 52, 0.14);
   backdrop-filter: blur(10px);
   pointer-events: none;
 }
