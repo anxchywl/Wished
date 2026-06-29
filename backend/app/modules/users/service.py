@@ -27,7 +27,9 @@ async def get_user_by_id(db: AsyncSession, user_id: UUID, allow_blocked: bool = 
     return user
 
 
-async def get_user_by_username(db: AsyncSession, username: str, allow_blocked: bool = False) -> User:
+async def get_user_by_username(
+    db: AsyncSession, username: str, allow_blocked: bool = False
+) -> User:
     """find user by username; blocked users are treated as not found unless allow_blocked is True"""
     normalized_username = _normalize_username(username)
     result = await db.execute(select(User).where(User.username.ilike(normalized_username)))
