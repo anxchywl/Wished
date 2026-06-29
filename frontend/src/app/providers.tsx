@@ -180,11 +180,20 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     }
   }, [accessToken, initialWishlistsSettled, setAppReady]);
 
+  // synchronously check if all required data is already in cache
+  const isFullyCached = useMemo(() => {
+    if (!wishlistsQuery.isSuccess) return false;
+    const items = wishlistsQuery.data?.items ?? [];
+    const hasAllWishes = items.every(wl => queryClient.getQueryData(wishQueryKeys.list(wl.id)) !== undefined);
+    const hasFollowing = queryClient.getQueryData(userQueryKeys.following(tgUserId)) !== undefined;
+    return hasAllWishes && hasFollowing;
+  }, [wishlistsQuery.isSuccess, wishlistsQuery.data?.items, tgUserId, queryClient]);
+
   // Background-prefetch wish counts + following list so both tabs are instant on first visit
   useEffect(() => {
     if (!accessToken) return;
 
-    if (wishlistsQuery.isSuccess && !initialWishesLoaded) {
+    if (wishlistsQuery.isSuccess && !initialWishesLoaded && !isFullyCached) {
       const items = wishlistsQuery.data?.items ?? [];
       // Use staleTime: Infinity so prefetchQuery resolves immediately if data is
       // already in cache (even stale). This gates the loading screen on "do we
@@ -210,7 +219,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     } else if (wishlistsQuery.isError && !initialWishesLoaded) {
       setInitialWishesLoaded(true);
     }
-  }, [accessToken, tgUserId, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, queryClient]);
+  }, [accessToken, tgUserId, wishlistsQuery.data, wishlistsQuery.isSuccess, wishlistsQuery.isError, initialWishesLoaded, isFullyCached, queryClient]);
 
   // warm sessions initialize synchronously and do not wait for telegram sdk startup.
   // once a session exists (or is synchronously expected), hold the loading screen
@@ -220,7 +229,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   // yet (or vice versa), making the panel pop in after the title.
   // also wait for the per-wishlist wish counts to be prefetched so the rows show
   // their real count instead of "..." popping in after the panel renders.
-  const initialWishlistsReady = initialWishlistsSettled && initialWishesLoaded;
+  const initialWishlistsReady = initialWishlistsSettled && (initialWishesLoaded || isFullyCached);
   const hasSession = Boolean(accessToken) || authStatus === "authenticated";
   const isLoading =
     !gateExpired &&

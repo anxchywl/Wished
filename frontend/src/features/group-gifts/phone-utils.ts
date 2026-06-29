@@ -67,6 +67,12 @@ export function formatPhoneInput(raw: string): string {
   return "+" + digits;
 }
 
+export function formatAccountInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  const groups = digits.match(/.{1,4}/g);
+  return groups ? groups.join(" ") : digits;
+}
+
 export function validatePhoneOrCredentials(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
@@ -74,5 +80,6 @@ export function validatePhoneOrCredentials(value: string): boolean {
     const digits = v.replace(/[\s\-()+]/g, "").replace(/^\+/, "");
     return digits.length >= 7 && digits.length <= 15 && /^\d+$/.test(digits);
   }
-  return CREDENTIALS_RE.test(v);
+  const noSpaces = v.replace(/\s+/g, "");
+  return CREDENTIALS_RE.test(noSpaces);
 }

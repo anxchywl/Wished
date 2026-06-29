@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api/api-client";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { useCreateGroupGiftMutation } from "@/features/group-gifts/hooks";
 import type { GroupGiftCreatePayload } from "@/features/group-gifts/api";
-import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
+import { isPhoneMode, formatPhoneInput, formatAccountInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
 import { useModalFocusMode } from "@/features/wishlists/use-modal-focus-mode";
 
 type Props = {
@@ -197,7 +197,7 @@ export function CreateGroupGiftContent({
 
             <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("phone")}`}>
               <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-                {isPhoneMode(paymentPhone) ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
+                {!paymentPhone.trim() ? t("credentialsOrPhoneLabel") : (isPhoneMode(paymentPhone) ? t("paymentPhoneLabel") : t("paymentAccountLabel"))}
               </label>
               <input
                 inputMode={isPhoneMode(paymentPhone) ? "tel" : "text"}
@@ -208,7 +208,11 @@ export function CreateGroupGiftContent({
                 value={paymentPhone}
                 onChange={(e) => {
                   const raw = e.currentTarget.value.replace(/[^0-9+\s\-()]/g, "");
-                  setPaymentPhone(isPhoneMode(paymentPhone) || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
+                  if (raw.startsWith("+")) {
+                    setPaymentPhone(formatPhoneInput(raw));
+                  } else {
+                    setPaymentPhone(raw ? formatAccountInput(raw) : "");
+                  }
                   setPhoneError("");
                 }}
                 onBlur={() => { handlePhoneBlur(); focusMode.onFieldBlur(); }}

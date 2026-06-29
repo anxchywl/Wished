@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useTranslation } from "@/lib/i18n/useTranslation";
-import { isPhoneMode, formatPhoneInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
+import { isPhoneMode, formatPhoneInput, formatAccountInput, validatePhoneOrCredentials } from "@/features/group-gifts/phone-utils";
 import { useModalFocusMode } from "@/features/wishlists/use-modal-focus-mode";
 import {
   useGroupGiftQuery,
@@ -939,7 +939,7 @@ export function ViewGroupGiftContent({
         </div>
         <div className={`flex flex-col gap-1.5 ${focusMode.sectionClass("phone")}`}>
           <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider">
-            {phoneMode ? t("paymentPhoneLabel") : t("credentialsOrPhoneLabel")}
+            {!paymentPhone.trim() ? t("credentialsOrPhoneLabel") : (phoneMode ? t("paymentPhoneLabel") : t("paymentAccountLabel"))}
           </label>
           <input
             inputMode={phoneMode ? "tel" : "text"}
@@ -956,7 +956,11 @@ export function ViewGroupGiftContent({
             }}
             onChange={(e) => {
               const raw = e.currentTarget.value.replace(/[^0-9+\s\-()]/g, "");
-              setPaymentPhone(phoneMode || raw.startsWith("+") ? formatPhoneInput(raw) : raw);
+              if (raw.startsWith("+")) {
+                setPaymentPhone(formatPhoneInput(raw));
+              } else {
+                setPaymentPhone(raw ? formatAccountInput(raw) : "");
+              }
               setPaymentPhoneError("");
             }}
             {...focusMode.fieldFocusProps("phone")}
