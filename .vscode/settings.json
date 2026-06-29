@@ -1,8 +1,0 @@
-{
-    "chat.tools.terminal.autoApprove": {
-        "/^node -e \"const sdk=require\\('\\./node_modules/@telegram-apps/sdk-react/dist/index\\.js'\\); \\['init','retrieveLaunchParams','isMiniAppSupported','isMiniAppMounted','isMiniAppActive','initDataRaw','initData','initDataUser'\\]\\.forEach\\(k=>console\\.log\\(k, typeof sdk\\[k\\]\\)\\);\"$/": {
-            "approve": true,
-            "matchCommandLine": true
-        }
-    }
-}

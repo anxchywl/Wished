@@ -26,5 +26,6 @@ backend/app.db
 
 .claude/
 *.pid
+.vscode/
 
 

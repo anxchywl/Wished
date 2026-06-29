@@ -27,7 +27,6 @@ DEPLOY_SCRIPTS = [
 
 INFRA_FILES = [
     ROOT / "infra" / "backup" / "Dockerfile",
-    ROOT / "DISASTER_RECOVERY.md",
 ]
 
 

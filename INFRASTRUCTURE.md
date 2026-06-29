@@ -1,4 +1,6 @@
-# Wished Infrastructure Architecture
+# Wished Infrastructure & Architecture
+
+Technical reference for developers and operators. Product rules and business logic live in [PRODUCT.md](./PRODUCT.md). Agent coding rules live in [AGENTS.md](./AGENTS.md).
 
 ## 1. Services
 
@@ -16,49 +18,19 @@ Wished infrastructure is composed of the following services:
 
 ## 2. Containers
 
-Expected container responsibilities:
+Development (`docker-compose.yml`):
 
-- **frontend**
-  - Runs the Next.js application.
-  - Serves Telegram Mini App frontend routes.
-  - Communicates with the backend API through configured public or internal API URLs.
+- **backend** — FastAPI application; validates Telegram init data, exposes API, connects to PostgreSQL, Redis, and MinIO.
+- **caddy** — Reverse proxy; routes public HTTP/HTTPS traffic to frontend and backend, handles TLS.
+- **postgres** — PostgreSQL; primary durable store, dedicated persistent volume.
+- **redis** — Redis; cache, rate limiting, ephemeral coordination.
+- **minio** — MinIO object storage; stores uploaded media, dedicated persistent volume.
+- **bot** — Telegram bot worker; runs background tasks and bot interactions.
 
-- **backend**
-  - Runs the FastAPI application.
-  - Validates Telegram Mini App init data.
-  - Exposes API endpoints for the frontend.
-  - Connects to PostgreSQL, Redis, and MinIO.
+Production additions (`docker-compose.prod.yml`):
 
-- **postgres**
-  - Runs PostgreSQL.
-  - Stores persistent relational data.
-  - Uses a dedicated persistent volume.
-
-- **redis**
-  - Runs Redis.
-  - Stores cache and ephemeral coordination data.
-  - May use persistence depending on production requirements.
-
-- **minio**
-  - Runs MinIO object storage.
-  - Stores uploaded media and object assets.
-  - Uses a dedicated persistent volume.
-
-- **minio-init**
-  - Optional one-time setup container.
-  - Creates required buckets and storage policies.
-  - Runs only during initialization or deployment setup.
-
-- **proxy**
-  - Terminates or forwards HTTP traffic depending on deployment model.
-  - Routes public requests to frontend and backend services.
-  - Handles TLS in self-hosted production setups unless TLS is terminated upstream.
-
-- **backup**
-  - Runs scheduled backup jobs.
-  - Exports PostgreSQL backups.
-  - Syncs MinIO bucket data or snapshots object storage.
-  - Sends backups to external storage.
+- **minio-init** — One-time setup container; creates required MinIO buckets and policies.
+- **backup** — Scheduled backup jobs; exports PostgreSQL and MinIO data to external storage.
 
 ## 3. Network Layout
 
@@ -92,74 +64,9 @@ Traffic flow:
 
 ## 4. Environment Variables
 
-Environment variables should be grouped by responsibility.
+See [`.env.example`](./.env.example) — authoritative reference for all variables, their defaults, and inline documentation.
 
-### Frontend
-
-- Public frontend URL.
-- Public backend API URL.
-- Telegram Mini App identifier or public configuration.
-- Runtime environment.
-- Feature flags, if used.
-
-### Backend
-
-- Backend public URL.
-- Allowed frontend origins.
-- Runtime environment.
-- Application secret.
-- Telegram bot token.
-- Telegram init data validation configuration.
-- Database connection settings.
-- Redis connection settings.
-- MinIO connection settings.
-- Logging level.
-- Rate limit configuration, if used.
-
-### PostgreSQL
-
-- Database name.
-- Database user.
-- Database password.
-- Database host.
-- Database port.
-- Database connection URL.
-
-### Redis
-
-- Redis host.
-- Redis port.
-- Redis password, if enabled.
-- Redis connection URL.
-- Redis persistence mode, if configured.
-
-### MinIO
-
-- MinIO endpoint.
-- MinIO public endpoint, if different.
-- Access key.
-- Secret key.
-- Bucket names.
-- Region, if required by S3-compatible clients.
-- Presigned URL expiration settings.
-
-### Proxy
-
-- Public domain.
-- TLS certificate configuration.
-- Frontend upstream.
-- Backend upstream.
-- Request size limits.
-- Timeout settings.
-
-### Backup
-
-- Backup schedule.
-- Backup retention period.
-- Backup destination.
-- Backup encryption key or credentials.
-- PostgreSQL backup configuration.
-- MinIO backup configuration.
+Copy it to `.env` and fill in the required values before running locally.
 
 ## 5. Storage Structure
 
@@ -331,4 +238,256 @@ Production requirements:
 - Define a disaster recovery process for data restoration.
 
 Production deployment topology may start as a single Docker Compose host for early-stage operation, but should be designed so PostgreSQL, Redis, object storage, and application services can later be migrated to managed or independently scaled infrastructure.
+
+---
+
+## Application Topology
+
+Service composition and data flows for the running system. For code-level module structure, file paths, and data flow through the codebase, see [AGENTS.md](./AGENTS.md).
+
+### System Diagram
+
+```mermaid
+flowchart LR
+  TG["Telegram Mini App"] --> FE["Next.js Frontend"]
+  FE --> API["FastAPI Backend"]
+
+  API --> AUTH["Auth Module"]
+  API --> PROFILE["Profile Module"]
+  API --> DISCOVERY["Discovery / Subscriptions"]
+  API --> WISH["Wishlists / Wishes"]
+  API --> RSV["Reservations"]
+  API --> NOTIF["Notifications"]
+  API --> MEDIA["Media Module"]
+  API --> POLICY["Authorization / Policy"]
+
+  AUTH --> PG["PostgreSQL"]
+  PROFILE --> PG
+  DISCOVERY --> PG
+  WISH --> PG
+  RSV --> PG
+  NOTIF --> PG
+  MEDIA --> PG
+
+  API --> REDIS["Redis"]
+  NOTIF --> REDIS
+  MEDIA --> MINIO["MinIO"]
+
+  REDIS --> WORKER["Background Worker"]
+  WORKER --> NOTIF
+  WORKER --> MEDIA
+```
+
+---
+
+## Scaling Strategy
+
+Backend scaling path:
+
+1. Single backend container.
+2. Multiple backend replicas behind a proxy.
+3. Separate worker replicas for notifications and media tasks.
+4. PostgreSQL read replicas for read-heavy workloads.
+5. Extract independent services only after module-specific scaling pressure is proven.
+
+Database scaling priorities:
+
+- Transactional reservation creation.
+- Constraint-backed prevention of duplicate active reservations.
+- Indexed ownership lookups.
+- Indexed notification recipient and read-state queries.
+- Pagination for unbounded lists.
+
+Redis may support cache entries, rate limiting, shared sessions, background job queues, and short-lived coordination. Redis must not be the source of truth for durable business state.
+
+MinIO scaling path:
+
+1. Single local or MVP instance.
+2. Persistent volume-backed deployment.
+3. Lifecycle cleanup for abandoned uploads.
+4. Distributed MinIO or managed S3-compatible storage.
+5. CDN integration for media delivery if traffic requires it.
+
+Future event reliability pattern (outbox):
+
+1. Write domain state and an event outbox record in the same PostgreSQL transaction.
+2. Worker reads unprocessed outbox records and processes events idempotently.
+3. Worker marks events as processed; failed events are retried or dead-lettered.
+
+---
+
+## Repository Structure
+
+```text
+wished/
+  README.md
+  AGENTS.md
+  INFRASTRUCTURE.md
+  Makefile
+  docker-compose.yml
+  docker-compose.prod.yml
+  tunnel.sh
+  .env.example
+  frontend/
+    package.json
+    src/
+  backend/
+    pyproject.toml
+    app/
+  infra/
+    docker/
+  scripts/
+  .github/
+```
+
+Do not move files or introduce new top-level directories without a clear project need.
+
+---
+
+## Development Workflow
+
+- Keep product behavior documented before implementing it.
+- Define API contracts before frontend and backend integration work.
+- Wishlist reorder uses `PATCH /wishlists/reorder` with `wishlist_ids`.
+- Wish reorder uses `PATCH /wishlists/{wishlist_id}/wishes/reorder` with `wish_ids`.
+- Keep frontend and backend changes scoped to the related feature.
+- Update documentation when setup, environment variables, or workflows change.
+- Add tests for meaningful backend behavior, frontend workflows, and integration boundaries.
+- Run formatting, linting, type checks, and tests before merging.
+- Do not commit secrets, local environment files, database dumps, or generated storage data.
+- Use pull requests for changes that affect shared behavior.
+- Keep migrations reviewable and tied to explicit data model changes.
+
+---
+
+## Disaster Recovery
+
+### Objectives
+
+| Metric | Target |
+|--------|--------|
+| RPO (Recovery Point Objective) | ≤ 6 hours (backup interval) |
+| RTO (Recovery Time Objective) | ≤ 2 hours |
+
+### Backup Architecture
+
+```
+PostgreSQL ──► pg_dump (custom format, compressed)
+                    │
+                    ▼
+MinIO ──────► mc mirror
+                    │
+                    ▼
+             /var/backups/wished/{timestamp}/    ← host path, NOT a Docker volume
+                    │
+                    ▼ (if BACKUP_EXTERNAL_ENABLED=true)
+             External S3-compatible bucket       ← survives server loss
+```
+
+**Critical design decision:** Backups land on a **host bind-mounted path** (`/var/backups/wished`), not a named Docker volume. This means `docker compose down -v`, `docker volume rm`, and `docker system prune -a` cannot destroy local backups.
+
+### Backup Contents
+
+Each timestamped backup directory contains:
+
+```
+/var/backups/wished/
+└── 2026-06-22_12-00/
+    ├── postgres.dump       pg_dump custom format, compressed
+    ├── manifest.json       metadata for verification
+    └── minio/
+        ├── wished-media/   user-uploaded images
+        └── wished-system/  system objects
+```
+
+### Common Failure Scenarios
+
+**`docker compose down -v` run accidentally**
+Impact: all named Docker volumes deleted. Local backups in `/var/backups/wished` survive (host path). Proceed to full restore below.
+
+**Server lost / disk failure**
+Impact: everything gone including local backups. Requires `BACKUP_EXTERNAL_ENABLED=true`. Copy the latest backup from external S3 to `/var/backups/wished/` on the new server, then restore.
+
+**Accidental data deletion (application level)**
+Restore from the last backup taken before the deletion. RPO = backup interval.
+
+**Bad migration applied**
+Stop all application containers immediately, restore from the last pre-migration backup, fix the migration before re-deploying.
+
+### Full Restore Procedure
+
+**Prerequisites:** server with Docker + Compose, valid backup in `/var/backups/wished/`, production `.env`.
+
+```bash
+# 1 — stop app services (do NOT use down -v)
+docker compose -f docker-compose.prod.yml stop backend frontend bot caddy
+
+# 2 — verify backup
+docker compose -f docker-compose.prod.yml run --rm backup verify-backup
+
+# 3 — restore PostgreSQL + MinIO (prompts for confirmation)
+docker compose -f docker-compose.prod.yml run --rm backup restore latest
+# or: ... restore 2026-06-22_12-00
+
+# 4 — run pending migrations if restoring from an older backup
+docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
+
+# 5 — restart all services
+bash scripts/deploy.sh
+
+# 6 — verify health
+docker compose -f docker-compose.prod.yml ps
+curl -f https://your-domain/api/v1/health
+```
+
+### Restore from External Storage
+
+```bash
+mc alias set external https://s3.example.com ACCESS_KEY SECRET_KEY
+mc mirror external/wished-backups/2026-06-22_12-00/ /var/backups/wished/2026-06-22_12-00/
+# then proceed from step 2 above
+```
+
+### Routine Backup Verification
+
+Run weekly or after any infrastructure change:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm backup verify-backup
+```
+
+Checks: recent backup exists, PostgreSQL dump is structurally valid, backup age is within expected interval.
+
+### Safe Deployment
+
+Always use the deployment script — it never removes volumes:
+
+```bash
+bash scripts/deploy.sh
+```
+
+Never run:
+```bash
+docker compose down -v          # destroys all volumes
+docker volume rm wished_*       # destroys named volumes
+docker system prune -a -f       # destroys everything including volumes
+```
+
+### Migration Safety
+
+Before applying migrations to production:
+
+```bash
+bash scripts/check-migrations.sh
+```
+
+Scans for `drop_table`, `drop_column`, `TRUNCATE`, and mass `DELETE`. Exits non-zero unless `FORCE_DESTRUCTIVE=true`.
+
+### Contacts
+
+| Role | Contact |
+|------|---------|
+| On-call engineer | — |
+| Database owner | — |
+| Infrastructure owner | — |
 

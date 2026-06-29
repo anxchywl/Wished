@@ -1,10 +1,80 @@
-# AGENTS.md
-
-# Wished AI Coding Agent Rules
+# Wished — AI Coding Agent Rules
 
 Mandatory rules for AI coding agents working on Wished.
-
 These rules are strict. If a required detail is missing, stop and ask before changing code.
+
+**Sources of truth** (read docs before code):
+- Product rules and business logic: `PRODUCT.md`
+- Infrastructure: `INFRASTRUCTURE.md`
+- This file: agent rules (mandatory)
+
+---
+
+## Architecture
+
+### Backend: `backend/app/`
+
+```
+api/v1/{feature}/router.py  →  modules/{feature}/service.py  →  modules/{feature}/schemas.py
+                                              ↓
+                                    db/repositories/  →  db/models/  →  db/migrations/
+
+core/config/      settings and env
+core/security/    JWT, tokens
+core/errors/      error handling patterns
+integrations/     redis, minio, telegram
+modules/          feature business logic (auth, wishlists, wishes, reservations, …)
+workers/          background tasks (bot.py)
+```
+
+### Frontend: `frontend/src/`
+
+```
+app/{route}/page.tsx          Next.js routes
+features/{feature}/
+  api.ts                      fetch calls
+  hooks.ts                    TanStack Query hooks
+  *-manager.tsx               page-level components
+stores/                       Zustand — local client state only
+lib/i18n/dict.ts              all user-facing strings
+lib/telegram/                 Telegram SDK wrappers
+```
+
+Data flow: `Route → Component → TanStack Query hook → API client → Backend`
+
+---
+
+## Domain Invariants
+
+| Domain | Invariant |
+|---|---|
+| Auth | Telegram initData validated backend-side; `core/security/jwt.py` issues tokens |
+| Wishlists | Owner-only writes; visibility enforced at service layer |
+| Wishes | active → completed / archived / deleted; reserved wish has side effects on delete |
+| Reservations | One active per wish; DB transaction; owner never sees reserver info |
+| Group Gifts | One per wish; organizer controls payment details and confirms transfers; `modules/group_gifts/` |
+| Discovery | Follow model: `db/models/follows.py`; privacy enforced server-side |
+| Notifications | Never leak reservation metadata to wish owner |
+| Media | MinIO stores bytes; PostgreSQL owns metadata and attachment state |
+
+---
+
+## Pre-Implementation Checklist
+
+Before implementing a non-trivial task, state:
+
+1. **Docs reviewed** — which files you read
+2. **Affected files** — exact paths
+3. **Edge cases** — cross-check with `PRODUCT.md §7`
+4. **Ordered plan**
+
+Wait for approval on large changes before writing code.
+
+---
+
+## Skip These
+
+`node_modules/`, `.next/`, `__pycache__/`, lock files, migration files (unless changing schema), unrelated features.
 
 ---
 
@@ -209,3 +279,16 @@ Bad: `upv`
 - TODO without an issue reference
 - AI-generated banners
 - Large comment blocks
+
+---
+
+## Security Checklist
+
+Run before marking any task complete:
+
+- [ ] No secrets in code, comments, or logs
+- [ ] All protected endpoints verify ownership and auth
+- [ ] Reservation response excludes owner-prohibited fields
+- [ ] Input validated at API boundary (`api/v1/` routers)
+- [ ] No CORS, cookie, or session rules weakened
+- [ ] Telegram bot token not accessible to frontend or logged
