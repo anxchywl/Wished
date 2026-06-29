@@ -1507,7 +1507,7 @@ function EditWishlistModal({
             </div>
           </div>
 
-          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-2 pt-2 relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-3 pt-3 relative overflow-hidden`}>
             <div
               className={`modal-focus-done modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming
@@ -1863,7 +1863,7 @@ function CreateWishModal({ open, onClose, onCreate, isPending }: CreateWishModal
                   </div>
                 </div>
 
-                <div className="modal-focus-footer border-t border-border mt-2 pt-2 relative overflow-hidden">
+                <div className="modal-focus-footer border-t border-border mt-3 pt-3 relative overflow-hidden">
                   <div
                     className={`modal-focus-done modal-footer-transition ${
                       focusMode.isFocusMode
@@ -2282,7 +2282,7 @@ function EditWishModal({
           </div>
 
 
-          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-2 pt-2 relative overflow-hidden`}>
+          <div className={`modal-focus-footer ${deleteConfirming ? "" : "border-t border-border"} mt-3 pt-3 relative overflow-hidden`}>
             <div
               className={`modal-focus-done modal-footer-transition ${
                 focusMode.isFocusMode && !deleteConfirming

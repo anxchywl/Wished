@@ -14,6 +14,8 @@ import {
 } from "./hooks";
 import type { AdminUserItem, AdminWishlistItem, AdminWishItem, AuditLogItem } from "./api";
 import { finalizeTextInput, normalizeTextInput } from "@/lib/forms/input-normalize";
+import { useModalFocusMode } from "@/features/wishlists/use-modal-focus-mode";
+
 
 type Tab = "dashboard" | "users" | "content" | "logs";
 
@@ -161,12 +163,12 @@ function ModerationDialog({
   const blockMutation = useBlockUser(searchQuery);
   const unblockMutation = useUnblockUser(searchQuery);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const focusMode = useModalFocusMode();
 
   useEffect(() => {
     if (dialog) {
       setReason("");
       setReasonError(false);
-      window.setTimeout(() => inputRef.current?.focus(), 60);
     }
   }, [dialog]);
 
@@ -205,19 +207,19 @@ function ModerationDialog({
       style={{ zIndex: 9000 }}
     >
       <div
-        className={`modal-sheet ${dialog ? "visible" : ""}`}
+        className={`modal-sheet ${dialog ? "visible" : ""} ${focusMode.isFocusMode ? "keyboard-focus-mode" : ""} ${focusMode.isSwitching ? "keyboard-switching-mode" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-handle" />
-        <h3 className="modal-title font-bold text-base mb-3 text-center">
+        <h3 className={`modal-title font-bold text-base mb-3 text-center ${focusMode.sectionClass("titleText")}`}>
           {isBlock ? t("adminBlockConfirmTitle") : t("adminUnblockConfirmTitle")} {name}
         </h3>
         
         <div className="public-nav-viewport" style={{ maxHeight: "none", overflow: "visible", padding: 0 }}>
-          <div className="public-nav-frame public-nav-enter-forward flex flex-col gap-3">
+          <div className="public-nav-frame modal-slide-up flex flex-col gap-3">
             
             {isBlock && (
-              <div className="flex flex-col gap-1 mt-2">
+              <div className={`flex flex-col gap-1 mt-2 ${focusMode.sectionClass("reason")}`}>
                 <label className="text-[10px] font-extrabold text-muted uppercase tracking-wider mb-1">
                   {t("adminBlockReasonLabel")}
                 </label>
@@ -230,10 +232,12 @@ function ModerationDialog({
                   }}
                   onBlur={() => {
                     setReason((current) => finalizeTextInput(current, 500));
+                    focusMode.onFieldBlur();
                   }}
                   placeholder={t("adminBlockReasonPlaceholder")}
                   className={`min-h-20 max-h-28 rounded-xl border bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none ${reasonError ? 'border-destructive' : 'border-border'}`}
                   maxLength={500}
+                  {...focusMode.fieldFocusProps("reason")}
                 />
                 {reasonError && (
                   <span className="text-xs text-destructive mt-1">
@@ -243,25 +247,48 @@ function ModerationDialog({
               </div>
             )}
             
-            <div className="flex gap-2 mt-4 pt-4 border-t border-border">
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={onClose}
-                className="flex-1 rounded-xl bg-muted/10 hover:bg-muted/20 text-muted h-10 text-sm font-medium transition-colors"
+            <div className="modal-focus-footer border-t border-border mt-3 pt-3 relative overflow-hidden">
+              <div
+                className={`modal-focus-done modal-footer-transition ${
+                  focusMode.isFocusMode
+                    ? "opacity-100 max-h-12 scale-100"
+                    : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+                }`}
               >
-                {t("adminCancel")}
-              </button>
-              <button
-                type="button"
-                disabled={isPending}
-                onClick={handleConfirm}
-                className={`flex-1 rounded-xl h-10 text-sm font-medium text-white transition-colors ${
-                  isPending ? "opacity-60 cursor-not-allowed" : ""
-                } ${isBlock ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"}`}
+                <button
+                  type="button"
+                  className="w-full rounded-xl bg-primary hover:bg-primary/90 text-white h-10 text-sm font-medium transition-colors"
+                  onClick={focusMode.clearFocus}
+                >
+                  {t("done") ?? "Done"}
+                </button>
+              </div>
+              <div
+                className={`flex gap-2 modal-footer-transition ${
+                  !focusMode.isFocusMode
+                    ? "opacity-100 max-h-12 scale-100"
+                    : "opacity-0 max-h-0 scale-95 pointer-events-none overflow-hidden"
+                }`}
               >
-                {t("adminConfirm")}
-              </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={onClose}
+                  className="flex-1 rounded-xl bg-muted/10 hover:bg-muted/20 text-muted h-10 text-sm font-medium transition-colors"
+                >
+                  {t("adminCancel")}
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={handleConfirm}
+                  className={`flex-1 rounded-xl h-10 text-sm font-medium text-white transition-colors ${
+                    isPending ? "opacity-60 cursor-not-allowed" : ""
+                  } ${isBlock ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"}`}
+                >
+                  {t("adminConfirm")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

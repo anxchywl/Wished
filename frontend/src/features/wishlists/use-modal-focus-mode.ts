@@ -97,6 +97,7 @@ export function useModalFocusMode() {
 
   return {
     focusedSection,
+    setFocusedSection,
     fieldFocusProps: (section: string) => ({
       "data-active-section": focusedSection === section ? "true" : undefined,
       onFocus: handleFocus(section),
