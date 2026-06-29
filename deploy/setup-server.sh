@@ -120,4 +120,4 @@ if [ -z "${HEARTBEAT}" ]; then
     echo ""
 fi
 
-log "Server setup complete. Run: bash scripts/deploy.sh"
+log "Server setup complete. Run: bash deploy/deploy.sh"

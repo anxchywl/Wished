@@ -6,7 +6,9 @@ import pytest
 from PIL import Image
 
 
-def _make_rgb_image(width: int = 400, height: int = 300, color=(100, 149, 237)) -> bytes:
+def _make_rgb_image(
+    width: int = 400, height: int = 300, color=(100, 149, 237)
+) -> bytes:
     """create a minimal in-memory JPEG for testing"""
     img = Image.new("RGB", (width, height), color=color)
     buf = io.BytesIO()

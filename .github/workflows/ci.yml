@@ -32,13 +32,13 @@ jobs:
           .venv/bin/pip install -e "backend[dev]"
 
       - name: Lint (ruff)
-        run: .venv/bin/ruff check backend/
+        run: .venv/bin/ruff check backend/ tests/backend/
 
       - name: Formatting check
-        run: .venv/bin/ruff format --check backend/
+        run: .venv/bin/ruff format --check backend/ tests/backend/
 
       - name: Run tests
-        run: .venv/bin/pytest backend/tests/ --cov=backend/app --cov-report=term-missing:skip-covered --cov-fail-under=55 -q
+        run: .venv/bin/pytest tests/backend/ --cov=backend/app --cov-report=term-missing:skip-covered --cov-fail-under=55 -q
 
   migration-safety:
     name: Migration Safety Check
@@ -91,4 +91,4 @@ jobs:
             cd ${{ secrets.SSH_PATH }}
             git stash push --include-untracked -m "pre-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
             git pull --ff-only
-            bash scripts/deploy.sh
+            bash deploy/deploy.sh

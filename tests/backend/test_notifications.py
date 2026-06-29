@@ -163,7 +163,11 @@ async def test_handle_followed_sends_notification() -> None:
     event_id = str(uuid4())
 
     follower = SimpleNamespace(
-        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+        id=follower_id,
+        first_name="Alice",
+        last_name=None,
+        username="alice",
+        language_code="en",
     )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
@@ -198,7 +202,11 @@ async def test_handle_followed_skips_duplicate() -> None:
     followed_id = uuid4()
 
     follower = SimpleNamespace(
-        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+        id=follower_id,
+        first_name="Alice",
+        last_name=None,
+        username="alice",
+        language_code="en",
     )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
@@ -229,7 +237,11 @@ async def test_handle_followed_survives_telegram_failure() -> None:
     followed_id = uuid4()
 
     follower = SimpleNamespace(
-        id=follower_id, first_name="Alice", last_name=None, username="alice", language_code="en"
+        id=follower_id,
+        first_name="Alice",
+        last_name=None,
+        username="alice",
+        language_code="en",
     )
     followed = SimpleNamespace(id=followed_id, telegram_id=999, language_code="en")
 
@@ -289,9 +301,15 @@ async def test_handle_wishlist_created_notifies_followers() -> None:
     follower_tg_id = 777
 
     owner = SimpleNamespace(
-        id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en"
+        id=owner_id,
+        first_name="Bob",
+        last_name=None,
+        username="bob",
+        language_code="en",
     )
-    wishlist = SimpleNamespace(id=wishlist_id, title="My Birthday List", visibility="public")
+    wishlist = SimpleNamespace(
+        id=wishlist_id, title="My Birthday List", visibility="public"
+    )
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(follower_tg_id, "en")])
     bot = AsyncMock()
@@ -324,9 +342,15 @@ async def test_handle_wishlist_created_skips_private_wishlist() -> None:
     wishlist_id = uuid4()
 
     owner = SimpleNamespace(
-        id=owner_id, first_name="Bob", last_name=None, username="bob", language_code="en"
+        id=owner_id,
+        first_name="Bob",
+        last_name=None,
+        username="bob",
+        language_code="en",
     )
-    wishlist = SimpleNamespace(id=wishlist_id, title="Secret List", visibility="private")
+    wishlist = SimpleNamespace(
+        id=wishlist_id, title="Secret List", visibility="private"
+    )
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(888, "en")])
     bot = AsyncMock()
@@ -361,7 +385,11 @@ async def test_handle_wish_created_notifies_followers() -> None:
     follower_tg_id = 555
 
     owner = SimpleNamespace(
-        id=owner_id, first_name="Carol", last_name=None, username="carol", language_code="en"
+        id=owner_id,
+        first_name="Carol",
+        last_name=None,
+        username="carol",
+        language_code="en",
     )
     wishlist = SimpleNamespace(id=wishlist_id, title="Wishlist", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="New Sneakers", wishlist_id=wishlist_id)
@@ -408,7 +436,11 @@ async def test_handle_wish_fulfilled_notifies_followers() -> None:
     follower_tg_id = 444
 
     owner = SimpleNamespace(
-        id=owner_id, first_name="Dave", last_name=None, username="dave", language_code="en"
+        id=owner_id,
+        first_name="Dave",
+        last_name=None,
+        username="dave",
+        language_code="en",
     )
     wishlist = SimpleNamespace(id=wishlist_id, title="Dave's List", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="Guitar", wishlist_id=wishlist_id)
@@ -454,7 +486,11 @@ async def test_wish_fulfilled_text_contains_no_reservation_info() -> None:
     wish_id = uuid4()
 
     owner = SimpleNamespace(
-        id=owner_id, first_name="Eve", last_name=None, username="eve", language_code="en"
+        id=owner_id,
+        first_name="Eve",
+        last_name=None,
+        username="eve",
+        language_code="en",
     )
     wishlist = SimpleNamespace(id=wishlist_id, title="List", visibility="public")
     wish = SimpleNamespace(id=wish_id, title="Book", wishlist_id=wishlist_id)
@@ -539,7 +575,9 @@ async def test_worker_dispatches_followed_event() -> None:
 
     with patch.object(worker_module, "_HANDLERS", {"FOLLOWED": fake_handle_followed}):
         task = asyncio.create_task(
-            run_notification_worker(redis, bot, session_factory, "https://app.example.com")
+            run_notification_worker(
+                redis, bot, session_factory, "https://app.example.com"
+            )
         )
         await asyncio.sleep(0)
         task.cancel()

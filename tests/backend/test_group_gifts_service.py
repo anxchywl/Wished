@@ -148,7 +148,9 @@ async def test_owner_cannot_create_group_gift_for_own_wish() -> None:
         )
 
     assert exc.value.status_code == 400
-    assert exc.value.detail == "Wish owner cannot organize a group gift on their own wish"
+    assert (
+        exc.value.detail == "Wish owner cannot organize a group gift on their own wish"
+    )
 
 
 @pytest.mark.asyncio
@@ -239,7 +241,9 @@ async def test_join_rejects_amount_above_remaining_target() -> None:
 
 
 @pytest.mark.asyncio
-async def test_commit_goal_reached_keeps_gift_active_until_organizer_completes() -> None:
+async def test_commit_goal_reached_keeps_gift_active_until_organizer_completes() -> (
+    None
+):
     contributor_id = uuid4()
     organizer_id = uuid4()
     wish_id = uuid4()
@@ -297,7 +301,9 @@ async def test_members_include_creator_and_hide_amounts_from_owner() -> None:
     contribution = _contribution(
         group_gift_id=gift.id,
         contributor_user_id=contributor_id,
-        contributor=_user(user_id=contributor_id, username="friend", first_name="Friend"),
+        contributor=_user(
+            user_id=contributor_id, username="friend", first_name="Friend"
+        ),
         status="confirmed",
     )
     db = FakeDb([FakeResult(gift), FakeResult([contribution])])
@@ -407,7 +413,9 @@ async def test_non_organizer_cannot_update_payment_details() -> None:
 
 
 @pytest.mark.asyncio
-async def test_organizer_can_mark_group_gift_purchased_for_existing_active_wish() -> None:
+async def test_organizer_can_mark_group_gift_purchased_for_existing_active_wish() -> (
+    None
+):
     owner_id = uuid4()
     organizer_id = uuid4()
     wish_id = uuid4()
@@ -500,7 +508,9 @@ async def test_organizer_approval_with_no_contributors_cancels_immediately() -> 
         ]
     )
 
-    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+    result = await toggle_group_gift_approval(
+        db, _user(user_id=organizer_id), gift.id, "cancel"
+    )
 
     # unanimous (1/1) → deletes gift, returns None
     assert result is None
@@ -515,13 +525,17 @@ async def test_organizer_approval_with_contributor_is_partial() -> None:
     gift = _gift_with_approvals(wish_id=wish_id, organizer_user_id=organizer_id)
     gift.collection_type = "commit"
     contributor = _user(user_id=contributor_id)
-    gift.contributions = [_contribution(gift.id, contributor_id, contributor, status="pledged")]
+    gift.contributions = [
+        _contribution(gift.id, contributor_id, contributor, status="pledged")
+    ]
     gift.wish = _wish(wish_id=wish_id, owner_user_id=uuid4())
 
     # single query: gift loaded in-memory; 1 of 2 participants → not unanimous
     db = FakeDb([FakeResult(gift)])
 
-    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+    result = await toggle_group_gift_approval(
+        db, _user(user_id=organizer_id), gift.id, "cancel"
+    )
 
     # not unanimous — gift survives, response returned with 1 cancel approval
     assert result is not None
@@ -543,7 +557,9 @@ async def test_revoking_existing_approval_removes_it() -> None:
 
     db = FakeDb([FakeResult(gift)])
 
-    result = await toggle_group_gift_approval(db, _user(user_id=organizer_id), gift.id, "cancel")
+    result = await toggle_group_gift_approval(
+        db, _user(user_id=organizer_id), gift.id, "cancel"
+    )
 
     assert result is not None
     assert result.cancel_approval_count == 0
@@ -573,7 +589,9 @@ class FakeDb:
         self.committed = False
 
     async def get(self, model, pk):  # noqa: ANN001
-        return SimpleNamespace(group_gift_visibility="anonymous", booking_visibility="anonymous")
+        return SimpleNamespace(
+            group_gift_visibility="anonymous", booking_visibility="anonymous"
+        )
 
     async def refresh(self, value) -> None:  # noqa: ANN001
         if getattr(value, "id", None) is None:

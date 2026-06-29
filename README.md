@@ -70,14 +70,19 @@ Built with Next.js, FastAPI, PostgreSQL, and the Telegram Mini Apps SDK.
 
 ```
 wished/
-  frontend/       Next.js Mini App
   backend/        FastAPI backend
-  infra/          Docker and deployment config
-  scripts/        Utility scripts
+  frontend/       Next.js Mini App
+  docs/           Product and infrastructure documentation
+  scripts/        Local utility scripts
+  infra/          Runtime infrastructure config
+  deploy/         Production deployment scripts
+  docker/         Dockerfiles
+  tests/          Cross-project test suites
+  .github/        CI/CD workflows
 ```
 
 Backend code layout and agent coding rules: [AGENTS.md](./AGENTS.md)  
-Infrastructure, setup, and deployment: [INFRASTRUCTURE.md](./INFRASTRUCTURE.md)
+Infrastructure, setup, and deployment: [docs/INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md)
 
 ---
 
@@ -92,4 +97,4 @@ cp .env.example .env
 docker compose up -d
 ```
 
-See [INFRASTRUCTURE.md](./INFRASTRUCTURE.md) for full setup, environment variables, and production deployment.
+See [docs/INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for full setup, environment variables, and production deployment.

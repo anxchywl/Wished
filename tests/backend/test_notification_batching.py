@@ -56,7 +56,10 @@ async def test_is_batched_returns_true_on_repeat_call():
 
 @pytest.mark.asyncio
 async def test_check_outbound_rate_returns_true_under_limit():
-    from app.modules.notifications.handlers import _check_outbound_rate, OUTBOUND_RATE_LIMIT
+    from app.modules.notifications.handlers import (
+        _check_outbound_rate,
+        OUTBOUND_RATE_LIMIT,
+    )
 
     redis = _make_redis_outbound(OUTBOUND_RATE_LIMIT - 1)
     result = await _check_outbound_rate(redis)
@@ -65,7 +68,10 @@ async def test_check_outbound_rate_returns_true_under_limit():
 
 @pytest.mark.asyncio
 async def test_check_outbound_rate_returns_false_over_limit():
-    from app.modules.notifications.handlers import _check_outbound_rate, OUTBOUND_RATE_LIMIT
+    from app.modules.notifications.handlers import (
+        _check_outbound_rate,
+        OUTBOUND_RATE_LIMIT,
+    )
 
     redis = _make_redis_outbound(OUTBOUND_RATE_LIMIT + 1)
     result = await _check_outbound_rate(redis)

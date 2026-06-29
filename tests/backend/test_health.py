@@ -7,7 +7,9 @@ from app.api.deps.redis import get_redis
 from app.main import create_app
 
 
-def test_health_endpoint_returns_ok_when_dependencies_are_available(monkeypatch) -> None:
+def test_health_endpoint_returns_ok_when_dependencies_are_available(
+    monkeypatch,
+) -> None:
     app = create_app()
     db = AsyncMock()
     redis = AsyncMock()

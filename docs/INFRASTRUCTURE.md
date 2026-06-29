@@ -1,6 +1,6 @@
 # Wished Infrastructure & Architecture
 
-Technical reference for developers and operators. Product rules and business logic live in [PRODUCT.md](./PRODUCT.md). Agent coding rules live in [AGENTS.md](./AGENTS.md).
+Technical reference for developers and operators. Product rules and business logic live in [PRODUCT.md](./PRODUCT.md). Agent coding rules live in [AGENTS.md](../AGENTS.md).
 
 ## 1. Services
 
@@ -64,7 +64,7 @@ Traffic flow:
 
 ## 4. Environment Variables
 
-See [`.env.example`](./.env.example) — authoritative reference for all variables, their defaults, and inline documentation.
+See [`.env.example`](../.env.example) — authoritative reference for all variables, their defaults, and inline documentation.
 
 Copy it to `.env` and fill in the required values before running locally.
 
@@ -322,20 +322,24 @@ Future event reliability pattern (outbox):
 wished/
   README.md
   AGENTS.md
-  INFRASTRUCTURE.md
-  Makefile
+  docs/
+    PRODUCT.md
+    INFRASTRUCTURE.md
   docker-compose.yml
   docker-compose.prod.yml
-  tunnel.sh
   .env.example
-  frontend/
-    package.json
-    src/
   backend/
     pyproject.toml
     app/
+  frontend/
+    package.json
+    src/
   infra/
-    docker/
+    backup/
+    caddy/
+  deploy/
+  docker/
+  tests/
   scripts/
   .github/
 ```
@@ -433,7 +437,7 @@ docker compose -f docker-compose.prod.yml run --rm backup restore latest
 docker compose -f docker-compose.prod.yml run --rm backend alembic upgrade head
 
 # 5 — restart all services
-bash scripts/deploy.sh
+bash deploy/deploy.sh
 
 # 6 — verify health
 docker compose -f docker-compose.prod.yml ps
@@ -463,7 +467,7 @@ Checks: recent backup exists, PostgreSQL dump is structurally valid, backup age 
 Always use the deployment script — it never removes volumes:
 
 ```bash
-bash scripts/deploy.sh
+bash deploy/deploy.sh
 ```
 
 Never run:
@@ -490,4 +494,3 @@ Scans for `drop_table`, `drop_column`, `TRUNCATE`, and mass `DELETE`. Exits non-
 | On-call engineer | — |
 | Database owner | — |
 | Infrastructure owner | — |
-

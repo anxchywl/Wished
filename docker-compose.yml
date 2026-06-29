@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: ../docker/backend.Dockerfile
     container_name: wished-backend
     environment:
       APP_ENV: ${APP_ENV:-development}
@@ -119,7 +119,7 @@ services:
   bot:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: ../docker/backend.Dockerfile
     container_name: wished-bot
     command: python -m app.workers.bot
     environment:

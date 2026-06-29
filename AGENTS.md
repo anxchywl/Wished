@@ -4,8 +4,8 @@ Mandatory rules for AI coding agents working on Wished.
 These rules are strict. If a required detail is missing, stop and ask before changing code.
 
 **Sources of truth** (read docs before code):
-- Product rules and business logic: `PRODUCT.md`
-- Infrastructure: `INFRASTRUCTURE.md`
+- Product rules and business logic: `docs/PRODUCT.md`
+- Infrastructure: `docs/INFRASTRUCTURE.md`
 - This file: agent rules (mandatory)
 
 ---
@@ -65,7 +65,7 @@ Before implementing a non-trivial task, state:
 
 1. **Docs reviewed** — which files you read
 2. **Affected files** — exact paths
-3. **Edge cases** — cross-check with `PRODUCT.md §7`
+3. **Edge cases** — cross-check with `docs/PRODUCT.md §7`
 4. **Ordered plan**
 
 Wait for approval on large changes before writing code.

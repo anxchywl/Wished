@@ -46,8 +46,12 @@ def _build_init_data(
         "query_id": "test-query",
         "user": json.dumps(user, separators=(",", ":")),
     }
-    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(payload.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(payload.items())
+    )
+    secret_key = hmac.new(
+        b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256
+    ).digest()
     payload["hash"] = hmac.new(
         secret_key,
         data_check_string.encode("utf-8"),
@@ -112,9 +116,14 @@ class TestCORS:
         client = TestClient(app, raise_server_exceptions=False)
         response = client.options(
             "/api/v1/health",
-            headers={"Origin": "https://example.com", "Access-Control-Request-Method": "GET"},
+            headers={
+                "Origin": "https://example.com",
+                "Access-Control-Request-Method": "GET",
+            },
         )
-        assert response.headers.get("access-control-allow-origin") == "https://example.com"
+        assert (
+            response.headers.get("access-control-allow-origin") == "https://example.com"
+        )
 
         _gs.cache_clear()
 
@@ -128,7 +137,10 @@ class TestCORS:
         client = TestClient(app, raise_server_exceptions=False)
         response = client.options(
             "/api/v1/health",
-            headers={"Origin": "https://evil.example.com", "Access-Control-Request-Method": "GET"},
+            headers={
+                "Origin": "https://evil.example.com",
+                "Access-Control-Request-Method": "GET",
+            },
         )
         allow = response.headers.get("access-control-allow-origin", "")
         assert "evil.example.com" not in allow
@@ -150,7 +162,9 @@ class TestCORS:
 
 
 class TestJWTSecretValidation:
-    def test_create_app_raises_in_production_with_default_secret(self, monkeypatch) -> None:
+    def test_create_app_raises_in_production_with_default_secret(
+        self, monkeypatch
+    ) -> None:
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("JWT_SECRET_KEY", "change-me")
 
@@ -164,7 +178,9 @@ class TestJWTSecretValidation:
 
         _gs.cache_clear()
 
-    def test_create_app_raises_in_production_with_empty_secret(self, monkeypatch) -> None:
+    def test_create_app_raises_in_production_with_empty_secret(
+        self, monkeypatch
+    ) -> None:
         monkeypatch.setenv("APP_ENV", "production")
         monkeypatch.setenv("JWT_SECRET_KEY", "")
 
@@ -235,7 +251,10 @@ class TestTelegramInitDataMaxAge:
         assert s.telegram_init_data_max_age_seconds == 300
 
     def test_validate_telegram_init_data_rejects_six_minute_old_data(self) -> None:
-        from app.integrations.telegram import TelegramInitDataError, validate_telegram_init_data
+        from app.integrations.telegram import (
+            TelegramInitDataError,
+            validate_telegram_init_data,
+        )
 
         init_data = _build_init_data(
             {"id": 1, "first_name": "Alice"},
@@ -335,10 +354,16 @@ class TestAuthRateLimiting:
                 ),
             ), "rtok"
 
-        monkeypatch.setattr("app.api.v1.auth.router.validate_telegram_init_data", fake_validate)
-        monkeypatch.setattr("app.api.v1.auth.router.authenticate_telegram_user", fake_authenticate)
+        monkeypatch.setattr(
+            "app.api.v1.auth.router.validate_telegram_init_data", fake_validate
+        )
+        monkeypatch.setattr(
+            "app.api.v1.auth.router.authenticate_telegram_user", fake_authenticate
+        )
 
-        response = TestClient(app).post("/api/v1/auth/telegram", json={"init_data": "data"})
+        response = TestClient(app).post(
+            "/api/v1/auth/telegram", json={"init_data": "data"}
+        )
         assert response.status_code == 200
 
 
@@ -394,7 +419,9 @@ class TestWishURLValidation:
         import pydantic
 
         with pytest.raises(pydantic.ValidationError, match="http or https"):
-            WishCreateRequest(title="bad", url="data:text/html,<script>alert(1)</script>")
+            WishCreateRequest(
+                title="bad", url="data:text/html,<script>alert(1)</script>"
+            )
 
     def test_rejects_file_url(self) -> None:
         from app.modules.wishes.schemas import WishCreateRequest
@@ -467,7 +494,9 @@ async def test_reservation_integrity_error_raises_409() -> None:
 
     no_group_gift = AsyncMock()
     no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
-    db.execute = AsyncMock(side_effect=[accessible_result, no_group_gift, active_result])
+    db.execute = AsyncMock(
+        side_effect=[accessible_result, no_group_gift, active_result]
+    )
     db.add = MagicMock()
     db.commit = AsyncMock(side_effect=IntegrityError("unique violation", {}, None))
     db.rollback = AsyncMock()
@@ -576,7 +605,9 @@ class TestMediaAccessAuthorization:
         # do not override get_current_user — let auth dependency enforce itself
         app.dependency_overrides[get_db_session] = lambda: None
 
-        response = TestClient(app, raise_server_exceptions=False).get(f"/api/v1/media/{uuid4()}")
+        response = TestClient(app, raise_server_exceptions=False).get(
+            f"/api/v1/media/{uuid4()}"
+        )
         assert response.status_code == 401
 
     def test_wish_images_endpoint_requires_authentication(self) -> None:
@@ -594,7 +625,6 @@ class TestMediaAccessAuthorization:
 
         caddyfile_path = os.path.join(
             os.path.dirname(__file__),
-            "..",
             "..",
             "..",
             "infra",

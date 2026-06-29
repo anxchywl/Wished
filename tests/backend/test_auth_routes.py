@@ -56,7 +56,9 @@ def test_telegram_auth_sets_access_token_and_refresh_cookie(monkeypatch) -> None
         fake_validate_telegram_init_data,
     )
 
-    response = TestClient(app).post("/api/v1/auth/telegram", json={"init_data": "signed-init-data"})
+    response = TestClient(app).post(
+        "/api/v1/auth/telegram", json={"init_data": "signed-init-data"}
+    )
 
     assert response.status_code == 200
     body = response.json()

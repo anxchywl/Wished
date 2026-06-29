@@ -75,8 +75,12 @@ def _build_init_data(
         "query_id": "test-query",
         "user": json.dumps(user, separators=(",", ":")),
     }
-    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(payload.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(payload.items())
+    )
+    secret_key = hmac.new(
+        b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256
+    ).digest()
     payload["hash"] = hmac.new(
         secret_key,
         data_check_string.encode("utf-8"),

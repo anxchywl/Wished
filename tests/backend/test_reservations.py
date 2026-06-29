@@ -150,7 +150,9 @@ class TestCreateReservation:
         no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
         existing_result = AsyncMock()
         existing_result.scalar_one_or_none = MagicMock(return_value=existing)
-        db.execute = AsyncMock(side_effect=[wish_result, no_group_gift, existing_result])
+        db.execute = AsyncMock(
+            side_effect=[wish_result, no_group_gift, existing_result]
+        )
 
         client = TestClient(_make_app(db, user))
         resp = client.post(f"/api/v1/wishes/{wish_id}/reserve")
@@ -171,7 +173,9 @@ class TestCreateReservation:
         no_group_gift.scalar_one_or_none = MagicMock(return_value=None)
         existing_result = AsyncMock()
         existing_result.scalar_one_or_none = MagicMock(return_value=existing)
-        db.execute = AsyncMock(side_effect=[wish_result, no_group_gift, existing_result])
+        db.execute = AsyncMock(
+            side_effect=[wish_result, no_group_gift, existing_result]
+        )
 
         client = TestClient(_make_app(db, user))
         resp = client.post(f"/api/v1/wishes/{wish_id}/reserve")
@@ -192,7 +196,9 @@ class TestCreateReservation:
         no_existing.scalar_one_or_none = MagicMock(return_value=None)
         db.execute = AsyncMock(side_effect=[wish_result, no_existing, no_existing])
         db.add = MagicMock()
-        db.commit = AsyncMock(side_effect=IntegrityError("uq_reservations_wish_active", {}, None))
+        db.commit = AsyncMock(
+            side_effect=IntegrityError("uq_reservations_wish_active", {}, None)
+        )
         db.rollback = AsyncMock()
 
         client = TestClient(_make_app(db, user))

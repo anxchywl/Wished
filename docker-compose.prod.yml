@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: ../docker/frontend.Dockerfile
       args:
         NEXT_PUBLIC_API_URL: /api/v1
         NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: ${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
@@ -23,7 +23,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.production
+      dockerfile: ../docker/backend.production.Dockerfile
     container_name: wished-backend
     environment:
       APP_ENV: production
@@ -169,7 +169,7 @@ services:
   bot:
     build:
       context: ./backend
-      dockerfile: Dockerfile.production
+      dockerfile: ../docker/backend.production.Dockerfile
     container_name: wished-bot
     command: python -m app.workers.bot
     environment:
@@ -213,7 +213,7 @@ services:
   backup:
     build:
       context: ./infra/backup
-      dockerfile: Dockerfile
+      dockerfile: ../../docker/backup.Dockerfile
     container_name: wished-backup
     environment:
       POSTGRES_HOST: postgres

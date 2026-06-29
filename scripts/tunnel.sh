@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Start a localhost.run tunnel and wire it up to the app.
-# Run this whenever the tunnel dies: ./tunnel.sh
+# Run this whenever the tunnel dies: scripts/tunnel.sh
 set -euo pipefail
 
 PORT=8002
-ENV_FILE="$(dirname "$0")/.env"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ROOT_DIR}/.env"
 
 echo "→ Starting localhost.run tunnel on port $PORT..."
 ssh -o StrictHostKeyChecking=no \

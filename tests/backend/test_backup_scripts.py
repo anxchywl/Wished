@@ -21,12 +21,12 @@ BACKUP_SCRIPTS = [
 ]
 
 DEPLOY_SCRIPTS = [
-    ROOT / "scripts" / "deploy.sh",
+    ROOT / "deploy" / "deploy.sh",
     ROOT / "scripts" / "check-migrations.sh",
 ]
 
 INFRA_FILES = [
-    ROOT / "infra" / "backup" / "Dockerfile",
+    ROOT / "docker" / "backup.Dockerfile",
 ]
 
 
@@ -55,7 +55,7 @@ class TestDeploySafetyGuard:
     def _run_deploy(self, *args):
         env = {**os.environ, "COMPOSE_FILE": "docker-compose.prod.yml"}
         return subprocess.run(
-            ["bash", str(ROOT / "scripts" / "deploy.sh"), *args],
+            ["bash", str(ROOT / "deploy" / "deploy.sh"), *args],
             capture_output=True,
             text=True,
             cwd=str(ROOT),
@@ -179,7 +179,11 @@ class TestProductionComposeBackupService:
         for line in lines:
             if line.strip() == "volumes:":
                 in_volumes_section = True
-            if in_volumes_section and "backup-data:" in line and not line.strip().startswith("#"):
+            if (
+                in_volumes_section
+                and "backup-data:" in line
+                and not line.strip().startswith("#")
+            ):
                 raise AssertionError(
                     "backup-data appears as a named Docker volume — "
                     "it must be a host-bind-mount to survive `docker compose down -v`"
@@ -197,7 +201,9 @@ class TestProductionComposeBackupService:
     def test_no_down_v_in_prod_compose(self):
         # "down -v" may appear in comments but must not be an actual command
         non_comment_lines = [
-            line for line in self._compose_text().splitlines() if not line.lstrip().startswith("#")
+            line
+            for line in self._compose_text().splitlines()
+            if not line.lstrip().startswith("#")
         ]
         text = "\n".join(non_comment_lines)
         assert "down -v" not in text
