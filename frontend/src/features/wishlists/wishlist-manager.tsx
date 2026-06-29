@@ -134,9 +134,7 @@ export function WishlistManager() {
   const hasWishlists = wishlists.length > 0;
   const querySettled = wishlistsQuery.isSuccess || wishlistsQuery.isError;
   const showWishlistsEmpty = querySettled && !wishlistsQuery.isError && !hasWishlists;
-  // hold in startup until auth AND initial wishlist fetch are both done so the
-  // panel and its content appear together rather than popping in after the shell
-  const guardDecision = isAuthPending(authStatus) || (!querySettled && !wishlistsQuery.isError)
+  const guardDecision = isAuthPending(authStatus)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
       ? "auth_required"
