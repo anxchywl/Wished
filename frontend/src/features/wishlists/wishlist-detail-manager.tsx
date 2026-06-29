@@ -921,12 +921,12 @@ function WishDetailsModal({ open, wish, wishlistId, isOwner, onClose, onEdit }: 
               id={wish!.id}
               title={wish!.title}
               imageUrl={wish!.images?.[0]?.medium_url ?? wish!.images?.[0]?.thumbnail_url}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${isCompleted ? "wish-image-fulfilled" : ""}`}
             />
+            {isCompleted ? (
+              <span className="wish-fulfilled-badge">{t("wishFulfilled")}</span>
+            ) : null}
           </div>
-          {isCompleted ? (
-            <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
-          ) : null}
 
           {/* owner self-booking controls */}
           {isOwner && !isCompleted && (!hasActiveGroupGift || showHiddenGroupGiftAsBooked) && (isMine || ownerBookingVisibility !== "hide" || wish?.group_gift?.status === "completed") && (

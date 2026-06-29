@@ -536,10 +536,10 @@ function BookedWishModal({ item, onClose }: BookedWishModalProps) {
               imageUrl={item.images?.[0]?.medium_url ?? item.images?.[0]?.thumbnail_url}
               className={`w-full h-full object-cover ${item.is_fulfilled_history ? "wish-image-fulfilled" : ""}`}
             />
+            {item.is_fulfilled_history ? (
+              <span className="wish-fulfilled-badge">{t("wishFulfilled")}</span>
+            ) : null}
           </div>
-          {item.is_fulfilled_history ? (
-            <p className="text-sm font-bold text-green-500">{t("wishFulfilled")}</p>
-          ) : null}
           <p className="text-xs text-muted text-center">
             {ownerWishlistLine}
           </p>
