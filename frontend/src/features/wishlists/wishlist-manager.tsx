@@ -133,7 +133,9 @@ export function WishlistManager() {
 
   const hasWishlists = wishlists.length > 0;
   const querySettled = wishlistsQuery.isSuccess || wishlistsQuery.isError;
+  const showWishlistsLoading = !querySettled && !hasWishlists && !wishlistsQuery.isError;
   const showWishlistsEmpty = querySettled && !wishlistsQuery.isError && !hasWishlists;
+  const showWishlistsPanel = hasWishlists || showWishlistsLoading;
   const guardDecision = isAuthPending(authStatus)
     ? "startup"
     : isAuthFailure(authStatus) || (authStatus !== "authenticated" && !accessToken)
@@ -220,8 +222,12 @@ export function WishlistManager() {
               </div>
             ) : null}
 
-            {hasWishlists ? (
+            {showWishlistsPanel ? (
               <div className="panel flex flex-col p-0 overflow-hidden bg-background" style={{ padding: 0 }}>
+                {showWishlistsLoading ? (
+                  <WishlistPanelSkeleton />
+                ) : null}
+                {hasWishlists ? (
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -255,6 +261,7 @@ export function WishlistManager() {
                     ) : null}
                   </DragOverlay>
                 </DndContext>
+                ) : null}
                 <div className="h-px bg-border/60" />
                 <button
                   onClick={() => setModalOpen(true)}
@@ -278,6 +285,26 @@ export function WishlistManager() {
         isPending={createMutation.isPending}
       />
     </>
+  );
+}
+
+
+function WishlistPanelSkeleton() {
+  return (
+    <div className="flex flex-col" aria-hidden="true">
+      {[0, 1, 2].map((item) => (
+        <div key={item}>
+          <div className="flex items-center justify-between p-4 min-h-[72px]">
+            <div className="flex flex-col gap-2">
+              <div className="h-3.5 w-32 rounded-full bg-border/70" />
+              <div className="h-3 w-20 rounded-full bg-border/50" />
+            </div>
+            <div className="h-3 w-14 rounded-full bg-border/50" />
+          </div>
+          {item < 2 && <div className="h-px bg-border/60 ml-4" />}
+        </div>
+      ))}
+    </div>
   );
 }
 
