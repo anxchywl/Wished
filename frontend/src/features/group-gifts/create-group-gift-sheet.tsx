@@ -188,7 +188,7 @@ export function CreateGroupGiftContent({
                 maxLength={80}
                 placeholder={t("paymentMethodPlaceholder")}
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
+                onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, "").replace(/\s{2,}/g, " "))}
                 onBlur={focusMode.onFieldBlur}
                 required
                 {...focusMode.fieldFocusProps("method")}
@@ -204,7 +204,7 @@ export function CreateGroupGiftContent({
                 autoComplete="tel"
                 className={`h-11 rounded-xl border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${phoneError ? "border-destructive" : "border-border"}`}
                 placeholder={t("credentialsOrPhonePlaceholder")}
-                maxLength={isPhoneMode(paymentPhone) ? 20 : 50}
+                maxLength={isPhoneMode(paymentPhone) ? 20 : 19}
                 value={paymentPhone}
                 onChange={(e) => {
                   const raw = e.currentTarget.value.replace(/[^0-9+\s\-()]/g, "");
@@ -232,7 +232,7 @@ export function CreateGroupGiftContent({
                 maxLength={300}
                 placeholder={t("paymentCommentPlaceholder")}
                 value={paymentComment}
-                onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
+                onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, "").replace(/\s{2,}/g, " "))}
                 onBlur={focusMode.onFieldBlur}
                 {...focusMode.fieldFocusProps("comment")}
               />

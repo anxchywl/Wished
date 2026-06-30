@@ -68,7 +68,7 @@ export function formatPhoneInput(raw: string): string {
 }
 
 export function formatAccountInput(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
+  const digits = raw.replace(/\D/g, "").slice(0, 16);
   const groups = digits.match(/.{1,4}/g);
   return groups ? groups.join(" ") : digits;
 }

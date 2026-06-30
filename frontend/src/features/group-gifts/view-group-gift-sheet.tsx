@@ -932,7 +932,7 @@ export function ViewGroupGiftContent({
             maxLength={80}
             placeholder={t("paymentMethodPlaceholder")}
             value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, ""))}
+            onChange={(e) => setPaymentMethod(e.currentTarget.value.replace(/^\s+/, "").replace(/\s{2,}/g, " "))}
             onBlur={focusMode.onFieldBlur}
             {...focusMode.fieldFocusProps("method")}
           />
@@ -946,7 +946,7 @@ export function ViewGroupGiftContent({
             autoComplete="tel"
             className="h-10 rounded-xl border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
             placeholder={t("credentialsOrPhonePlaceholder")}
-            maxLength={phoneMode ? 20 : 50}
+            maxLength={phoneMode ? 20 : 19}
             value={paymentPhone}
             onBlur={() => {
               if (paymentPhone.trim()) {
@@ -978,7 +978,7 @@ export function ViewGroupGiftContent({
             maxLength={300}
             placeholder={t("paymentCommentPlaceholder")}
             value={paymentComment}
-            onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, ""))}
+            onChange={(e) => setPaymentComment(e.currentTarget.value.replace(/^\s+/, "").replace(/\s{2,}/g, " "))}
             onBlur={focusMode.onFieldBlur}
             {...focusMode.fieldFocusProps("comment")}
           />
