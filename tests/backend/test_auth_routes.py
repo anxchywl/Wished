@@ -176,3 +176,31 @@ def _token_response() -> TokenResponse:
             is_premium=False,
         ),
     )
+
+
+def test_telegram_auth_rejects_blocked_user(monkeypatch) -> None:
+    import pytest
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from app.modules.auth import service as auth_service
+
+    async def fake_get_or_create_user(db, telegram_user):
+        return SimpleNamespace(is_blocked=True, blocked_reason="spam")
+
+    monkeypatch.setattr(auth_service, "_get_or_create_user", fake_get_or_create_user)
+
+    async def run():
+        with pytest.raises(HTTPException) as exc:
+            await auth_service.authenticate_telegram_user(
+                db=AsyncMock(),
+                telegram_user=SimpleNamespace(telegram_id=1),
+                settings=MagicMock(),
+            )
+        assert exc.value.status_code == 403
+        assert exc.value.detail == {"code": "account_blocked", "reason": "spam"}
+
+    import asyncio
+
+    asyncio.run(run())

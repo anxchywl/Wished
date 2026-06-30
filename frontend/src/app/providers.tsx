@@ -21,6 +21,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useTelegramLoginMutation } from "@/features/auth";
 import { useWishlistsQuery } from "@/features/wishlists/hooks";
 import { listWishes } from "@/features/wishes/api";
+import { ApiError } from "@/lib/api";
 import { wishQueryKeys } from "@/features/wishes/query-keys";
 import { listFollowing } from "@/features/users/api";
 import { userQueryKeys, useFollowingQuery } from "@/features/users/hooks";
@@ -166,10 +167,23 @@ function PersistentLayout({ children }: { children: ReactNode }) {
           setTgUserId(data.user.telegram_id);
         },
         onError: (err) => {
-          logStartup("login request fails", "error", {
+          // a blocked account returns 403 account_blocked; apiClient already set the
+          // "blocked" status + reason, so preserve it instead of clobbering with "error"
+          const blocked =
+            err instanceof ApiError &&
+            err.status === 403 &&
+            (err.payload as { detail?: { code?: string; reason?: string } } | null)?.detail?.code ===
+              "account_blocked";
+          logStartup("login request fails", blocked ? "blocked" : "error", {
             error: err instanceof Error ? err.message : String(err),
           });
-          setAuthStatus("error");
+          if (blocked) {
+            const reason =
+              (err.payload as { detail?: { reason?: string } } | null)?.detail?.reason ?? null;
+            setAuthStatus("blocked", reason);
+          } else {
+            setAuthStatus("error");
+          }
         },
       });
     } else if (!initDataRaw && !accessToken && !loginMutationRef.current.isPending) {

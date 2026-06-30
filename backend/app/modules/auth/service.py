@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +28,13 @@ async def authenticate_telegram_user(
 ) -> tuple[TokenResponse, str]:
     """authenticate telegram user; returns (response, refresh_token_plaintext)"""
     user = await _get_or_create_user(db, telegram_user)
+    # blocked accounts must never receive a token — reject at login with the same
+    # shape get_current_user uses so the client shows the consistent blocked screen
+    if user.is_blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "account_blocked", "reason": user.blocked_reason},
+        )
     _update_user_from_telegram(user, telegram_user)
     await ensure_public_username(db, user, telegram_user.username)
     user.last_login_at = datetime.now(UTC)
