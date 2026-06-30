@@ -43,19 +43,24 @@ function getInitialAuthStatus(): AuthStatus {
     if (!raw) return "bootstrap";
     const parsed = JSON.parse(raw) as { state?: { accessToken?: string | null; tgUserId?: number | null; blockReason?: string | null } };
     const { accessToken, tgUserId, blockReason } = parsed?.state ?? {};
-    
+
+    const initDataRaw = captureTelegramInitDataFromLocation() || window.sessionStorage.getItem("wished/tgInitDataRaw");
+    const currentTgUserId = initDataRaw ? extractTgUserIdFromInitData(initDataRaw) : null;
+
+    // a different Telegram account on this device must never inherit the previous
+    // user's session — including a stale "blocked" state. Detect the switch before
+    // honoring blockReason so blocking one user doesn't lock out other accounts.
+    if (currentTgUserId !== null && tgUserId != null && currentTgUserId !== tgUserId) {
+      clearPersistedUserSession(tgUserId);
+      return "bootstrap";
+    }
+
+    // blocked state only applies to the account it was set for
     if (blockReason) {
       return "blocked";
     }
     if (!accessToken) return "bootstrap";
     if (!tgUserId) {
-      clearPersistedUserSession(tgUserId);
-      return "bootstrap";
-    }
-
-    const initDataRaw = captureTelegramInitDataFromLocation() || window.sessionStorage.getItem("wished/tgInitDataRaw");
-    const currentTgUserId = initDataRaw ? extractTgUserIdFromInitData(initDataRaw) : null;
-    if (currentTgUserId !== null && currentTgUserId !== tgUserId) {
       clearPersistedUserSession(tgUserId);
       return "bootstrap";
     }
@@ -111,6 +116,7 @@ export const useAuthStore = create<AuthState>()(
           authStatus: "telegram_ready",
           tgUserId,
           isAppReady: false,
+          blockReason: null,
         }),
       clearAuth: () =>
         set({

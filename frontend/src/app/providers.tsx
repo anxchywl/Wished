@@ -120,7 +120,22 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // blocked is terminal — never run any (re)authentication for a blocked session
+    const currentTgUserId = isReady ? extractTgUserIdFromInitData(initDataRaw ?? "") : null;
+
+    // a different Telegram account on this device wipes the previous session,
+    // including a stale blocked state — checked first so switching away from a
+    // blocked account recovers without needing a reload
+    if (currentTgUserId && tgUserId && currentTgUserId !== tgUserId) {
+      clearPersistedCache();
+      queryClient.clear();
+      prepareAccountSwitch(currentTgUserId);
+      setInitialWishesLoaded(false);
+      lastLoginInitDataRef.current = null;
+      loginMutationRef.current.reset();
+      return;
+    }
+
+    // blocked is terminal for the SAME account — never run any (re)authentication
     if (authStatus === "blocked") {
       return;
     }
@@ -132,19 +147,6 @@ function PersistentLayout({ children }: { children: ReactNode }) {
 
     if (initDataRaw && authStatus === "waiting_for_telegram") {
       setAuthStatus("telegram_ready");
-    }
-
-    const currentTgUserId = extractTgUserIdFromInitData(initDataRaw ?? "");
-
-    // if account changed (or a stale token has no matching stored user), clear everything
-    if (currentTgUserId && accessToken && currentTgUserId !== tgUserId) {
-      clearPersistedCache();
-      queryClient.clear();
-      prepareAccountSwitch(currentTgUserId);
-      setInitialWishesLoaded(false);
-      lastLoginInitDataRef.current = null;
-      loginMutationRef.current.reset();
-      return;
     }
 
     if (currentTgUserId && !tgUserId) {
