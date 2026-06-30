@@ -448,6 +448,38 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
       >
         <UIControls />
 
+        {profileQuery.data && (
+          <div className="cover-profile-row">
+            <div className="cover-avatar">
+              <span className="cover-avatar-initials">
+                {([profileQuery.data.first_name, profileQuery.data.last_name]
+                  .filter(Boolean)
+                  .join(" ") || profileQuery.data.username || "?")
+                  .split(" ")
+                  .map((w: string) => w[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            </div>
+            <div className="cover-profile-meta">
+              <p className="cover-profile-name">
+                {[profileQuery.data.first_name, profileQuery.data.last_name].filter(Boolean).join(" ") ||
+                  (profileQuery.data.username ? `@${profileQuery.data.username}` : "—")}
+              </p>
+              {profileQuery.data.birthday && (
+                <span className="cover-birthday-value">
+                  {(() => {
+                    const [y, m, d] = profileQuery.data.birthday.split("-");
+                    const months = t("months").split(",");
+                    return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
+                  })()}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-end justify-between w-full mt-auto">
           <h1 className="cover-title line-clamp-1 pr-4 mt-auto">{wishlist.title}</h1>
         </div>
