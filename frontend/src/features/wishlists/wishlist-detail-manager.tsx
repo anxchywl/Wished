@@ -114,6 +114,18 @@ type PreviewFile = File & {
   previewUrl?: string;
 };
 
+function getTelegramPhotoUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const user = (window as unknown as {
+      Telegram?: { WebApp?: { initDataUnsafe?: { user?: { photo_url?: string } } } };
+    }).Telegram?.WebApp?.initDataUnsafe?.user;
+    return user?.photo_url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * manage wishlist details and wishes combined
  */
@@ -125,6 +137,18 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   const { t, lang } = useTranslation();
   const profileQuery = useProfileQuery(accessToken);
   const currentUserId = profileQuery.data?.id;
+  const profilePhotoUrl = profileQuery.data?.photo_url ?? getTelegramPhotoUrl();
+  const profileDisplayName = profileQuery.data
+    ? [profileQuery.data.first_name, profileQuery.data.last_name].filter(Boolean).join(" ") ||
+      (profileQuery.data.username ? `@${profileQuery.data.username}` : "—")
+    : "—";
+  const profileInitials = (profileDisplayName || "?")
+    .replace(/^@/, "")
+    .split(" ")
+    .map((w: string) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   // local states for editing wishlist
   const [editTitle, setEditTitle] = useState("");
@@ -451,22 +475,26 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
         {profileQuery.data && (
           <div className="cover-profile-row">
             <div className="cover-avatar">
-              <span className="cover-avatar-initials">
-                {([profileQuery.data.first_name, profileQuery.data.last_name]
-                  .filter(Boolean)
-                  .join(" ") || profileQuery.data.username || "?")
-                  .split(" ")
-                  .map((w: string) => w[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()}
-              </span>
+              {profilePhotoUrl ? (
+                <>
+                  <img
+                    src={profilePhotoUrl}
+                    alt={profileDisplayName}
+                    className="cover-avatar-img"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                      const fallback = event.currentTarget.nextElementSibling as HTMLElement | null;
+                      if (fallback) fallback.style.display = "flex";
+                    }}
+                  />
+                  <span className="cover-avatar-initials" style={{ display: "none" }}>{profileInitials}</span>
+                </>
+              ) : (
+                <span className="cover-avatar-initials">{profileInitials}</span>
+              )}
             </div>
             <div className="cover-profile-meta">
-              <p className="cover-profile-name">
-                {[profileQuery.data.first_name, profileQuery.data.last_name].filter(Boolean).join(" ") ||
-                  (profileQuery.data.username ? `@${profileQuery.data.username}` : "—")}
-              </p>
+              <p className="cover-profile-name">{profileDisplayName}</p>
               {profileQuery.data.birthday && (
                 <span className="cover-birthday-value">
                   {(() => {
