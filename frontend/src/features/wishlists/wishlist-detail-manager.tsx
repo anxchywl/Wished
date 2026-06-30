@@ -324,13 +324,42 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     }
     const startParam = encodeWishlistStartParam(ownerId, wishlistId, shareToken);
     const miniAppUrl = `https://t.me/${botUsername}/wished?startapp=${encodeURIComponent(startParam)}`;
-    const shareText = t("shareWishlistText").replace("{wishlist}", wishlist?.title ?? "");
+    const title = wishlist?.title ?? "";
+
+    const webApp =
+      typeof window !== "undefined"
+        ? (window as unknown as {
+            Telegram?: {
+              WebApp?: {
+                switchInlineQuery?: (query: string, chatTypes?: string[]) => void;
+                openTelegramLink?: (url: string) => void;
+              };
+            };
+          }).Telegram?.WebApp
+        : undefined;
+
+    // primary path: Telegram inline mode renders a clean message with the wishlist
+    // name as a hidden deep link. The bot's inline_query handler builds the result.
+    if (typeof webApp?.switchInlineQuery === "function") {
+      try {
+        // keep the inline query well under Telegram's 256-char limit
+        const compactTitle = title.slice(0, 100);
+        const query = compactTitle ? `${startParam} ${compactTitle}` : startParam;
+        webApp.switchInlineQuery(query, ["users", "groups", "channels"]);
+        return;
+      } catch {
+        // fall through to the legacy share sheet below
+      }
+    }
+
+    // fallback: inline mode unavailable (disabled in BotFather, unsupported client,
+    // or switchInlineQuery missing) — never break sharing
+    const shareText = t("shareWishlistText").replace("{wishlist}", title);
     const tgShareUrl =
       `https://t.me/share/url?url=${encodeURIComponent(miniAppUrl)}` +
       `&text=${encodeURIComponent(shareText)}`;
-    const win = window as unknown as { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } };
-    if (typeof window !== "undefined" && win.Telegram?.WebApp?.openTelegramLink) {
-      win.Telegram.WebApp.openTelegramLink(tgShareUrl);
+    if (webApp?.openTelegramLink) {
+      webApp.openTelegramLink(tgShareUrl);
     } else {
       window.open(tgShareUrl, "_blank");
     }

@@ -1,13 +1,16 @@
 # telegram bot service
 import asyncio
+import html
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
     KeyboardButton,
     KeyboardButtonRequestUsers,
     MenuButtonWebApp,
@@ -20,11 +23,14 @@ from redis.exceptions import RedisError
 from app.core.config import get_settings
 from app.db.models import User
 from app.db.models.group_gifts import GroupGift, GroupGiftContribution
+from app.db.models.wishlists import Wishlist
 from app.db.session import async_session_factory, dispose_db
 from app.integrations.redis import close_redis, get_redis_client
+from app.integrations.telegram.start_param import decode_wishlist_start_param
 from app.modules.group_gifts import service as group_gift_service
 from app.modules.notifications.worker import run_notification_worker
 from app.modules.users.discovery import create_discovery_token
+from app.modules.wishlists.share_token import validate_wishlist_share_token
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -57,6 +63,8 @@ BOT_TEXT = {
         "unknown_user": "This user",
         "language_changed": "Language set to English.",
         "language_select": "Please choose your language.",
+        "share_wishlist_prefix": "Here, see my wishlist in Wished:",
+        "share_wishlist_result": "Share wishlist",
     },
     "ru": {
         "find_friends": "Найти друзей",
@@ -77,6 +85,8 @@ BOT_TEXT = {
         "unknown_user": "Этот пользователь",
         "language_changed": "Язык изменён на русский.",
         "language_select": "Пожалуйста, выберите язык.",
+        "share_wishlist_prefix": "Смотри мой список желаний в Wished:",
+        "share_wishlist_result": "Поделиться вишлистом",
     },
     "kz": {
         "find_friends": "Достарды табу",
@@ -97,6 +107,8 @@ BOT_TEXT = {
         "unknown_user": "Бұл пайдаланушы",
         "language_changed": "Тіл қазақша деп орнатылды.",
         "language_select": "Тіліңізді таңдаңыз.",
+        "share_wishlist_prefix": "Wished-тегі тілектер тізімімді қара:",
+        "share_wishlist_result": "Тілектер тізімімен бөлісу",
     },
 }
 
@@ -504,6 +516,68 @@ async def gg_reject_handler(callback: types.CallbackQuery) -> None:
     await callback.answer()
 
 
+INLINE_QUERY_CACHE_TIME = 30
+
+
+def _build_wishlist_share_message(start_param: str, title: str, prefix: str) -> str:
+    """build the HTML inline message: localized prefix + wishlist name as a hidden deep link"""
+    settings = get_settings()
+    bot_username = settings.telegram_bot_username or "wished_app_bot"
+    # start_param is base64url + url-safe token, so it needs no further encoding
+    deep_link = f"https://t.me/{bot_username}/wished?startapp={start_param}"
+    safe_title = html.escape(title) or "Wished"
+    # the deep link lives only in the href so Telegram still renders the Mini App
+    # preview card while the raw URL never appears in the visible message body
+    return f'{html.escape(prefix)}\n<a href="{html.escape(deep_link, quote=True)}">{safe_title}</a>'
+
+
+async def inline_query_handler(inline_query: types.InlineQuery) -> None:
+    """serve a clean shareable wishlist message via Telegram inline mode"""
+    if not inline_query.from_user:
+        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+        return
+
+    text = BOT_TEXT[await _get_user_lang(inline_query.from_user.id)]
+
+    # the query is "<start_param> <title>"; we only trust the start param and load
+    # the authoritative title from the database — never the inline-supplied title
+    start_param = inline_query.query.strip().split(" ", 1)[0]
+    decoded = decode_wishlist_start_param(start_param)
+    if decoded is None:
+        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+        return
+
+    async with async_session_factory() as db:
+        result = await db.execute(select(Wishlist).where(Wishlist.id == decoded.wishlist_id))
+        wishlist = result.scalar_one_or_none()
+
+    # reject missing wishlists, and private ones without a valid share token
+    if wishlist is None:
+        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+        return
+    if wishlist.visibility != "public":
+        valid = await validate_wishlist_share_token(
+            get_redis_client(), decoded.share_token, decoded.wishlist_id
+        )
+        if not valid:
+            await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+            return
+
+    message_text = _build_wishlist_share_message(
+        start_param, wishlist.title, text["share_wishlist_prefix"]
+    )
+    article = InlineQueryResultArticle(
+        id=uuid4().hex,
+        title=text["share_wishlist_result"],
+        description=wishlist.title,
+        input_message_content=InputTextMessageContent(
+            message_text=message_text,
+            parse_mode="HTML",
+        ),
+    )
+    await inline_query.answer([article], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+
+
 async def main() -> None:
     """start telegram bot polling"""
     settings = get_settings()
@@ -520,6 +594,7 @@ async def main() -> None:
     dp.message.register(language_text_handler, F.text.in_(LANG_BUTTON_LABELS.keys()))
     dp.callback_query.register(gg_confirm_handler, F.data.startswith("gg_confirm:"))
     dp.callback_query.register(gg_reject_handler, F.data.startswith("gg_reject:"))
+    dp.inline_query.register(inline_query_handler)
 
     web_app_url = settings.telegram_mini_app_url or "http://localhost:3000"
     await bot.set_chat_menu_button(
