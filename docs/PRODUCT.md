@@ -58,6 +58,8 @@ Non-goals for MVP:
 - Completed wishes.
 - In-app notifications.
 - Optional media uploads backed by MinIO.
+- Marketplace link preview — URL scraping and product metadata extraction for supported stores.
+- Telegram bot notifications dispatched via a Redis-backed queue.
 
 ---
 
@@ -91,9 +93,11 @@ Included in MVP:
 - Hidden reservation behavior from the wish owner.
 - Group gifts with contribution tracking and transfer confirmation.
 - Completed wish state.
-- Basic in-app notifications.
+- Telegram bot notifications via a Redis-backed queue worker.
+- Marketplace link preview for supported stores.
+- Admin panel.
 - PostgreSQL-backed durable data.
-- Redis for cache, rate limiting, sessions, or background coordination where needed.
+- Redis for cache, rate limiting, and notification dispatch.
 - MinIO for user-uploaded media.
 
 Excluded from MVP:
@@ -101,12 +105,8 @@ Excluded from MVP:
 - Payments.
 - Checkout.
 - Price tracking.
-- Store integrations.
-- Advanced privacy controls.
-- Blocking and reporting.
-- Telegram bot notifications unless separately required.
-- Admin dashboard unless separately required.
-- Multi-language support unless separately required.
+- Advanced privacy controls (blocking, reporting).
+- Multi-language support.
 
 ---
 
@@ -157,7 +157,7 @@ Excluded from MVP:
 
 ### Notifications
 
-- As a user, I want notifications about wishlist updates and allowed completion activity.
+- As a user, I want to receive Telegram bot messages about wishlist activity I'm allowed to know about.
 - As a user, I do not want notifications to spoil hidden reservations.
 
 ---
@@ -238,16 +238,18 @@ Events are for side effects. PostgreSQL remains the source of truth for business
 
 ## 9. Notification Flow
 
-Notification creation flow:
+Notifications are Telegram bot messages, not in-app records. There is no notification table in PostgreSQL.
 
-1. A domain action occurs.
-2. A domain event is emitted.
-3. The notification module receives the event.
-4. Candidate recipients are selected.
-5. The policy module filters recipients by access and privacy.
-6. Viewer-safe notification content is generated.
-7. Notification records are stored.
-8. The frontend fetches notifications and unread counts.
+Notification dispatch flow:
+
+1. A domain action occurs and a domain event is pushed to the `notifications:queue` Redis list.
+2. The bot worker (`app.workers.bot`) pops events from the queue with `BLPOP`.
+3. The worker dispatches the event to the matching handler in `app.modules.notifications.handlers`.
+4. The handler selects candidate recipients (followers, participants, organizers, etc.).
+5. The handler applies privacy filters — reservation details are never included for the wish owner.
+6. The handler sends a Telegram bot message to each eligible recipient via the aiogram bot.
+
+Duplicate suppression and outbound rate limiting are applied per-user per-event in Redis before sending.
 
 Notification privacy rules:
 
@@ -313,32 +315,20 @@ Cancellation and removal:
 
 ## 12. File Upload Flow
 
-Recommended MVP upload flow:
+Upload flow:
 
 1. An authenticated user selects a file.
-2. The frontend asks the backend to start an upload.
-3. The backend verifies authentication.
-4. The backend verifies the target resource can be modified by the user.
-5. The backend validates intended file type and size.
-6. The backend creates pending media metadata.
-7. The backend returns upload instructions.
-8. The frontend uploads the object to MinIO using the approved instructions.
-9. The frontend tells the backend the upload is complete.
-10. The backend verifies the object exists in MinIO.
-11. The backend marks the media as uploaded.
-12. The backend attaches the media to the target resource.
-13. The frontend refreshes the target resource.
+2. The frontend uploads the file to the backend endpoint (`POST /api/v1/media/wishes/{wish_id}/images`).
+3. The backend verifies the user owns the wish.
+4. The backend validates file type (images only) and size.
+5. The backend processes the image — generating `thumbnail` and `medium` variants.
+6. The backend stores all variants in MinIO under the configured `MINIO_MEDIA_BUCKET`.
+7. The backend creates a `WishImage` record in PostgreSQL with `status="ready"`.
+8. The frontend refreshes the wish.
 
-Media lifecycle states: Pending → Uploaded → Attached → Failed → Deleted.
+`WishImage` records track three object names per upload: `object_name` (original), `thumbnail_object_name`, and `medium_object_name`.
 
-Upload rules:
-
-- Only authenticated users may upload files.
-- Users may attach media only to resources they can modify.
-- File type and size must be validated.
-- Object names must not expose sensitive user data.
-- Orphaned pending uploads should be cleaned up.
-- MinIO object storage is not the source of truth for media ownership.
+Orphaned MinIO objects (objects in the bucket with no corresponding `WishImage` row) are cleaned up by the `media_cleanup` worker (`app.workers.media_cleanup`), which runs standalone with a configurable grace period.
 
 ---
 

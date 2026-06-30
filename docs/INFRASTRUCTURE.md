@@ -34,32 +34,22 @@ Production additions (`docker/docker-compose.prod.yml`):
 
 ## 3. Network Layout
 
-The infrastructure should use separated network zones:
+Two bridge networks are defined:
 
-- **Public network**
-  - Exposes only the reverse proxy or public application entry point.
-  - Receives Telegram Mini App browser traffic.
-  - Receives API requests from the frontend.
+- **`wished-app`** — connects `caddy`, `backend`, `bot`, and `frontend` (production only). Caddy is the only service with public ports.
+- **`wished-data`** — connects `backend`, `bot`, `caddy`, and `backup` to `postgres`, `redis`, and `minio`. In production this network is `internal: true`, meaning it has no outbound internet access and no ports exposed to the host.
 
-- **Application network**
-  - Connects frontend and backend services.
-  - Allows the proxy to route traffic to frontend and backend.
-  - Not directly exposed to the public internet.
-
-- **Data network**
-  - Connects backend to PostgreSQL, Redis, and MinIO.
-  - Isolated from public traffic.
-  - Database, Redis, and MinIO ports should not be publicly exposed in production.
+`postgres`, `redis`, and `minio` are on `wished-data` only — they are never directly reachable from outside the host.
 
 Traffic flow:
 
 1. Telegram opens the Mini App URL.
-2. User traffic reaches the public HTTPS endpoint.
-3. The proxy routes frontend requests to Next.js.
-4. The frontend calls the backend API.
-5. The backend validates Telegram data and handles application requests.
+2. User traffic reaches Caddy on ports 80/443 (production) or 8002 (development).
+3. Caddy routes frontend requests to Next.js and API requests to FastAPI.
+4. The frontend calls the backend API via Caddy.
+5. The backend validates Telegram init data and handles application requests.
 6. The backend reads and writes PostgreSQL data.
-7. The backend uses Redis for cache or ephemeral coordination.
+7. The backend uses Redis for cache and ephemeral coordination.
 8. The backend stores and retrieves media through MinIO.
 
 ## 4. Environment Variables
@@ -70,174 +60,88 @@ Copy it to `.env` and fill in the required values before running locally.
 
 ## 5. Storage Structure
 
-Storage should be separated by data type and lifecycle.
-
-### PostgreSQL Storage
-
-- Application relational data.
-- User records.
-- Wishlist records.
-- Wishlist item records.
-- Reservation or coordination records.
-- Audit or event data only if explicitly required by product design.
-
-Database storage must be persistent and backed up regularly.
-
-### Redis Storage
-
-- Cache entries.
-- Ephemeral workflow state.
-- Rate limit counters.
-- Background coordination data.
-
-Redis should not be the only source of truth for critical business data.
-
-### MinIO Storage
-
-Recommended bucket separation:
-
-- **wished-media**
-  - User-uploaded wishlist item images.
-  - Profile or wishlist media if supported.
-
-- **wished-system**
-  - Internal generated assets if needed.
-  - Non-public system objects.
-
-- **wished-backups**
-  - Optional local backup staging bucket for development only.
-  - Production backups should be copied to external durable storage.
-
-Object paths should be predictable, scoped by entity type, and avoid exposing sensitive identifiers unnecessarily.
-
-## 6. Volumes
-
-Required persistent volumes:
-
-- **postgres-data**
-  - Stores PostgreSQL database files.
-  - Must be backed up.
-
-- **redis-data**
-  - Stores Redis persistence files if Redis persistence is enabled.
-  - Optional for purely ephemeral Redis usage.
-
-- **minio-data**
-  - Stores MinIO object data.
-  - Must be backed up.
-
-- **backup-data**
-  - Temporary local backup staging area.
-  - Should not be the only backup location.
-
-Optional volumes:
-
-- **proxy-certs**
-  - Stores TLS certificates for self-hosted production.
-
-- **proxy-logs**
-  - Stores proxy logs if logs are file-based.
-
-- **app-logs**
-  - Stores application logs if logs are file-based.
-  - Prefer centralized logging in production.
-
-## 7. Backup Strategy
-
 ### PostgreSQL
 
-- Run scheduled logical backups.
-- Store backups outside the application host.
-- Encrypt backups before or during transfer.
-- Retain multiple restore points.
-- Test restore procedures regularly.
-- Keep backup retention aligned with business and compliance requirements.
-
-Recommended backup tiers:
-
-- Frequent short-retention backups for operational recovery.
-- Daily medium-retention backups.
-- Longer-retention backups for disaster recovery.
-
-### MinIO
-
-- Back up buckets through object replication, snapshotting, or scheduled sync.
-- Store production object backups in external durable storage.
-- Preserve metadata needed by the application.
-- Include bucket policy and lifecycle configuration in infrastructure documentation.
+Primary durable store for all relational application data: users, wishlists, wishlist items, reservations, and coordination records.
 
 ### Redis
 
-- Back up Redis only if it contains data that must survive restarts.
-- If Redis is strictly ephemeral, prioritize fast recreation over backup.
+Used for cache entries, ephemeral workflow state, rate limit counters, and background coordination. Not used as the sole source of truth for business data.
+
+### MinIO
+
+One bucket is configured via `MINIO_MEDIA_BUCKET` (default: `wished-media`). It holds user-uploaded wishlist item images and any other media the backend stores. The bucket name is injected at runtime — no bucket names are hardcoded in the application.
+
+Production backups are written to the host filesystem (not a MinIO bucket) and optionally mirrored to an external S3-compatible bucket via `BACKUP_S3_BUCKET`.
+
+## 6. Volumes
+
+Named Docker volumes declared in the compose files:
+
+Development (`docker-compose.yml`):
+- **`postgres-data`** — PostgreSQL data directory.
+- **`redis-data`** — Redis persistence files.
+- **`minio-data`** — MinIO object data.
+
+Production (`docker-compose.prod.yml`) adds:
+- **`caddy-data`** — Caddy's automatic TLS certificate storage.
+- **`caddy-config`** — Caddy runtime config.
+
+Backups are **not** stored in a named volume. The `backup` container uses a host bind-mount (`BACKUP_LOCAL_PATH`, default `/var/backups/wished`) so that `docker compose down -v` cannot destroy local backup copies.
+
+## 7. Backup Strategy
+
+The `backup` container runs `pg_dump` and `mc mirror` on a configurable interval (default: every 6 hours via `BACKUP_INTERVAL_SECONDS=21600`). Backups land on a **host bind-mount** at `BACKUP_LOCAL_PATH` (default: `/var/backups/wished`) — not a named Docker volume — so `docker compose down -v` cannot destroy them.
+
+### PostgreSQL
+
+`pg_dump` produces a compressed custom-format dump (`postgres.dump`). Local copies are retained for `BACKUP_RETENTION_DAYS` days (default: 7).
+
+### MinIO
+
+`mc mirror` copies the `wished-media` bucket contents alongside the PostgreSQL dump in the same timestamped directory.
+
+### Redis
+
+Redis is not backed up. It holds only ephemeral state that can be rebuilt from PostgreSQL on restart.
+
+### External replication
+
+When `BACKUP_EXTERNAL_ENABLED=true`, the backup container mirrors each completed backup to an S3-compatible bucket defined by `BACKUP_S3_BUCKET`. This is the only copy that survives server loss.
 
 ### Verification
 
-- Backups are not valid until restore has been tested.
-- Restore testing should include PostgreSQL and MinIO together to confirm data consistency.
-- Document recovery time objective and recovery point objective once business requirements are known.
+The backup container's healthcheck runs `verify-backup` hourly: it checks that a recent backup exists, that the PostgreSQL dump is structurally valid, and that backup age is within the expected interval. Restores are exercised manually using `docker compose run --rm backup restore latest`.
 
 ## 8. Development Setup
 
-Development infrastructure should prioritize reproducibility and low setup cost.
+Defined in `docker/docker-compose.yml`. The development stack runs:
 
-Development services:
+- `backend` — FastAPI, port `127.0.0.1:8001` on the host, with the `backend/app` directory bind-mounted for hot reload.
+- `caddy` — reverse proxy on host port `8002`.
+- `postgres` — PostgreSQL 16, persisted to `postgres-data` volume.
+- `redis` — Redis 7, password-protected, persisted to `redis-data` volume.
+- `minio` — MinIO with console on port `9001`, persisted to `minio-data` volume.
+- `bot` — Telegram bot worker using the same `wished-backend` image.
 
-- Next.js frontend container or local frontend process.
-- FastAPI backend container or local backend process.
-- PostgreSQL container.
-- Redis container.
-- MinIO container.
-- Optional MinIO initialization container.
+The frontend is not containerized in development — it runs as a local process (`npm run dev`).
 
-Development expectations:
-
-- Use Docker Compose for shared infrastructure.
-- Use local environment files excluded from Git.
-- Provide an example environment file with non-secret placeholders.
-- Expose service ports only for local development needs.
-- Persist PostgreSQL and MinIO data across container restarts.
-- Allow easy reset of local volumes when a clean environment is needed.
-- Keep Telegram local testing requirements documented.
-- Use HTTPS tunneling or an approved public development URL when Telegram requires a public Mini App endpoint.
-
-Development data:
-
-- Use seed data only when explicitly defined.
-- Do not use production credentials.
-- Do not connect local development to production databases, Redis, or object storage.
+Configuration comes from a `.env` file (excluded from Git). Copy `.env.example` and fill in required values. Telegram testing that requires a public HTTPS endpoint uses an external tunnel pointed at the local Caddy port.
 
 ## 9. Production Setup
 
-Production infrastructure should prioritize security, durability, observability, and controlled deployment.
+Defined in `docker/docker-compose.prod.yml`, applied on top of the base compose file. Production adds or changes:
 
-Production services:
+- **`frontend`** — Next.js container, no host ports exposed (traffic goes through Caddy). Built with `NEXT_PUBLIC_TELEGRAM_MOCK=0`.
+- **`caddy`** — ports 80, 443, and 443/udp (QUIC) bound publicly. Uses `Caddyfile.production`, handles automatic TLS. Caddy data and config persisted to `caddy-data` and `caddy-config` volumes.
+- **`backend`** — uses `backend.production.Dockerfile` (no bind-mount, no dev reload). `TRUST_PROXY_HEADERS=true`. Connects to `postgres` as `APP_DB_USER` (a least-privilege application role, not the superuser).
+- **`bot`** — same image as backend, same least-privilege DB user.
+- **`backup`** — see §7.
+- **`wished-data` network** — marked `internal: true`; postgres, redis, and minio have no outbound internet access and no host-exposed ports.
 
-- Public reverse proxy or managed edge service.
-- Next.js frontend runtime.
-- FastAPI backend runtime.
-- Managed or self-hosted PostgreSQL.
-- Managed or self-hosted Redis.
-- Managed object storage or hardened MinIO deployment.
-- Backup runner or managed backup service.
-- Monitoring, logging, and alerting stack.
+All containers in production run with `security_opt: no-new-privileges:true`, `cap_drop: ALL` (where applicable), `restart: unless-stopped`, and explicit memory and PID limits.
 
-Production requirements:
-
-- Serve Telegram Mini App over HTTPS.
-- Keep database, Redis, and MinIO private.
-- Store secrets in a secure secret manager or protected deployment environment.
-- Run database migrations through a controlled release process.
-- Configure health checks for frontend, backend, PostgreSQL, Redis, and MinIO.
-- Configure centralized logging for application and infrastructure services.
-- Monitor API latency, error rates, container health, database performance, Redis memory, and object storage usage.
-- Apply least-privilege access for MinIO buckets and service credentials.
-- Use separate environments for development, staging, and production.
-- Avoid sharing credentials across environments.
-- Define a rollback process for application releases.
-- Define a disaster recovery process for data restoration.
-
-Production deployment topology may start as a single Docker Compose host for early-stage operation, but should be designed so PostgreSQL, Redis, object storage, and application services can later be migrated to managed or independently scaled infrastructure.
+Secrets (`JWT_SECRET_KEY`, `APP_DB_PASSWORD`, `REDIS_PASSWORD`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`) are required at startup — the compose file uses `:?` syntax so missing values abort the stack rather than starting with empty credentials.
 
 ---
 
@@ -257,7 +161,6 @@ flowchart LR
   API --> DISCOVERY["Discovery / Subscriptions"]
   API --> WISH["Wishlists / Wishes"]
   API --> RSV["Reservations"]
-  API --> NOTIF["Notifications"]
   API --> MEDIA["Media Module"]
   API --> POLICY["Authorization / Policy"]
 
@@ -266,16 +169,12 @@ flowchart LR
   DISCOVERY --> PG
   WISH --> PG
   RSV --> PG
-  NOTIF --> PG
   MEDIA --> PG
-
-  API --> REDIS["Redis"]
-  NOTIF --> REDIS
   MEDIA --> MINIO["MinIO"]
 
-  REDIS --> WORKER["Background Worker"]
-  WORKER --> NOTIF
-  WORKER --> MEDIA
+  API --> REDIS["Redis"]
+  REDIS --> WORKER["Bot Worker"]
+  WORKER --> TG_API["Telegram Bot API"]
 ```
 
 ---
@@ -401,8 +300,7 @@ Each timestamped backup directory contains:
     ├── postgres.dump       pg_dump custom format, compressed
     ├── manifest.json       metadata for verification
     └── minio/
-        ├── wished-media/   user-uploaded images
-        └── wished-system/  system objects
+        └── wished-media/   user-uploaded images
 ```
 
 ### Common Failure Scenarios

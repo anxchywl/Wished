@@ -9,7 +9,6 @@ import { useReservationStatusQuery, useCreateReservationMutation } from "@/featu
 import { ViewGroupGiftContent, type ActionMode } from "@/features/group-gifts/view-group-gift-sheet";
 import { CreateGroupGiftContent } from "@/features/group-gifts/create-group-gift-sheet";
 import { UserAvatar } from "@/features/users/user-avatar";
-import { ProfileLinkShareCard } from "@/features/profile";
 import {
   getUserProfile,
   getUserProfileById,
@@ -519,12 +518,6 @@ function PublicUserView({
           </div>
         </div>
       ) : null}
-
-      <ProfileLinkShareCard
-        publicUsername={profile?.public_username}
-        publicProfileUrl={profile?.public_profile_url}
-        telegramStartappUrl={profile?.telegram_startapp_url}
-      />
 
       <section className="flex flex-col mt-1 px-2">
         <div className="px-4 py-3 border-b-2 border-border">

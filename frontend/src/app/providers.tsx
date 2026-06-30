@@ -27,7 +27,7 @@ import { userQueryKeys, useFollowingQuery } from "@/features/users/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
-import { BookingVisibilityHeaderButton } from "@/features/users/user-discovery-manager";
+import { BookingVisibilityHeaderButton, ShareProfileButton } from "@/features/users/user-discovery-manager";
 import { useBookedWishesQuery } from "@/features/reservations/hooks";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
@@ -275,7 +275,12 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     hideProfile = true;
   }
 
-  const extraControls = pathname === "/users" ? <BookingVisibilityHeaderButton /> : undefined;
+  const extraControls = pathname === "/users" ? (
+    <>
+      <ShareProfileButton />
+      <BookingVisibilityHeaderButton />
+    </>
+  ) : undefined;
 
   // Render the full shell unconditionally so the browser pre-paints the content
   // on its own compositing layer while the loading overlay covers it.  When the
