@@ -75,7 +75,12 @@ export const useAuthStore = create<AuthState>()(
       isAppReady: false,
       blockReason: null,
       setAccessToken: (value) =>
-        set(() => {
+        set((state) => {
+          // "blocked" is terminal — never let a refreshed/late token resurrect a
+          // blocked session (which would render the app shell and crash)
+          if (value && state.authStatus === "blocked") {
+            return {};
+          }
           const authStatus = value ? "authenticated" : "unauthenticated";
           logStartup("access token changed", authStatus, {
             hasAccessToken: Boolean(value),
@@ -87,11 +92,16 @@ export const useAuthStore = create<AuthState>()(
         }),
       setAuthStatus: (value, blockReason) => {
         logStartup("auth status changed", value);
-        if (blockReason !== undefined) {
-            set({ authStatus: value, blockReason });
-        } else {
-            set({ authStatus: value });
-        }
+        set(() => {
+          const next: Partial<AuthState> =
+            blockReason !== undefined ? { authStatus: value, blockReason } : { authStatus: value };
+          // dropping the token keeps the blocked user out of any authenticated UI
+          // so only the BlockedScreen renders
+          if (value === "blocked") {
+            next.accessToken = null;
+          }
+          return next;
+        });
       },
       setTgUserId: (value) => set({ tgUserId: value }),
       setAppReady: (value) => set({ isAppReady: value }),

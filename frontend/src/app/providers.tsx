@@ -47,15 +47,25 @@ function BlockedScreen() {
   const blockReason = useAuthStore((state) => state.blockReason);
   
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-background z-[9999] px-8 text-center gap-4">
-      <div style={{ fontSize: 48 }}>🚫</div>
-      <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--tg-theme-text-color)" }}>
-        {t("accountRestrictedTitle")}
-      </h1>
-      <p style={{ fontSize: 15, color: "var(--tg-theme-hint-color)", lineHeight: 1.5 }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background px-8 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+        <svg
+          className="h-8 w-8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5.64 5.64l12.72 12.72" />
+        </svg>
+      </div>
+      <h1 className="text-lg font-bold text-foreground">{t("accountRestrictedTitle")}</h1>
+      <p className="max-w-sm text-sm leading-relaxed text-muted">
         {blockReason ? blockReason : t("accountRestrictedBody")}
       </p>
-      <p style={{ fontSize: 13, color: "var(--tg-theme-hint-color)", opacity: 0.8, marginTop: 16 }}>
+      <p className="mt-2 max-w-sm text-xs leading-relaxed text-muted/80">
         {t("accountRestrictedSupport") ?? "If you believe this is a mistake, please contact support."}
       </p>
     </div>
@@ -110,6 +120,10 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // blocked is terminal — never run any (re)authentication for a blocked session
+    if (authStatus === "blocked") {
+      return;
+    }
     if (!isReady) {
       // warm start: already have a token, keep authStatus and queries enabled
       if (!accessToken && authStatus !== "authenticated") setAuthStatus("waiting_for_telegram");

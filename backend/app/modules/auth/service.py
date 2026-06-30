@@ -63,6 +63,19 @@ async def refresh_tokens(
 ) -> tuple[RefreshResponse, str]:
     """rotate refresh token; returns (response, new_refresh_token_plaintext)"""
     existing_token = await _get_active_refresh_token(db, refresh_token_value)
+
+    # blocked accounts must not be able to mint new access tokens via refresh
+    owner = (
+        await db.execute(select(User).where(User.id == existing_token.user_id))
+    ).scalar_one_or_none()
+    if owner is not None and owner.is_blocked:
+        existing_token.revoked_at = datetime.now(UTC)
+        await db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "account_blocked", "reason": owner.blocked_reason},
+        )
+
     existing_token.revoked_at = datetime.now(UTC)
 
     access_token, access_expires_at = create_access_token(existing_token.user_id, settings)
