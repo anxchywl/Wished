@@ -31,6 +31,22 @@ def _base64url_to_bytes(value: str) -> bytes:
     return base64.urlsafe_b64decode(padded)
 
 
+def _bytes_to_base64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode().rstrip("=")
+
+
+def encode_wishlist_start_param(
+    user_id: UUID, wishlist_id: UUID, share_token: str | None = None
+) -> str:
+    """build a compact "wb_" start param from trusted values (mirrors the frontend).
+
+    Use this for any outgoing deep link so we never echo attacker-supplied query
+    bytes back into a shared message.
+    """
+    blob = user_id.bytes + wishlist_id.bytes
+    return f"{WISHLIST_BINARY_PREFIX}{_bytes_to_base64url(blob)}{share_token or ''}"
+
+
 def decode_wishlist_start_param(value: str) -> WishlistStartParam | None:
     """recover wishlist id + share token from a start param; None if malformed"""
     if not value:

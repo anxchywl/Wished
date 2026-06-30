@@ -29,6 +29,7 @@ import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
 import { BookingVisibilityHeaderButton } from "@/features/users/user-discovery-manager";
 import { useBookedWishesQuery } from "@/features/reservations/hooks";
+import { useProfileQuery } from "@/features/profile";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
 import { extractTgUserIdFromInitData } from "@/lib/telegram/capture-init-data";
@@ -81,9 +82,11 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [gateExpired, setGateExpired] = useState(false);
   const [initialWishesLoaded, setInitialWishesLoaded] = useState(false);
+  const [framePainted, setFramePainted] = useState(false);
   const lastLoginInitDataRef = useRef<string | null>(null);
   const followingQuery = useFollowingQuery();
   const bookedWishesQuery = useBookedWishesQuery();
+  const profileQuery = useProfileQuery(accessToken);
 
   const loginMutationRef = useRef(loginMutation);
   loginMutationRef.current = loginMutation;
@@ -235,12 +238,34 @@ function PersistentLayout({ children }: { children: ReactNode }) {
   // also wait for the per-wishlist wish counts to be prefetched so the rows show
   // their real count instead of "..." popping in after the panel renders.
   const initialWishlistsReady = initialWishlistsSettled && (initialWishesLoaded || isFullyCached);
+  // the cover header (avatar + name) is part of the first screen, so wait for the
+  // profile too — otherwise it pops in after the overlay drops
+  const initialProfileReady = profileQuery.isSuccess || profileQuery.isError;
   const hasSession = Boolean(accessToken) || authStatus === "authenticated";
-  const isLoading =
-    !gateExpired &&
-    (hasSession
-      ? isWishlistsRoute && !initialWishlistsReady
-      : !isReady || isAuthPending(authStatus));
+  const dataLoading =
+    hasSession
+      ? isWishlistsRoute && !(initialWishlistsReady && initialProfileReady)
+      : !isReady || isAuthPending(authStatus);
+
+  // once the data is ready, hold the overlay for one extra painted frame so the
+  // shell + panel are committed and painted underneath before we reveal them —
+  // this removes the brief flash where the panel renders after the loading screen
+  useEffect(() => {
+    if (dataLoading) {
+      setFramePainted(false);
+      return;
+    }
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => setFramePainted(true));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [dataLoading]);
+
+  const isLoading = !gateExpired && (dataLoading || !framePainted);
 
   if (authStatus === "blocked") {
     return <BlockedScreen />;

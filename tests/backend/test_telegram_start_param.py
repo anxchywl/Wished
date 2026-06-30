@@ -1,7 +1,13 @@
 import base64
 from uuid import UUID
 
-from app.integrations.telegram.start_param import decode_wishlist_start_param
+import pytest
+
+from app.integrations.telegram.start_param import (
+    decode_wishlist_start_param,
+    encode_wishlist_start_param,
+)
+from app.workers.bot import _build_wishlist_share_message
 
 USER_ID = UUID("11111111-1111-1111-1111-111111111111")
 WISHLIST_ID = UUID("22222222-2222-2222-2222-222222222222")
@@ -34,3 +40,45 @@ def test_decode_rejects_garbage() -> None:
     assert decode_wishlist_start_param("wb_short") is None
     assert decode_wishlist_start_param("") is None
     assert decode_wishlist_start_param("p_max_472") is None
+
+
+def test_encode_roundtrips_public() -> None:
+    decoded = decode_wishlist_start_param(
+        encode_wishlist_start_param(USER_ID, WISHLIST_ID)
+    )
+    assert decoded is not None
+    assert decoded.user_id == USER_ID
+    assert decoded.wishlist_id == WISHLIST_ID
+    assert decoded.share_token is None
+
+
+def test_encode_roundtrips_private_with_token() -> None:
+    token = "tok_ABC-123_xyz"
+    decoded = decode_wishlist_start_param(
+        encode_wishlist_start_param(USER_ID, WISHLIST_ID, token)
+    )
+    assert decoded is not None
+    assert decoded.share_token == token
+
+
+@pytest.mark.parametrize(
+    "evil_title",
+    [
+        "<script>alert(1)</script>",
+        '"><img src=x onerror=alert(1)>',
+        "a</a><b>injected",
+        "A & B < C > D",
+    ],
+)
+def test_share_message_escapes_html_in_title(evil_title: str) -> None:
+    start_param = encode_wishlist_start_param(USER_ID, WISHLIST_ID)
+    message = _build_wishlist_share_message(
+        start_param, evil_title, "Here, see my wishlist:"
+    )
+
+    # no attacker markup survives; only our single anchor tag is emitted
+    assert "<script" not in message
+    assert "<img" not in message
+    assert "<b>" not in message
+    assert message.count("<a href=") == 1
+    assert message.count("</a>") == 1

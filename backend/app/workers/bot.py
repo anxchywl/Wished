@@ -2,6 +2,7 @@
 import asyncio
 import html
 import logging
+import time
 from uuid import UUID, uuid4
 
 from aiogram import Bot, Dispatcher, F, types
@@ -26,7 +27,10 @@ from app.db.models.group_gifts import GroupGift, GroupGiftContribution
 from app.db.models.wishlists import Wishlist
 from app.db.session import async_session_factory, dispose_db
 from app.integrations.redis import close_redis, get_redis_client
-from app.integrations.telegram.start_param import decode_wishlist_start_param
+from app.integrations.telegram.start_param import (
+    decode_wishlist_start_param,
+    encode_wishlist_start_param,
+)
 from app.modules.group_gifts import service as group_gift_service
 from app.modules.notifications.worker import run_notification_worker
 from app.modules.users.discovery import create_discovery_token
@@ -517,13 +521,27 @@ async def gg_reject_handler(callback: types.CallbackQuery) -> None:
 
 
 INLINE_QUERY_CACHE_TIME = 30
+INLINE_QUERY_RATE_LIMIT = 20
+INLINE_QUERY_RATE_WINDOW_SECONDS = 60
+# global ceiling on inline queries that reach the database, across all users — a
+# botnet of many accounts can each stay under the per-user limit, so this bounds the
+# aggregate DB/CPU load from well-formed-but-fake payloads. Sized well above any
+# realistic legitimate aggregate for this app.
+INLINE_QUERY_GLOBAL_LIMIT = 600
+INLINE_QUERY_GLOBAL_WINDOW_SECONDS = 60
+# the raw inline query string is bounded by Telegram (256 bytes), but cap it
+# defensively before doing any work so oversized payloads are dropped cheaply
+INLINE_QUERY_MAX_LENGTH = 256
 
 
 def _build_wishlist_share_message(start_param: str, title: str, prefix: str) -> str:
-    """build the HTML inline message: localized prefix + wishlist name as a hidden deep link"""
+    """build the HTML inline message: localized prefix + wishlist name as a hidden deep link.
+
+    `start_param` must be rebuilt from trusted database values by the caller — never
+    the raw inline query — so attacker-supplied bytes can't leak into the link.
+    """
     settings = get_settings()
     bot_username = settings.telegram_bot_username or "wished_app_bot"
-    # start_param is base64url + url-safe token, so it needs no further encoding
     deep_link = f"https://t.me/{bot_username}/wished?startapp={start_param}"
     safe_title = html.escape(title) or "Wished"
     # the deep link lives only in the href so Telegram still renders the Mini App
@@ -531,40 +549,124 @@ def _build_wishlist_share_message(start_param: str, title: str, prefix: str) -> 
     return f'{html.escape(prefix)}\n<a href="{html.escape(deep_link, quote=True)}">{safe_title}</a>'
 
 
-async def inline_query_handler(inline_query: types.InlineQuery) -> None:
-    """serve a clean shareable wishlist message via Telegram inline mode"""
-    if not inline_query.from_user:
-        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
-        return
+async def _allow_inline_query(telegram_id: int) -> bool:
+    """rate limit inline queries per user; fail closed on redis errors"""
+    try:
+        redis = get_redis_client()
+        key = f"rate:inline-query:{telegram_id}"
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, INLINE_QUERY_RATE_WINDOW_SECONDS)
+        return count <= INLINE_QUERY_RATE_LIMIT
+    except RedisError:
+        logger.exception("inline query rate limit failed")
+        return False
 
-    text = BOT_TEXT[await _get_user_lang(inline_query.from_user.id)]
 
-    # the query is "<start_param> <title>"; we only trust the start param and load
-    # the authoritative title from the database — never the inline-supplied title
-    start_param = inline_query.query.strip().split(" ", 1)[0]
+async def _allow_inline_query_global() -> bool:
+    """global ceiling on DB-bound inline queries across all users; fail closed.
+
+    Checked only once a payload is well-formed enough to require a database lookup,
+    so distributed floods of fake-but-valid start params can't exhaust the DB.
+    """
+    try:
+        redis = get_redis_client()
+        # fixed 60s window bucket — coarse but enough to cap aggregate DB load
+        bucket = int(time.time()) // INLINE_QUERY_GLOBAL_WINDOW_SECONDS
+        key = f"rate:inline-query:global:{bucket}"
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, INLINE_QUERY_GLOBAL_WINDOW_SECONDS)
+        return count <= INLINE_QUERY_GLOBAL_LIMIT
+    except RedisError:
+        logger.exception("inline query global rate limit failed")
+        return False
+
+
+async def _resolve_inline_results(
+    inline_query: types.InlineQuery,
+) -> tuple[list[InlineQueryResultArticle], int]:
+    """resolve an inline query to (results, cache_time); [] means no result is served.
+
+    Every rejection returns an identical empty result so the response never reveals
+    whether a wishlist exists, is private, or has a blocked owner.
+    """
+    from_user = inline_query.from_user
+    assert from_user is not None  # guaranteed by the caller
+
+    if not await _allow_inline_query(from_user.id):
+        return [], INLINE_QUERY_CACHE_TIME
+
+    if len(inline_query.query) > INLINE_QUERY_MAX_LENGTH:
+        return [], INLINE_QUERY_CACHE_TIME
+
+    # the query is "<start_param> <lang> <title>"; we only trust the start param and
+    # load the authoritative title from the database — never the inline-supplied title
+    parts = inline_query.query.strip().split(" ", 2)
+    start_param = parts[0] if parts else ""
+
+    # decode first: malformed / fuzzed / oversized payloads are rejected here with no
+    # database access at all
     decoded = decode_wishlist_start_param(start_param)
     if decoded is None:
-        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
-        return
+        return [], INLINE_QUERY_CACHE_TIME
+
+    # the payload is well-formed and about to hit the database — enforce the global
+    # ceiling so a distributed flood of fake start params can't exhaust the DB
+    if not await _allow_inline_query_global():
+        return [], INLINE_QUERY_CACHE_TIME
+
+    # localize using the language selected in the Mini App; fall back to the bot's
+    # stored preference, then English, if the query carries no valid language
+    query_lang = parts[1] if len(parts) > 1 else ""
+    lang = query_lang if query_lang in BOT_TEXT else await _get_user_lang(from_user.id)
+    text = BOT_TEXT[lang]
 
     async with async_session_factory() as db:
-        result = await db.execute(select(Wishlist).where(Wishlist.id == decoded.wishlist_id))
-        wishlist = result.scalar_one_or_none()
+        # blocked senders may not use inline sharing (inline mode bypasses the API
+        # auth layer that enforces this everywhere else)
+        sharer_blocked = (
+            await db.execute(select(User.is_blocked).where(User.telegram_id == from_user.id))
+        ).scalar_one_or_none()
+        if sharer_blocked:
+            return [], INLINE_QUERY_CACHE_TIME
 
-    # reject missing wishlists, and private ones without a valid share token
-    if wishlist is None:
-        await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
-        return
+        # load the wishlist and the owner's moderation flag in one indexed query
+        row = (
+            await db.execute(
+                select(Wishlist, User.is_blocked)
+                .join(User, User.id == Wishlist.owner_user_id)
+                .where(Wishlist.id == decoded.wishlist_id)
+            )
+        ).first()
+
+    # missing wishlist or blocked owner — content is not shareable
+    if row is None:
+        return [], INLINE_QUERY_CACHE_TIME
+    wishlist, owner_blocked = row
+    if owner_blocked:
+        return [], INLINE_QUERY_CACHE_TIME
+
+    trusted_share_token: str | None = None
+    cache_time = INLINE_QUERY_CACHE_TIME
     if wishlist.visibility != "public":
         valid = await validate_wishlist_share_token(
             get_redis_client(), decoded.share_token, decoded.wishlist_id
         )
         if not valid:
-            await inline_query.answer([], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
-            return
+            return [], INLINE_QUERY_CACHE_TIME
+        trusted_share_token = decoded.share_token
+        # never let Telegram cache a private share: the token may be revoked at any
+        # time, so each query must be re-validated against Redis
+        cache_time = 0
 
+    # rebuild the deep link from the trusted wishlist row (and validated token for
+    # private lists) instead of echoing the attacker-controlled query back out
+    trusted_start_param = encode_wishlist_start_param(
+        wishlist.owner_user_id, wishlist.id, trusted_share_token
+    )
     message_text = _build_wishlist_share_message(
-        start_param, wishlist.title, text["share_wishlist_prefix"]
+        trusted_start_param, wishlist.title, text["share_wishlist_prefix"]
     )
     article = InlineQueryResultArticle(
         id=uuid4().hex,
@@ -575,7 +677,34 @@ async def inline_query_handler(inline_query: types.InlineQuery) -> None:
             parse_mode="HTML",
         ),
     )
-    await inline_query.answer([article], cache_time=INLINE_QUERY_CACHE_TIME, is_personal=True)
+    return [article], cache_time
+
+
+async def inline_query_handler(inline_query: types.InlineQuery) -> None:
+    """serve a clean shareable wishlist message via Telegram inline mode.
+
+    Inline mode is open to every Telegram user in any chat, so the entire query is
+    treated as hostile: it is rate limited, length capped, the start param is the
+    only trusted input, and the outgoing deep link is rebuilt from the database row.
+    Any unexpected failure (Redis/DB outage, etc.) fails closed with an empty result
+    and never leaks internal details to the client.
+    """
+    from_user = inline_query.from_user
+    if from_user is None:
+        return
+
+    results: list[InlineQueryResultArticle] = []
+    cache_time = INLINE_QUERY_CACHE_TIME
+    try:
+        results, cache_time = await _resolve_inline_results(inline_query)
+    except Exception:
+        # log without any payload / token / link, then fall through to an empty answer
+        logger.exception("inline query handler failed for telegram_id=%s", from_user.id)
+
+    try:
+        await inline_query.answer(results, cache_time=cache_time, is_personal=True)
+    except Exception:
+        logger.exception("inline query answer failed for telegram_id=%s", from_user.id)
 
 
 async def main() -> None:

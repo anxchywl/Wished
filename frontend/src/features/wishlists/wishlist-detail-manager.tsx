@@ -122,7 +122,7 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
   const accessToken = useAuthStore((state) => state.accessToken);
   const authStatus = useAuthStore((state) => state.authStatus);
   const fallbackCover = useUIStore((state) => state.coverStyle);
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const profileQuery = useProfileQuery(accessToken);
   const currentUserId = profileQuery.data?.id;
 
@@ -342,9 +342,11 @@ export function WishlistDetailManager({ wishlistId }: WishlistDetailManagerProps
     // name as a hidden deep link. The bot's inline_query handler builds the result.
     if (typeof webApp?.switchInlineQuery === "function") {
       try {
-        // keep the inline query well under Telegram's 256-char limit
+        // keep the inline query well under Telegram's 256-char limit.
+        // format: "<startParam> <lang> <title>" — the bot localizes the shared
+        // message prefix using the language selected in the Mini App
         const compactTitle = title.slice(0, 100);
-        const query = compactTitle ? `${startParam} ${compactTitle}` : startParam;
+        const query = `${startParam} ${lang} ${compactTitle}`.trimEnd();
         webApp.switchInlineQuery(query, ["users", "groups", "channels"]);
         return;
       } catch {
