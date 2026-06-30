@@ -27,7 +27,7 @@ import { userQueryKeys, useFollowingQuery } from "@/features/users/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@/lib/i18n/useTranslation";
 import { CoverHeader } from "@/components/ui/cover-header";
-import { BookingVisibilityHeaderButton, ShareProfileButton } from "@/features/users/user-discovery-manager";
+import { BookingVisibilityHeaderButton } from "@/features/users/user-discovery-manager";
 import { useBookedWishesQuery } from "@/features/reservations/hooks";
 import { BottomNav } from "@/components/ui/bottom-nav";
 import { logStartup } from "@/lib/debug/startup-log";
@@ -275,12 +275,7 @@ function PersistentLayout({ children }: { children: ReactNode }) {
     hideProfile = true;
   }
 
-  const extraControls = pathname === "/users" ? (
-    <>
-      <ShareProfileButton />
-      <BookingVisibilityHeaderButton />
-    </>
-  ) : undefined;
+  const extraControls = pathname === "/users" ? <BookingVisibilityHeaderButton /> : undefined;
 
   // Render the full shell unconditionally so the browser pre-paints the content
   // on its own compositing layer while the loading overlay covers it.  When the
@@ -375,7 +370,6 @@ function TelegramDeepLinkHandler() {
 
       const wishlistTarget = decodeWishlistStartParam(startParam);
       if (wishlistTarget) {
-        window.sessionStorage.removeItem("wished/tgStartParam");
         let url =
           `/users?profile_id=${encodeURIComponent(wishlistTarget.userId)}` +
           `&wishlist=${encodeURIComponent(wishlistTarget.wishlistId)}`;
@@ -388,7 +382,6 @@ function TelegramDeepLinkHandler() {
 
       const publicUsername = decodeProfileStartParam(startParam);
       if (publicUsername) {
-        window.sessionStorage.removeItem("wished/tgStartParam");
         setPendingUrl(`/users?profile_public=${encodeURIComponent(publicUsername)}`);
         return;
       }
@@ -397,7 +390,6 @@ function TelegramDeepLinkHandler() {
       const token = startParam.slice(0, PROFILE_TOKEN_LENGTH);
       const username = startParam.slice(PROFILE_TOKEN_LENGTH);
       if (!username) return;
-      window.sessionStorage.removeItem("wished/tgStartParam");
       setPendingUrl(`/users?profile=${encodeURIComponent(username)}&profile_token=${encodeURIComponent(token)}`);
     }
 
@@ -421,6 +413,10 @@ function TelegramDeepLinkHandler() {
       current.get("profile_public")?.toLowerCase() === pendingParams.get("profile_public")?.toLowerCase() &&
       current.get("profile_id") === pendingParams.get("profile_id") &&
       current.get("wishlist") === pendingParams.get("wishlist");
+    // the deep link has now been handled — safe to drop the persisted param so it
+    // doesn't re-trigger on later navigations (kept until here so a reload during
+    // auth/onboarding can still recover the destination)
+    window.sessionStorage.removeItem("wished/tgStartParam");
     if (alreadyThere) {
       setPendingUrl(null);
       return;
