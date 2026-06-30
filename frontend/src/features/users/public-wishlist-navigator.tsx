@@ -488,7 +488,7 @@ function PublicUserView({
                     <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
                     <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
                   </svg>
-                  {new Date(profile.birthday).toLocaleDateString(undefined, { month: "long", day: "numeric" })}
+                  {formatBirthday(profile.birthday)}
                 </p>
               ) : null}
             </div>
