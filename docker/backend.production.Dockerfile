@@ -19,4 +19,7 @@ USER wished
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Multiple workers so one CPU-bound request (image processing) can't stall others;
+# WEB_CONCURRENCY is tunable per host (default 2 — matches a 2-core box). Access
+# logging is disabled because Caddy already logs every request at the edge.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY:-2} --no-access-log"]

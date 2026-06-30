@@ -33,6 +33,7 @@ services:
     container_name: wished-backend
     environment:
       APP_ENV: production
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
       APP_NAME: ${APP_NAME:-Wished API}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
@@ -80,7 +81,7 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    mem_limit: 768m
+    mem_limit: 1g
     pids_limit: 512
     networks:
       - wished-app

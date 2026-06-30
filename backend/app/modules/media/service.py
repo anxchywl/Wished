@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID, uuid4
 
@@ -85,9 +86,11 @@ async def upload_wish_image(
         content=content,
     )
 
-    # server-side processing: strip EXIF, convert to WebP, generate variants
+    # server-side processing: strip EXIF, convert to WebP, generate variants.
+    # Pillow decode/encode is CPU-heavy and blocks the event loop, so run it in a
+    # worker thread (Pillow releases the GIL during codec work, so this parallelizes).
     try:
-        thumbnail_bytes, medium_bytes = process_image(content)
+        thumbnail_bytes, medium_bytes = await asyncio.to_thread(process_image, content)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -100,8 +103,9 @@ async def upload_wish_image(
     medium_name = f"wishes/{wish_id}/{image_id}-m"
     thumb_name = f"wishes/{wish_id}/{image_id}-t"
 
-    upload_object(bucket, medium_name, medium_bytes, "image/webp")
-    upload_object(bucket, thumb_name, thumbnail_bytes, "image/webp")
+    # MinIO SDK is synchronous (blocking network I/O); offload so the loop stays free.
+    await asyncio.to_thread(upload_object, bucket, medium_name, medium_bytes, "image/webp")
+    await asyncio.to_thread(upload_object, bucket, thumb_name, thumbnail_bytes, "image/webp")
 
     image = WishImage(
         id=image_id,
@@ -144,7 +148,7 @@ async def delete_wish_image(
 
     for obj in _image_object_names(image):
         try:
-            delete_object(image.bucket, obj)
+            await asyncio.to_thread(delete_object, image.bucket, obj)
         except Exception as exc:
             logger.error("failed to delete minio object %s/%s: %s", image.bucket, obj, exc)
     await db.delete(image)

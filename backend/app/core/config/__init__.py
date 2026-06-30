@@ -102,6 +102,14 @@ class Settings(BaseSettings):
     # False by default — use the direct TCP connection IP for rate limiting
     trust_proxy_headers: bool = False
 
+    # SQLAlchemy connection pool sizing. Each uvicorn worker gets its own pool, so the
+    # max Postgres connections used is roughly (db_pool_size + db_max_overflow) * WEB_CONCURRENCY.
+    # Keep that product comfortably under Postgres max_connections (default 100).
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 1800
+
     admin_telegram_ids: list[int] = Field(default_factory=list)
 
     @field_validator("admin_telegram_ids", mode="before")

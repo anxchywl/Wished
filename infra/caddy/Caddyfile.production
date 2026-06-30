@@ -27,6 +27,10 @@
         -X-Powered-By
     }
 
+    # compress responses at the edge (JSON API + HTML/JS); Caddy skips
+    # already-compressed types like images, so media objects pass through untouched
+    encode zstd gzip
+
     request_body {
         max_size 10MB
     }
@@ -66,6 +70,8 @@ events.anxchywl.dev {
         -Server
         -X-Powered-By
     }
+
+    encode zstd gzip
 
     request_body {
         max_size 10MB
