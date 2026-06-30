@@ -1,3 +1,18 @@
+# Global options: connection/slow-attack hardening at the edge.
+# read_header guards against Slowloris (slow header dribbling); read_body
+# guards slow-body POST floods; idle reaps idle keep-alive connections so
+# they can't be held open to exhaust the connection table.
+{
+    servers {
+        timeouts {
+            read_body   10s
+            read_header 5s
+            idle        120s
+        }
+        max_header_size 32KB
+    }
+}
+
 {$CADDY_DOMAIN} {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
@@ -8,6 +23,8 @@
         # constraining script/style sources, so the Next.js app is unaffected
         Content-Security-Policy "object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
         -Server
+        # don't advertise the framework/version to attackers
+        -X-Powered-By
     }
 
     request_body {
@@ -47,6 +64,7 @@ events.anxchywl.dev {
         X-Frame-Options "SAMEORIGIN"
         Referrer-Policy "strict-origin-when-cross-origin"
         -Server
+        -X-Powered-By
     }
 
     request_body {
@@ -59,4 +77,10 @@ events.anxchywl.dev {
         output stderr
         format json
     }
+}
+
+# Bare apex and www both resolve to this host but had no site block, so visitors
+# hitting them got a TLS handshake error. Canonicalize them to the Wished app.
+anxchywl.dev, www.anxchywl.dev {
+    redir https://wished.anxchywl.dev{uri} permanent
 }
