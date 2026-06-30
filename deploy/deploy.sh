@@ -34,11 +34,8 @@ fi
 
 log "Deploying with ${COMPOSE_FILE} ..."
 
-log "Pulling base images..."
-docker compose "${COMPOSE_ARGS[@]}" pull --quiet 2>/dev/null || true
-
-log "Building application images..."
-docker compose "${COMPOSE_ARGS[@]}" build
+log "Pulling images (including prebuilt app images from registry)..."
+docker compose "${COMPOSE_ARGS[@]}" pull --quiet
 
 log "Stopping app-layer services before migrations..."
 # release data-network endpoints so compose can reconcile network config safely

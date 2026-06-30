@@ -51,9 +51,11 @@ def _sum_committed(contributions: list[GroupGiftContribution]) -> Decimal:
     )
 
 
-def _participant_count(non_cancelled: list[GroupGiftContribution]) -> int:
-    """organizer + active contributors"""
-    return 1 + len(non_cancelled)
+def _participant_count(gift: GroupGift, non_cancelled: list[GroupGiftContribution]) -> int:
+    """unique participants: organizer + active contributors (organizer may also be a contributor)"""
+    contributor_ids = {c.contributor_user_id for c in non_cancelled}
+    contributor_ids.add(gift.organizer_user_id)
+    return len(contributor_ids)
 
 
 def _build_group_gift_response(
@@ -145,7 +147,7 @@ def _build_group_gift_response(
         ),
         organizer_display_name=organizer_display_name,
         created_at=gift.created_at,
-        participant_count=_participant_count(accepted_contributions),
+        participant_count=_participant_count(gift, accepted_contributions),
         cancel_approval_count=len(cancel_approvals),
         unbook_approval_count=len(unbook_approvals),
         my_cancel_approval=any(a.user_id == current_user.id for a in cancel_approvals),
@@ -495,7 +497,7 @@ async def toggle_group_gift_approval(
         gift.approvals.append(new_approval)
 
     type_approvals = [a for a in gift.approvals if a.approval_type == approval_type]
-    participant_count = _participant_count(non_cancelled)
+    participant_count = _participant_count(gift, non_cancelled)
 
     if len(type_approvals) >= participant_count:
         # unanimous — execute the action in the same transaction then commit once

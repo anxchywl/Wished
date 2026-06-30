@@ -2,6 +2,7 @@ name: wished
 
 services:
   frontend:
+    image: ghcr.io/${REGISTRY_OWNER:-anxchywl}/wished-frontend:latest
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
@@ -25,7 +26,7 @@ services:
       - wished-app
 
   backend:
-    image: wished-backend
+    image: ghcr.io/${REGISTRY_OWNER:-anxchywl}/wished-backend:latest
     build:
       context: ..
       dockerfile: docker/backend.production.Dockerfile
@@ -217,6 +218,7 @@ services:
   # so that `docker compose down -v` cannot destroy them.
   # Configure BACKUP_EXTERNAL_ENABLED=true + S3 credentials for off-server copies.
   backup:
+    image: ghcr.io/${REGISTRY_OWNER:-anxchywl}/wished-backup:latest
     build:
       context: ..
       dockerfile: docker/backup.Dockerfile
