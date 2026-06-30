@@ -175,7 +175,7 @@ services:
       - wished-data
 
   bot:
-    image: wished-backend
+    image: ghcr.io/${REGISTRY_OWNER:-anxchywl}/wished-backend:latest
     container_name: wished-bot
     command: python -m app.workers.bot
     environment:
