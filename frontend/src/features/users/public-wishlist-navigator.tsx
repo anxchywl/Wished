@@ -294,7 +294,7 @@ export function PublicWishlistNavigator({
           <span className="w-10" />
         </div>
 
-        <div className="public-nav-viewport">
+        <div className={`public-nav-viewport ${current.view === "wish" ? "wish-detail-viewport" : ""}`}>
           {guardDecision === "startup" ? (
             <div className="public-nav-frame">
               <div className="public-nav-content">

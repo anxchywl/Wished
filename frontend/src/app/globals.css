@@ -1721,11 +1721,18 @@ html[data-theme="dark"] .privacy-option-active {
   padding-bottom: 2px;
 }
 
+.public-nav-viewport.wish-detail-viewport {
+  max-height: min(72dvh, 620px);
+  padding-bottom: 4px;
+  scroll-padding-bottom: 16px;
+}
+
 .modal-sheet-nav-host .wish-detail-viewport {
   flex: 0 1 auto;
+  max-height: min(72dvh, 620px);
   overflow-y: auto;
-  padding-bottom: 18px;
-  scroll-padding-bottom: 36px;
+  padding-bottom: 4px;
+  scroll-padding-bottom: 16px;
 }
 
 .public-nav-frame {
