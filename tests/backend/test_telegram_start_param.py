@@ -14,7 +14,9 @@ def _encode_binary(user_id: UUID, wishlist_id: UUID, share_token: str = "") -> s
 
 
 def test_decode_binary_with_share_token() -> None:
-    decoded = decode_wishlist_start_param(_encode_binary(USER_ID, WISHLIST_ID, "abc123"))
+    decoded = decode_wishlist_start_param(
+        _encode_binary(USER_ID, WISHLIST_ID, "abc123")
+    )
     assert decoded is not None
     assert decoded.user_id == USER_ID
     assert decoded.wishlist_id == WISHLIST_ID
