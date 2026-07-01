@@ -56,6 +56,7 @@ export type AdminWishItem = {
   id: string;
   wishlist_id: string;
   owner_telegram_id: number;
+  owner_username: string | null;
   title: string;
   status: string;
   created_at: string;

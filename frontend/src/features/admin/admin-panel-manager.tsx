@@ -446,6 +446,49 @@ function ContentTab() {
   );
 }
 
+function OwnerLine({ username, telegramId }: { username: string | null; telegramId: number }) {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  async function copyId() {
+    const id = String(telegramId);
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(id);
+    } else {
+      const input = document.createElement("textarea");
+      input.value = id;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <>
+      {t("adminOwner")}:{" "}
+      {username && (
+        <a href={`https://t.me/${username}`} target="_blank" rel="noreferrer" className="admin-username" style={{ display: "inline", margin: 0 }}>
+          @{username}
+        </a>
+      )}{" "}
+      <button
+        type="button"
+        onClick={copyId}
+        title={copied ? t("adminUsernameCopied") : t("adminCopyUsername")}
+        className="admin-username"
+        style={{ display: "inline", margin: 0 }}
+      >
+        ({telegramId})
+      </button>
+    </>
+  );
+}
+
 function WishlistRow({ item }: { item: AdminWishlistItem }) {
   const { t } = useTranslation();
   const visibilityMap: Record<string, string> = {
@@ -456,7 +499,7 @@ function WishlistRow({ item }: { item: AdminWishlistItem }) {
     <article className="admin-list-card">
       <div className="admin-list-title">{item.title}</div>
       <div className="admin-list-meta">
-        {t("adminOwner")}: {item.owner_username ? `@${item.owner_username}` : `tg:${item.owner_telegram_id}`} · {item.wish_count} {t("adminWishesCount")} · {visibilityMap[item.visibility] ?? item.visibility}
+        <OwnerLine username={item.owner_username} telegramId={item.owner_telegram_id} /> · {item.wish_count} {t("adminWishesCount")} · {visibilityMap[item.visibility] ?? item.visibility}
       </div>
       <div className="admin-list-meta">
         {new Date(item.created_at).toLocaleDateString()}
@@ -476,7 +519,7 @@ function WishRow({ item }: { item: AdminWishItem }) {
     <article className="admin-list-card">
       <div className="admin-list-title">{item.title}</div>
       <div className="admin-list-meta">
-        {t("adminOwner")}: tg:{item.owner_telegram_id} · {statusMap[item.status] ?? item.status} · {item.image_count} {t("adminImagesCount")}
+        <OwnerLine username={item.owner_username} telegramId={item.owner_telegram_id} /> · {statusMap[item.status] ?? item.status} · {item.image_count} {t("adminImagesCount")}
         {item.has_reservation && ` · ${t("adminReserved")}`}
       </div>
       <div className="admin-list-meta">

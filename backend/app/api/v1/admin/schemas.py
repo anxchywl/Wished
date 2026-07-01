@@ -56,6 +56,7 @@ class AdminWishItem(BaseModel):
     id: UUID
     wishlist_id: UUID
     owner_telegram_id: int
+    owner_username: str | None
     title: str
     status: str
     created_at: str

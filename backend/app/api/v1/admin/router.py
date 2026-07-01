@@ -294,6 +294,7 @@ async def list_wishes(
                 id=wish.id,
                 wishlist_id=wish.wishlist_id,
                 owner_telegram_id=owner.telegram_id,
+                owner_username=owner.username,
                 title=wish.title,
                 status=wish.status,
                 created_at=wish.created_at.isoformat(),
