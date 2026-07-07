@@ -114,6 +114,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Prevent iOS/WKWebView from auto-zooming when a sub-16px input is focused
+  // (Telegram Mini App runs in a fixed webview, so pinch-zoom isn't needed).
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
   interactiveWidget: "overlays-content",
 };

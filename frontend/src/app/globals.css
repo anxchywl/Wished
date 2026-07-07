@@ -149,6 +149,17 @@ input, textarea {
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Guarantee iOS/WKWebView never auto-zooms on focus: it only zooms when a
+   focused form control renders below 16px. Every field in the app uses
+   text-sm (14px) or smaller, so we force a 16px floor on the actual control.
+   !important is required to beat Tailwind's .text-* font-size utilities.
+   Paired with the viewport maximum-scale=1 lock in layout.tsx. */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 .auth-loading-panel {
   min-height: 194px;
   display: flex;
