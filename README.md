@@ -99,6 +99,8 @@ docker compose -f docker/docker-compose.yml up -d
 
 **Enable inline sharing:** in [@BotFather](https://t.me/BotFather) run `/setinline` for your bot to turn on inline mode (any placeholder text works). This powers the clean "Share wishlist" flow; without it the app automatically falls back to the classic share sheet.
 
+**Enable group gifting:** group gift contributions require the bot to have access to payment information. Configure `PAYMENT_PROVIDER_TOKEN` in `.env` using a provider token from [@BotFather](https://t.me/BotFather) (`/mybots` → Payments).
+
 See [docs/INFRASTRUCTURE.md](./docs/INFRASTRUCTURE.md) for full setup, environment variables, and production deployment.
 
 **Reservation privacy:** the wish owner never sees who reserved their wish — not in API responses, notifications, sort order, or counts. This is enforced at the service layer, not just the API surface.
