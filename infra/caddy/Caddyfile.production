@@ -85,6 +85,37 @@ events.anxchywl.dev {
     }
 }
 
+# Gradus: the GPA feature's API (separate compose project: gradus). Like the
+# events app above, its backend joins Wished's proxy network
+# (wished_wished-app) for ingress only and publishes no port of its own. The
+# upstream is the container name rather than the service name, because
+# "backend" already belongs to Wished on this network.
+gradus.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    # a syllabus upload is the largest thing this API accepts; the service caps
+    # it at 4 MB itself and refuses anything bigger, so this only needs headroom
+    request_body {
+        max_size 6MB
+    }
+
+    reverse_proxy gradus-backend-1:8000
+
+    log {
+        output stderr
+        format json
+    }
+}
+
 # Bare apex and www both resolve to this host but had no site block, so visitors
 # hitting them got a TLS handshake error. Canonicalize them to the Wished app.
 anxchywl.dev, www.anxchywl.dev {
