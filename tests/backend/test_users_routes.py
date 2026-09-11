@@ -28,24 +28,18 @@ def test_get_user_profile_returns_profile(monkeypatch) -> None:
         assert username == "bob"
         return target_user
 
-    async def fake_validate_discovery_token(
-        redis, token, requester_tid, target_tid, db=None
-    ):
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
         return False
 
     async def fake_is_following_user(db, current_user, user):
         return False
 
-    monkeypatch.setattr(
-        "app.api.v1.users.router.get_user_by_username", fake_get_user_by_username
-    )
+    monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
     monkeypatch.setattr(
         "app.api.v1.users.router.validate_discovery_token",
         fake_validate_discovery_token,
     )
-    monkeypatch.setattr(
-        "app.api.v1.users.router.is_following_user", fake_is_following_user
-    )
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob")
 
@@ -68,9 +62,7 @@ def test_get_user_profile_by_public_username_returns_profile(monkeypatch) -> Non
         assert public_username == "max"
         return target_user
 
-    async def fake_validate_discovery_token(
-        redis, token, requester_tid, target_tid, db=None
-    ):
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
         return False
 
     async def fake_is_following_user(db, current_user, user):
@@ -117,24 +109,18 @@ def test_get_private_user_profile_returns_not_found(monkeypatch) -> None:
     async def fake_get_user_by_username(db, username):
         return target_user
 
-    async def fake_validate_discovery_token(
-        redis, token, requester_tid, target_tid, db=None
-    ):
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
         return False
 
     async def fake_is_following_user(db, current_user, user):
         return False
 
-    monkeypatch.setattr(
-        "app.api.v1.users.router.get_user_by_username", fake_get_user_by_username
-    )
+    monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
     monkeypatch.setattr(
         "app.api.v1.users.router.validate_discovery_token",
         fake_validate_discovery_token,
     )
-    monkeypatch.setattr(
-        "app.api.v1.users.router.is_following_user", fake_is_following_user
-    )
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob")
 
@@ -162,27 +148,19 @@ def test_get_user_wishlists_returns_visible_wishlists(monkeypatch) -> None:
     async def fake_get_user_by_username(db, username):
         return _user(username="bob")
 
-    async def fake_validate_discovery_token(
-        redis, token, requester_tid, target_tid, db=None
-    ):
+    async def fake_validate_discovery_token(redis, token, requester_tid, target_tid, db=None):
         return False
 
     async def fake_is_following_user(db, current_user, user):
         return False
 
-    monkeypatch.setattr(
-        "app.api.v1.users.router.get_user_by_username", fake_get_user_by_username
-    )
-    monkeypatch.setattr(
-        "app.api.v1.users.router.list_user_wishlists", fake_list_user_wishlists
-    )
+    monkeypatch.setattr("app.api.v1.users.router.get_user_by_username", fake_get_user_by_username)
+    monkeypatch.setattr("app.api.v1.users.router.list_user_wishlists", fake_list_user_wishlists)
     monkeypatch.setattr(
         "app.api.v1.users.router.validate_discovery_token",
         fake_validate_discovery_token,
     )
-    monkeypatch.setattr(
-        "app.api.v1.users.router.is_following_user", fake_is_following_user
-    )
+    monkeypatch.setattr("app.api.v1.users.router.is_following_user", fake_is_following_user)
 
     response = TestClient(app).get("/api/v1/users/bob/wishlists")
 

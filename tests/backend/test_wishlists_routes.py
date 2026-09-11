@@ -48,13 +48,9 @@ def test_create_wishlist_uses_payload_and_current_user(monkeypatch) -> None:
         assert payload.title == "Books"
         assert payload.description == "Things to read"
         assert payload.visibility == "private"
-        return _wishlist(
-            owner_user_id=user.id, title=payload.title, visibility=payload.visibility
-        )
+        return _wishlist(owner_user_id=user.id, title=payload.title, visibility=payload.visibility)
 
-    monkeypatch.setattr(
-        "app.api.v1.wishlists.router.create_wishlist", fake_create_wishlist
-    )
+    monkeypatch.setattr("app.api.v1.wishlists.router.create_wishlist", fake_create_wishlist)
 
     response = TestClient(app).post(
         "/api/v1/wishlists",
@@ -103,16 +99,12 @@ def test_patch_wishlist_reorder_uses_payload(monkeypatch) -> None:
         assert payload.wishlist_ids == wishlist_ids
         return {
             "items": [
-                _wishlist(
-                    owner_user_id=user.id, wishlist_id=wishlist_id, position=index
-                )
+                _wishlist(owner_user_id=user.id, wishlist_id=wishlist_id, position=index)
                 for index, wishlist_id in enumerate(wishlist_ids)
             ]
         }
 
-    monkeypatch.setattr(
-        "app.api.v1.wishlists.router.reorder_wishlists", fake_reorder_wishlists
-    )
+    monkeypatch.setattr("app.api.v1.wishlists.router.reorder_wishlists", fake_reorder_wishlists)
 
     response = TestClient(app).patch(
         "/api/v1/wishlists/reorder",
@@ -145,9 +137,7 @@ def test_patch_wishlist_rejects_null_title() -> None:
     app.dependency_overrides[get_current_user] = lambda: _user()
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    response = TestClient(app).patch(
-        f"/api/v1/wishlists/{uuid4()}", json={"title": None}
-    )
+    response = TestClient(app).patch(f"/api/v1/wishlists/{uuid4()}", json={"title": None})
 
     assert response.status_code == 422
 
@@ -164,9 +154,7 @@ def test_delete_wishlist_returns_no_content(monkeypatch) -> None:
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
 
-    monkeypatch.setattr(
-        "app.api.v1.wishlists.router.delete_wishlist", fake_delete_wishlist
-    )
+    monkeypatch.setattr("app.api.v1.wishlists.router.delete_wishlist", fake_delete_wishlist)
 
     response = TestClient(app).delete(f"/api/v1/wishlists/{wishlist_id}")
 
@@ -186,9 +174,7 @@ def test_upload_wishlist_cover_passes_file_and_security_dependencies(
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_redis] = lambda: redis
 
-    async def fake_upload(
-        db, current_user, requested_id, file, current_settings, current_redis
-    ):
+    async def fake_upload(db, current_user, requested_id, file, current_settings, current_redis):
         assert current_user is user
         assert requested_id == wishlist_id
         assert file.filename == "cover.jpg"
@@ -196,9 +182,7 @@ def test_upload_wishlist_cover_passes_file_and_security_dependencies(
         assert current_redis is redis
         return _wishlist(owner_user_id=user.id, wishlist_id=wishlist_id)
 
-    monkeypatch.setattr(
-        "app.api.v1.wishlists.router.upload_wishlist_cover", fake_upload
-    )
+    monkeypatch.setattr("app.api.v1.wishlists.router.upload_wishlist_cover", fake_upload)
 
     response = TestClient(app).post(
         f"/api/v1/wishlists/{wishlist_id}/cover",

@@ -20,9 +20,9 @@ def test_get_me_returns_current_profile() -> None:
     payload = response.json()
     assert payload["public_username"] == "alice"
     assert payload["public_profile_url"].endswith("/@alice")
-    assert payload["telegram_startapp_url"] is None or payload[
-        "telegram_startapp_url"
-    ].endswith("?startapp=p_alice")
+    assert payload["telegram_startapp_url"] is None or payload["telegram_startapp_url"].endswith(
+        "?startapp=p_alice"
+    )
     assert payload == {
         "id": str(user.id),
         "telegram_id": 123456789,

@@ -1,0 +1,7 @@
+# ruff resolves configuration by walking up from each file, so backend/ found
+# backend/pyproject.toml while tests/backend/ found nothing and fell back to the
+# tool's built-in defaults. CI lints both paths in one command, so half of it was
+# being checked against a rule set nobody chose. This file puts the whole
+# repository under the backend's configuration; the settings themselves stay in
+# backend/pyproject.toml alongside mypy's and pytest's.
+extend = "backend/pyproject.toml"

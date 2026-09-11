@@ -179,11 +179,7 @@ class TestProductionComposeBackupService:
         for line in lines:
             if line.strip() == "volumes:":
                 in_volumes_section = True
-            if (
-                in_volumes_section
-                and "backup-data:" in line
-                and not line.strip().startswith("#")
-            ):
+            if in_volumes_section and "backup-data:" in line and not line.strip().startswith("#"):
                 raise AssertionError(
                     "backup-data appears as a named Docker volume — "
                     "it must be a host-bind-mount to survive `docker compose down -v`"
@@ -201,9 +197,7 @@ class TestProductionComposeBackupService:
     def test_no_down_v_in_prod_compose(self):
         # "down -v" may appear in comments but must not be an actual command
         non_comment_lines = [
-            line
-            for line in self._compose_text().splitlines()
-            if not line.lstrip().startswith("#")
+            line for line in self._compose_text().splitlines() if not line.lstrip().startswith("#")
         ]
         text = "\n".join(non_comment_lines)
         assert "down -v" not in text

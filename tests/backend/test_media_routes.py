@@ -110,9 +110,7 @@ def test_upload_wish_image_accepts_valid_png(monkeypatch) -> None:
     app, _ = _make_app(monkeypatch, {"upload_wish_image": fake_upload})
     resp = TestClient(app).post(
         f"/api/v1/wishes/{wish_id}/images",
-        files={
-            "file": ("photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")
-        },
+        files={"file": ("photo.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 100, "image/png")},
     )
     assert resp.status_code == 201
 
@@ -185,9 +183,7 @@ def test_validate_image_upload_rejects_double_extension() -> None:
 
     # e.g. malware.php.jpg — extension is "jpg" but content is not JPEG
     with pytest.raises(HTTPException) as exc_info:
-        validate_image_upload(
-            "malware.php.jpg", "image/jpeg", b"<?php system($_GET['cmd']); ?>"
-        )
+        validate_image_upload("malware.php.jpg", "image/jpeg", b"<?php system($_GET['cmd']); ?>")
     # magic bytes fail — file content is not a JPEG
     assert exc_info.value.status_code == 415
 
