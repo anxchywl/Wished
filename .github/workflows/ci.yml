@@ -111,6 +111,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-and-test, migration-safety, docker-build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Deploy to server
@@ -119,13 +122,17 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: GHCR_READ_TOKEN,GITHUB_ACTOR
+          envs: REGISTRY_TOKEN,GITHUB_ACTOR
           script: |
-            echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+            # without this a failed git pull still runs deploy.sh on whatever is on disk
+            set -eu
+            echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
             cd ${{ secrets.SSH_PATH }}
             git stash push --include-untracked -m "pre-deploy $(date -u +%Y-%m-%dT%H:%M:%SZ)" || true
             git pull --ff-only
             bash deploy/deploy.sh
         env:
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          # the job's own token: it expires with the run, and it can pull what
+          # docker-build pushed with the same token
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
