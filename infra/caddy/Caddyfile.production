@@ -90,3 +90,93 @@ events.anxchywl.dev {
 anxchywl.dev, www.anxchywl.dev {
     redir https://wished.anxchywl.dev{uri} permanent
 }
+
+# Loci Telegram Mini App (separate compose project: loci).
+# This shared Caddy instance fronts Loci because ports 80/443 are already owned here.
+loci.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    request_body {
+        max_size 10MB
+    }
+
+    handle /api/* {
+        reverse_proxy loci-api-1:8000
+    }
+
+    handle /health {
+        reverse_proxy loci-api-1:8000
+    }
+
+    handle {
+        reverse_proxy loci-web-1:3000
+    }
+
+    log {
+        output stderr
+        format json
+    }
+}
+
+# Muto marketplace API (separate compose project: muto).
+# This shared Caddy instance fronts Muto because ports 80/443 are already owned here.
+muto.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    request_body {
+        max_size 10MB
+    }
+
+    reverse_proxy muto-backend-1:8000
+
+    log {
+        output stderr
+        format json
+    }
+}
+
+# Gradus GPA API (separate compose project: gradus).
+# This shared Caddy instance fronts Gradus because ports 80/443 are already owned here.
+gradus.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    # the service caps a syllabus upload at 4 MB itself; this rejects anything
+    # far past that at the edge, before it reaches the app
+    request_body {
+        max_size 6MB
+    }
+
+    reverse_proxy gradus-backend-1:8000
+
+    log {
+        output stderr
+        format json
+    }
+}
