@@ -18,9 +18,7 @@ from fastapi import HTTPException
 def test_validate_preview_url_accepts_wildberries() -> None:
     from app.modules.link_preview.service import validate_preview_url
 
-    url, hostname = validate_preview_url(
-        "https://www.wildberries.ru/catalog/12345678/detail.aspx"
-    )
+    url, hostname = validate_preview_url("https://www.wildberries.ru/catalog/12345678/detail.aspx")
     assert hostname == "www.wildberries.ru"
 
 
@@ -132,9 +130,7 @@ def _addr(ip: str) -> list:
 async def test_ssrf_check_allows_public_ip() -> None:
     from app.modules.link_preview.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
         await _check_host_not_private("example.com")  # must not raise
 
 
@@ -142,9 +138,7 @@ async def test_ssrf_check_allows_public_ip() -> None:
 async def test_ssrf_check_blocks_loopback() -> None:
     from app.modules.link_preview.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("example.com")
         assert exc_info.value.status_code == 422
@@ -154,9 +148,7 @@ async def test_ssrf_check_blocks_loopback() -> None:
 async def test_ssrf_check_blocks_private_10_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -165,9 +157,7 @@ async def test_ssrf_check_blocks_private_10_range() -> None:
 async def test_ssrf_check_blocks_private_172_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -176,9 +166,7 @@ async def test_ssrf_check_blocks_private_172_range() -> None:
 async def test_ssrf_check_blocks_private_192_168_range() -> None:
     from app.modules.link_preview.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("example.com")
 
@@ -267,9 +255,7 @@ async def test_cache_hit_returns_cached_result() -> None:
     )
     redis = MagicMock()
     redis.get = AsyncMock(return_value=json.dumps(cached.model_dump()).encode())
-    result = await _get_cached(
-        redis, "https://wildberries.ru/catalog/12345/detail.aspx"
-    )
+    result = await _get_cached(redis, "https://wildberries.ru/catalog/12345/detail.aspx")
     assert result is not None
     assert result.title == "Cached Product"
     assert result.source == "wildberries"
@@ -370,9 +356,7 @@ async def test_generic_extractor_extracts_opengraph() -> None:
     mock_client.get = AsyncMock(return_value=mock_response)
 
     extractor = GenericExtractor()
-    result = await extractor.extract(
-        "https://example.com/widget", "example.com", mock_client
-    )
+    result = await extractor.extract("https://example.com/widget", "example.com", mock_client)
 
     assert result.title == "Amazing Widget"
     assert result.image_url == "https://example.com/img.jpg"
@@ -385,9 +369,7 @@ async def test_generic_extractor_extracts_opengraph() -> None:
 async def test_generic_extractor_falls_back_to_title_tag() -> None:
     from app.modules.link_preview.extractors.generic import GenericExtractor
 
-    html = (
-        "<html><head><title>My Shop | Some Product</title></head><body></body></html>"
-    )
+    html = "<html><head><title>My Shop | Some Product</title></head><body></body></html>"
 
     mock_response = MagicMock()
     mock_response.raise_for_status = MagicMock()
@@ -397,9 +379,7 @@ async def test_generic_extractor_falls_back_to_title_tag() -> None:
     mock_client.get = AsyncMock(return_value=mock_response)
 
     extractor = GenericExtractor()
-    result = await extractor.extract(
-        "https://example.com/product", "example.com", mock_client
-    )
+    result = await extractor.extract("https://example.com/product", "example.com", mock_client)
     assert result.title == "My Shop | Some Product"
 
 
@@ -412,9 +392,7 @@ async def test_generic_extractor_returns_empty_on_fetch_failure() -> None:
     mock_client.get = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
 
     extractor = GenericExtractor()
-    result = await extractor.extract(
-        "https://example.com/product", "example.com", mock_client
-    )
+    result = await extractor.extract("https://example.com/product", "example.com", mock_client)
     assert result.title is None
     assert result.image_url is None
     assert result.price is None
@@ -540,9 +518,7 @@ async def test_kaspi_extractor_extracts_metadata() -> None:
     mock_client.get = AsyncMock(return_value=mock_response)
 
     extractor = KaspiExtractor()
-    result = await extractor.extract(
-        "https://kaspi.kz/shop/p/tv-1", "kaspi.kz", mock_client
-    )
+    result = await extractor.extract("https://kaspi.kz/shop/p/tv-1", "kaspi.kz", mock_client)
 
     assert result.title == "Samsung TV 55"
     assert result.price == "149999"
@@ -575,9 +551,7 @@ async def test_ozon_extractor_extracts_metadata() -> None:
     mock_client.get = AsyncMock(return_value=mock_response)
 
     extractor = OzonExtractor()
-    result = await extractor.extract(
-        "https://ozon.ru/product/123/", "ozon.ru", mock_client
-    )
+    result = await extractor.extract("https://ozon.ru/product/123/", "ozon.ru", mock_client)
 
     assert result.title == "iPhone 15 Pro"
     assert result.image_url == "https://ozon.ru/img.jpg"
@@ -638,9 +612,7 @@ async def test_fetch_link_preview_uses_cache_on_hit() -> None:
 
     settings = SimpleNamespace(link_preview_rate_per_hour=20)
 
-    with patch(
-        "app.modules.link_preview.service._check_host_not_private", new=AsyncMock()
-    ):
+    with patch("app.modules.link_preview.service._check_host_not_private", new=AsyncMock()):
         result = await fetch_link_preview(
             "https://wildberries.ru/catalog/111/detail.aspx",
             "wildberries.ru",

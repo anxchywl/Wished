@@ -114,9 +114,7 @@ async def test_start_handler_always_shows_language_selector(monkeypatch) -> None
     """start_handler shows language selector regardless of existing preference"""
     message = FakeMessage()
     user = SimpleNamespace(telegram_id=999, language_code="en")
-    monkeypatch.setattr(
-        bot, "get_redis_client", lambda: FakeRedis({"bot:lang_pref:999": "en"})
-    )
+    monkeypatch.setattr(bot, "get_redis_client", lambda: FakeRedis({"bot:lang_pref:999": "en"}))
     monkeypatch.setattr(bot, "async_session_factory", lambda: FakeSession(user=user))
 
     await bot.start_handler(message)
@@ -499,9 +497,7 @@ async def test_users_shared_handler_ignores_current_user(monkeypatch) -> None:
 async def test_start_handler_unknown_language_shows_selector(monkeypatch) -> None:
     """unknown language code in redis is not a valid preference — show selector"""
     message = FakeMessage()
-    monkeypatch.setattr(
-        bot, "get_redis_client", lambda: FakeRedis({"bot:lang_pref:999": "fr"})
-    )
+    monkeypatch.setattr(bot, "get_redis_client", lambda: FakeRedis({"bot:lang_pref:999": "fr"}))
     monkeypatch.setattr(bot, "async_session_factory", lambda: FakeSession(user=None))
 
     await bot.start_handler(message)

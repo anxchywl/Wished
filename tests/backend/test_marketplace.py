@@ -33,18 +33,14 @@ def test_validate_import_url_accepts_www_kaspi() -> None:
 def test_validate_import_url_accepts_wildberries_ru() -> None:
     from app.modules.marketplace.service import validate_import_url
 
-    _, hostname = validate_import_url(
-        "https://wildberries.ru/catalog/12345/detail.aspx"
-    )
+    _, hostname = validate_import_url("https://wildberries.ru/catalog/12345/detail.aspx")
     assert hostname == "wildberries.ru"
 
 
 def test_validate_import_url_accepts_wildberries_kz() -> None:
     from app.modules.marketplace.service import validate_import_url
 
-    _, hostname = validate_import_url(
-        "https://wildberries.kz/catalog/12345/detail.aspx"
-    )
+    _, hostname = validate_import_url("https://wildberries.kz/catalog/12345/detail.aspx")
     assert hostname == "wildberries.kz"
 
 
@@ -154,9 +150,7 @@ def _addr(ip: str) -> list:
 async def test_check_host_not_private_allows_public_ip() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("1.1.1.1")):
         await _check_host_not_private("kaspi.kz")  # must not raise
 
 
@@ -164,9 +158,7 @@ async def test_check_host_not_private_allows_public_ip() -> None:
 async def test_check_host_not_private_blocks_loopback_127() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("127.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("kaspi.kz")
         assert exc_info.value.status_code == 422
@@ -176,9 +168,7 @@ async def test_check_host_not_private_blocks_loopback_127() -> None:
 async def test_check_host_not_private_blocks_10_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("10.0.0.1")):
         with pytest.raises(HTTPException) as exc_info:
             await _check_host_not_private("kaspi.kz")
         assert exc_info.value.status_code == 422
@@ -188,9 +178,7 @@ async def test_check_host_not_private_blocks_10_range() -> None:
 async def test_check_host_not_private_blocks_172_16_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("172.20.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
 
@@ -199,9 +187,7 @@ async def test_check_host_not_private_blocks_172_16_range() -> None:
 async def test_check_host_not_private_blocks_192_168_range() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.100")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("192.168.1.100")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
 
@@ -210,9 +196,7 @@ async def test_check_host_not_private_blocks_192_168_range() -> None:
 async def test_check_host_not_private_blocks_link_local() -> None:
     from app.modules.marketplace.service import _check_host_not_private
 
-    with patch(
-        "app.modules.url_safety.socket.getaddrinfo", return_value=_addr("169.254.0.1")
-    ):
+    with patch("app.modules.url_safety.socket.getaddrinfo", return_value=_addr("169.254.0.1")):
         with pytest.raises(HTTPException):
             await _check_host_not_private("kaspi.kz")
 
@@ -485,9 +469,7 @@ def test_wildberries_parser_falls_back_to_html_selectors() -> None:
       <span class="price-block__wallet-price">2 490 ₽</span>
     </body></html>
     """
-    product = parser.parse(
-        html, "https://wildberries.ru/catalog/999/detail.aspx", "wildberries.ru"
-    )
+    product = parser.parse(html, "https://wildberries.ru/catalog/999/detail.aspx", "wildberries.ru")
 
     assert product.title == "Платье летнее"
     assert product.price == Decimal("2490")

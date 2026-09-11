@@ -44,9 +44,7 @@ async def test_ensure_public_username_uses_available_telegram_username(monkeypat
     async def username_exists(_db, _username):
         return False
 
-    monkeypatch.setattr(
-        "app.modules.users.service._public_username_exists", username_exists
-    )
+    monkeypatch.setattr("app.modules.users.service._public_username_exists", username_exists)
     user = SimpleNamespace(id=uuid4(), public_username=None)
 
     await ensure_public_username(FakeDb(), user, "Max_472")
@@ -61,9 +59,7 @@ async def test_ensure_public_username_falls_back_when_telegram_username_is_missi
     async def username_exists(_db, _username):
         return False
 
-    monkeypatch.setattr(
-        "app.modules.users.service._public_username_exists", username_exists
-    )
+    monkeypatch.setattr("app.modules.users.service._public_username_exists", username_exists)
     user = SimpleNamespace(id=uuid4(), public_username=None)
 
     await ensure_public_username(FakeDb(), user, None)
@@ -77,9 +73,7 @@ async def test_ensure_public_username_skips_taken_preferred_username(monkeypatch
     async def username_exists(_db, username):
         return username == "max"
 
-    monkeypatch.setattr(
-        "app.modules.users.service._public_username_exists", username_exists
-    )
+    monkeypatch.setattr("app.modules.users.service._public_username_exists", username_exists)
     user = SimpleNamespace(id=uuid4(), public_username=None)
 
     await ensure_public_username(FakeDb(), user, "Max")
@@ -122,7 +116,4 @@ def test_profile_urls_are_generated_from_settings():
     )
 
     assert build_public_profile_url(user, settings) == "https://wished.app/@max"
-    assert (
-        build_telegram_startapp_url(user, settings)
-        == "https://t.me/wished_bot?startapp=p_max"
-    )
+    assert build_telegram_startapp_url(user, settings) == "https://t.me/wished_bot?startapp=p_max"

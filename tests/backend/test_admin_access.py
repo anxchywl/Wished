@@ -115,9 +115,7 @@ def test_non_admin_user_cannot_access_admin_api(method: str, path: str) -> None:
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, NON_ADMIN_SETTINGS)
 
-    response = client.request(
-        method, path, headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.request(method, path, headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 403, (
         f"{method} {path} returned {response.status_code} instead of 403 for non-admin"
@@ -125,9 +123,7 @@ def test_non_admin_user_cannot_access_admin_api(method: str, path: str) -> None:
 
 
 @pytest.mark.parametrize("method,path", ADMIN_ENDPOINTS)
-def test_unauthenticated_request_cannot_access_admin_api(
-    method: str, path: str
-) -> None:
+def test_unauthenticated_request_cannot_access_admin_api(method: str, path: str) -> None:
     """requests without a token must receive 401 or 403 on all admin endpoints"""
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, _ = _make_client(user, NON_ADMIN_SETTINGS)
@@ -144,9 +140,7 @@ def test_admin_me_returns_200_for_admin_user() -> None:
     user = _make_user(ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
     data = response.json()
@@ -159,9 +153,7 @@ def test_admin_me_returns_403_for_non_admin_user() -> None:
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, NON_ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 403
 
@@ -171,9 +163,7 @@ def test_non_admin_cannot_access_stats() -> None:
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, NON_ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/stats", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/stats", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 403
 
@@ -183,9 +173,7 @@ def test_non_admin_cannot_list_users() -> None:
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, NON_ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/users", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 403
 
@@ -195,9 +183,7 @@ def test_non_admin_cannot_view_audit_logs() -> None:
     user = _make_user(NON_ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, NON_ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/audit-logs", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/audit-logs", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 403
 
@@ -228,9 +214,7 @@ def test_privilege_escalation_impossible_via_request_body() -> None:
         json={"is_admin": True, "role": "admin"},
     )
 
-    assert response.status_code != 200, (
-        "Body-injected admin claim must not grant admin access"
-    )
+    assert response.status_code != 200, "Body-injected admin claim must not grant admin access"
 
 
 def test_is_admin_dependency_uses_env_ids_not_db_role() -> None:
@@ -239,15 +223,11 @@ def test_is_admin_dependency_uses_env_ids_not_db_role() -> None:
     user = _make_user(ADMIN_TELEGRAM_ID)
     client, token = _make_client(user, ADMIN_SETTINGS)
 
-    response = client.get(
-        "/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/api/v1/admin/me", headers={"Authorization": f"Bearer {token}"})
 
     assert response.status_code == 200
     # user with non-admin telegram_id is rejected even though it's the same db session
     user_non_admin = _make_user(NON_ADMIN_TELEGRAM_ID)
     client2, token2 = _make_client(user_non_admin, ADMIN_SETTINGS)
-    response2 = client2.get(
-        "/api/v1/admin/me", headers={"Authorization": f"Bearer {token2}"}
-    )
+    response2 = client2.get("/api/v1/admin/me", headers={"Authorization": f"Bearer {token2}"})
     assert response2.status_code == 403

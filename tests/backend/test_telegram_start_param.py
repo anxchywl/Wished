@@ -20,9 +20,7 @@ def _encode_binary(user_id: UUID, wishlist_id: UUID, share_token: str = "") -> s
 
 
 def test_decode_binary_with_share_token() -> None:
-    decoded = decode_wishlist_start_param(
-        _encode_binary(USER_ID, WISHLIST_ID, "abc123")
-    )
+    decoded = decode_wishlist_start_param(_encode_binary(USER_ID, WISHLIST_ID, "abc123"))
     assert decoded is not None
     assert decoded.user_id == USER_ID
     assert decoded.wishlist_id == WISHLIST_ID
@@ -43,9 +41,7 @@ def test_decode_rejects_garbage() -> None:
 
 
 def test_encode_roundtrips_public() -> None:
-    decoded = decode_wishlist_start_param(
-        encode_wishlist_start_param(USER_ID, WISHLIST_ID)
-    )
+    decoded = decode_wishlist_start_param(encode_wishlist_start_param(USER_ID, WISHLIST_ID))
     assert decoded is not None
     assert decoded.user_id == USER_ID
     assert decoded.wishlist_id == WISHLIST_ID
@@ -54,9 +50,7 @@ def test_encode_roundtrips_public() -> None:
 
 def test_encode_roundtrips_private_with_token() -> None:
     token = "tok_ABC-123_xyz"
-    decoded = decode_wishlist_start_param(
-        encode_wishlist_start_param(USER_ID, WISHLIST_ID, token)
-    )
+    decoded = decode_wishlist_start_param(encode_wishlist_start_param(USER_ID, WISHLIST_ID, token))
     assert decoded is not None
     assert decoded.share_token == token
 
@@ -72,9 +66,7 @@ def test_encode_roundtrips_private_with_token() -> None:
 )
 def test_share_message_escapes_html_in_title(evil_title: str) -> None:
     start_param = encode_wishlist_start_param(USER_ID, WISHLIST_ID)
-    message = _build_wishlist_share_message(
-        start_param, evil_title, "Here, see my wishlist:"
-    )
+    message = _build_wishlist_share_message(start_param, evil_title, "Here, see my wishlist:")
 
     # no attacker markup survives; only our single anchor tag is emitted
     assert "<script" not in message
