@@ -307,9 +307,7 @@ async def test_handle_wishlist_created_notifies_followers() -> None:
         username="bob",
         language_code="en",
     )
-    wishlist = SimpleNamespace(
-        id=wishlist_id, title="My Birthday List", visibility="public"
-    )
+    wishlist = SimpleNamespace(id=wishlist_id, title="My Birthday List", visibility="public")
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(follower_tg_id, "en")])
     bot = AsyncMock()
@@ -348,9 +346,7 @@ async def test_handle_wishlist_created_skips_private_wishlist() -> None:
         username="bob",
         language_code="en",
     )
-    wishlist = SimpleNamespace(
-        id=wishlist_id, title="Secret List", visibility="private"
-    )
+    wishlist = SimpleNamespace(id=wishlist_id, title="Secret List", visibility="private")
 
     db = _fake_db_wishlist_created(owner, wishlist, followers=[(888, "en")])
     bot = AsyncMock()
@@ -575,9 +571,7 @@ async def test_worker_dispatches_followed_event() -> None:
 
     with patch.object(worker_module, "_HANDLERS", {"FOLLOWED": fake_handle_followed}):
         task = asyncio.create_task(
-            run_notification_worker(
-                redis, bot, session_factory, "https://app.example.com"
-            )
+            run_notification_worker(redis, bot, session_factory, "https://app.example.com")
         )
         await asyncio.sleep(0)
         task.cancel()

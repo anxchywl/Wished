@@ -32,16 +32,12 @@ def test_list_wishes_returns_wishlist_wishes(monkeypatch) -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
     app.dependency_overrides[get_redis] = _rate_limit_redis
 
-    async def fake_list_wishlist_wishes(
-        db, current_user, requested_wishlist_id, **kwargs
-    ):
+    async def fake_list_wishlist_wishes(db, current_user, requested_wishlist_id, **kwargs):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         return {"items": [_wish(wishlist_id=wishlist_id)]}
 
-    monkeypatch.setattr(
-        "app.api.v1.wishes.router.list_wishlist_wishes", fake_list_wishlist_wishes
-    )
+    monkeypatch.setattr("app.api.v1.wishes.router.list_wishlist_wishes", fake_list_wishlist_wishes)
 
     response = TestClient(app).get(f"/api/v1/wishlists/{wishlist_id}/wishes")
 
@@ -102,9 +98,7 @@ def test_patch_wish_can_move_between_wishlists(monkeypatch) -> None:
     app.dependency_overrides[get_db_session] = lambda: object()
     app.dependency_overrides[get_redis] = _rate_limit_redis
 
-    async def fake_update_wish(
-        db, current_user, requested_wish_id, payload, redis=None
-    ):
+    async def fake_update_wish(db, current_user, requested_wish_id, payload, redis=None):
         assert current_user is user
         assert requested_wish_id == wish_id
         assert payload.wishlist_id == target_wishlist_id
@@ -129,9 +123,7 @@ def test_patch_wish_reorder_uses_payload(monkeypatch) -> None:
     app.dependency_overrides[get_current_user] = lambda: user
     app.dependency_overrides[get_db_session] = lambda: object()
 
-    async def fake_reorder_wishes(
-        db, current_user, requested_wishlist_id, payload, redis=None
-    ):
+    async def fake_reorder_wishes(db, current_user, requested_wishlist_id, payload, redis=None):
         assert current_user is user
         assert requested_wishlist_id == wishlist_id
         assert payload.wish_ids == wish_ids

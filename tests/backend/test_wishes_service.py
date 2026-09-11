@@ -36,9 +36,7 @@ class FakeDb:
 async def test_create_fulfilled_record_for_booking_and_cancel_reservation() -> None:
     owner_id = uuid4()
     reserver_id = uuid4()
-    wish = SimpleNamespace(
-        id=uuid4(), wishlist_id=uuid4(), title="Lamp", group_gift=None
-    )
+    wish = SimpleNamespace(id=uuid4(), wishlist_id=uuid4(), title="Lamp", group_gift=None)
     reservation = SimpleNamespace(reserver_user_id=reserver_id, status="active")
     db = FakeDb(None, reservation)
 
@@ -81,9 +79,7 @@ async def test_create_fulfilled_records_for_group_gift_archives_participants() -
         contributions=[contribution],
         approvals=[approval],
     )
-    wish = SimpleNamespace(
-        id=uuid4(), wishlist_id=uuid4(), title="Lamp", group_gift=gift
-    )
+    wish = SimpleNamespace(id=uuid4(), wishlist_id=uuid4(), title="Lamp", group_gift=gift)
     reservation = SimpleNamespace(status="active")
     db = FakeDb(gift, reservation)
 
