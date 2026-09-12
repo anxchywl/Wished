@@ -149,7 +149,7 @@ muto.anxchywl.dev {
         max_size 10MB
     }
 
-    reverse_proxy muto-backend-1:8000
+    reverse_proxy muto-api:8000
 
     log {
         output stderr
@@ -177,7 +177,7 @@ gradus.anxchywl.dev {
         max_size 6MB
     }
 
-    reverse_proxy gradus-backend-1:8000
+    reverse_proxy gradus-api:8000
 
     log {
         output stderr

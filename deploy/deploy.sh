@@ -46,7 +46,13 @@ docker compose "${COMPOSE_ARGS[@]}" run --rm backend alembic upgrade head
 
 log "Bringing services up (preserving all volumes)..."
 # --remove-orphans cleans renamed services; -d is detached; no -v anywhere
+# (this is scoped to -p wished, so other projects' containers on the shared
+# network are not touched)
 docker compose "${COMPOSE_ARGS[@]}" up -d --remove-orphans
+
+log "Checking Caddy upstreams are unambiguous..."
+# paths here are repo-root relative, like COMPOSE_FILE above
+bash scripts/check-caddy-upstreams.sh
 
 log "Deployment complete."
 docker compose "${COMPOSE_ARGS[@]}" ps
