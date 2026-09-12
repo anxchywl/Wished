@@ -35,20 +35,24 @@
         max_size 10MB
     }
 
-    # API requests to the backend
+    # API requests to the backend.
+    # Upstreams are container names, not compose service names: this host runs
+    # several compose projects on the shared wished_wished-app network, and
+    # muto/gradus each publish the alias "backend" there too, so "backend:8000"
+    # round-robins across all three and most API calls 404 on a foreign app.
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy wished-backend:8000
     }
 
     # MinIO media objects — presigned URLs use this origin as the public endpoint.
     # Set MINIO_PUBLIC_ENDPOINT=https://{$CADDY_DOMAIN} so generated URLs resolve here.
     handle /wished-media/* {
-        reverse_proxy minio:9000
+        reverse_proxy wished-minio:9000
     }
 
     # Everything else goes to the frontend
     handle {
-        reverse_proxy frontend:3000
+        reverse_proxy wished-frontend:3000
     }
 
     log {
