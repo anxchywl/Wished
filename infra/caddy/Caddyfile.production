@@ -122,7 +122,7 @@ loci.anxchywl.dev {
     }
 
     handle {
-        reverse_proxy loci-web-1:3000
+        reverse_proxy loci-web:3000
     }
 
     log {
