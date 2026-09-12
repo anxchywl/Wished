@@ -1,3 +1,26 @@
+# This file fronts five separate compose projects on one host: wished, loci,
+# muto, gradus and events_bot. Every project reaches Caddy over the shared
+# wished_wished-app network.
+#
+# Rule for this file: address every upstream by CONTAINER NAME, never by a bare
+# compose service name. Compose always registers a service's own name as a
+# network alias and gives no way to suppress it, so two projects that each
+# name a service the same thing make that name ambiguous on the shared network
+# — Docker's embedded DNS then round-robins and requests land on whichever app
+# answers. Nothing errors; the wrong app simply 404s a route it never had.
+#
+# This is not hypothetical. On 2026-09-12 `backend` resolved to three
+# containers (wished, muto, gradus) and roughly two of every three Wished API
+# calls — including POST /auth/telegram — were answered by Muto or Gradus,
+# which broke Telegram login intermittently for everyone. `web` was ambiguous
+# the same way between loci and events_bot, harmless only because both site
+# blocks below already used container names.
+#
+# Those services have since been renamed to muto-api, gradus-api, loci-web and
+# events-web, so no name on the network is ambiguous today. The rule stands
+# anyway: it is what keeps the next project added here from resurrecting the
+# bug. scripts/check-caddy-upstreams.sh enforces it on every deploy.
+
 # Global options: connection/slow-attack hardening at the edge.
 # read_header guards against Slowloris (slow header dribbling); read_body
 # guards slow-body POST floods; idle reaps idle keep-alive connections so
@@ -35,11 +58,7 @@
         max_size 10MB
     }
 
-    # API requests to the backend.
-    # Upstreams are container names, not compose service names: this host runs
-    # several compose projects on the shared wished_wished-app network, and
-    # muto/gradus each publish the alias "backend" there too, so "backend:8000"
-    # round-robins across all three and most API calls 404 on a foreign app.
+    # API requests to the backend (container name — see the note at the top)
     handle /api/* {
         reverse_proxy wished-backend:8000
     }
