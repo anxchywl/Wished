@@ -1,3 +1,26 @@
+# This file fronts five separate compose projects on one host: wished, loci,
+# muto, gradus and events_bot. Every project reaches Caddy over the shared
+# wished_wished-app network.
+#
+# Rule for this file: address every upstream by CONTAINER NAME, never by a bare
+# compose service name. Compose always registers a service's own name as a
+# network alias and gives no way to suppress it, so two projects that each
+# name a service the same thing make that name ambiguous on the shared network
+# — Docker's embedded DNS then round-robins and requests land on whichever app
+# answers. Nothing errors; the wrong app simply 404s a route it never had.
+#
+# This is not hypothetical. On 2026-09-12 `backend` resolved to three
+# containers (wished, muto, gradus) and roughly two of every three Wished API
+# calls — including POST /auth/telegram — were answered by Muto or Gradus,
+# which broke Telegram login intermittently for everyone. `web` was ambiguous
+# the same way between loci and events_bot, harmless only because both site
+# blocks below already used container names.
+#
+# Those services have since been renamed to muto-api, gradus-api, loci-web and
+# events-web, so no name on the network is ambiguous today. The rule stands
+# anyway: it is what keeps the next project added here from resurrecting the
+# bug. scripts/check-caddy-upstreams.sh enforces it on every deploy.
+
 # Global options: connection/slow-attack hardening at the edge.
 # read_header guards against Slowloris (slow header dribbling); read_body
 # guards slow-body POST floods; idle reaps idle keep-alive connections so
@@ -35,20 +58,20 @@
         max_size 10MB
     }
 
-    # API requests to the backend
+    # API requests to the backend (container name — see the note at the top)
     handle /api/* {
-        reverse_proxy backend:8000
+        reverse_proxy wished-backend:8000
     }
 
     # MinIO media objects — presigned URLs use this origin as the public endpoint.
     # Set MINIO_PUBLIC_ENDPOINT=https://{$CADDY_DOMAIN} so generated URLs resolve here.
     handle /wished-media/* {
-        reverse_proxy minio:9000
+        reverse_proxy wished-minio:9000
     }
 
     # Everything else goes to the frontend
     handle {
-        reverse_proxy frontend:3000
+        reverse_proxy wished-frontend:3000
     }
 
     log {
@@ -118,7 +141,7 @@ loci.anxchywl.dev {
     }
 
     handle {
-        reverse_proxy loci-web-1:3000
+        reverse_proxy loci-web:3000
     }
 
     log {
@@ -145,7 +168,7 @@ muto.anxchywl.dev {
         max_size 10MB
     }
 
-    reverse_proxy muto-backend-1:8000
+    reverse_proxy muto-api:8000
 
     log {
         output stderr
@@ -173,7 +196,7 @@ gradus.anxchywl.dev {
         max_size 6MB
     }
 
-    reverse_proxy gradus-backend-1:8000
+    reverse_proxy gradus-api:8000
 
     log {
         output stderr
