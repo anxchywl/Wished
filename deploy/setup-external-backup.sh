@@ -6,6 +6,8 @@
 # After running this script, copy the printed env vars into your production .env.
 set -euo pipefail
 
+MC_IMAGE="quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727"
+
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 err() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2; exit 1; }
 
@@ -82,18 +84,18 @@ log "Testing connection to ${S3_ENDPOINT} ..."
 
 # Use the mc client from the backup image to test the connection
 docker run --rm \
-    minio/mc \
+    "$MC_IMAGE" \
     alias set test-external "${S3_ENDPOINT}" "${S3_ACCESS_KEY}" "${S3_SECRET_KEY}" \
     >/dev/null 2>&1 || err "Failed to configure mc alias — check endpoint and credentials."
 
 log "Testing bucket access: ${S3_BUCKET} ..."
 
-if docker run --rm minio/mc ls "test-external/${S3_BUCKET}" >/dev/null 2>&1; then
+if docker run --rm "$MC_IMAGE" ls "test-external/${S3_BUCKET}" >/dev/null 2>&1; then
     log "Bucket exists and is accessible."
 else
     log "Bucket not found — attempting to create: ${S3_BUCKET} ..."
     docker run --rm \
-        minio/mc \
+        "$MC_IMAGE" \
         mb "test-external/${S3_BUCKET}" 2>&1 \
         || err "Could not create bucket. Create it manually in your provider's console and re-run."
     log "Bucket created: ${S3_BUCKET}"
@@ -104,12 +106,12 @@ TEST_FILE=$(mktemp)
 echo "wished-backup-test-$(date -u +%Y%m%d%H%M%S)" > "${TEST_FILE}"
 docker run --rm \
     -v "${TEST_FILE}:/tmp/test-object" \
-    minio/mc \
+    "$MC_IMAGE" \
     cp /tmp/test-object "test-external/${S3_BUCKET}/.connection-test" \
     >/dev/null 2>&1 || err "Write test failed — check bucket permissions."
 rm -f "${TEST_FILE}"
 
-docker run --rm minio/mc rm "test-external/${S3_BUCKET}/.connection-test" >/dev/null 2>&1 || true
+docker run --rm "$MC_IMAGE" rm "test-external/${S3_BUCKET}/.connection-test" >/dev/null 2>&1 || true
 
 log "Connection and write test passed."
 
