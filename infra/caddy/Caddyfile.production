@@ -1,5 +1,5 @@
-# This file fronts five separate compose projects on one host: wished, loci,
-# muto, gradus and events_bot. Every project reaches Caddy over the shared
+# This file fronts six separate compose projects on one host: wished, loci,
+# muto, gradus, events_bot and gdg. Every project reaches Caddy over the shared
 # wished_wished-app network.
 #
 # Rule for this file: address every upstream by CONTAINER NAME, never by a bare
@@ -197,6 +197,26 @@ gradus.anxchywl.dev {
     }
 
     reverse_proxy gradus-api:8000
+
+    log {
+        output stderr
+        format json
+    }
+}
+
+# GDG datathon sponsorship site (separate compose project: gdg).
+# A static Caddy container; it sets its own CSP and security headers.
+gdg.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
+
+    request_body {
+        max_size 1KB
+    }
+
+    reverse_proxy gdg-web:8080
 
     log {
         output stderr
