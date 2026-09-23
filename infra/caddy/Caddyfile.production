@@ -1,6 +1,6 @@
-# This file fronts six separate compose projects on one host: wished, loci,
-# muto, gradus, events_bot and gdg. Every project reaches Caddy over the shared
-# wished_wished-app network.
+# This file fronts seven separate compose projects on one host: wished, loci,
+# muto, gradus, events_bot, gdg and clavis. Every project reaches Caddy over the
+# shared wished_wished-app network.
 #
 # Rule for this file: address every upstream by CONTAINER NAME, never by a bare
 # compose service name. Compose always registers a service's own name as a
@@ -217,6 +217,29 @@ gdg.anxchywl.dev {
     }
 
     reverse_proxy gdg-web:8080
+
+    log {
+        output stderr
+        format json
+    }
+}
+
+# Clavis piano room booking API (separate compose project: clavis).
+# The service sets its own security headers; a booking body is a slot id.
+clavis.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    request_body {
+        max_size 64KB
+    }
+
+    reverse_proxy clavis-api:8000
 
     log {
         output stderr
