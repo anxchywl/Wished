@@ -246,3 +246,24 @@ clavis.anxchywl.dev {
         format json
     }
 }
+
+# iter Telegram Mini App (separate compose project: iter). Append to the shared
+# Caddyfile. Only iter-web joins wished_wished-app; the api and database stay
+# on iter's internal networks. No X-Frame-Options: Telegram Web embeds the app
+# in an iframe, and the site's own CSP frame-ancestors limits that to telegram.
+# No access log: launch URLs carry Telegram start parameters.
+iter.anxchywl.dev {
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+        -X-Powered-By
+    }
+
+    encode zstd gzip
+
+    request_body {
+        max_size 64KB
+    }
+
+    reverse_proxy iter-web:3000
+}
