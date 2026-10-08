@@ -106,8 +106,10 @@ services:
       - wished-data
 
   minio:
-    # docker hub no longer hosts minio images
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    # minio stopped publishing images; chainguard rebuilds the same binary
+    image: cgr.dev/chainguard/minio:latest@sha256:59667194421209c2c1eacbe761e24787e047985c5dfa96b15da9b59fe9b55cd0
+    # the old image ran as root and owns the existing volume
+    user: "0:0"
     container_name: wished-minio
     command: server /data --console-address ":9001"
     environment:
