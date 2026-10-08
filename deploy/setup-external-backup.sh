@@ -6,7 +6,7 @@
 # After running this script, copy the printed env vars into your production .env.
 set -euo pipefail
 
-MC_IMAGE="quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727"
+MC_IMAGE="cgr.dev/chainguard/minio-client:latest@sha256:7a5387f27d1aa8fc11286acde9e024b7b1b77585e17c36378552eeafcccf2ba3"
 
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 err() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ERROR: $*" >&2; exit 1; }
